@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>LastValidatedAt__c</fullName>
+    <label>Last Validated At</label>
+    <description>Timestamp of the most recent successful Test Connection. Null means the key has never been validated.</description>
+    <type>DateTime</type>
+</CustomField>

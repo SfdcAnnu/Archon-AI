@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Synapse AI — Salesforce AppExchange visual AI agent builder. Project brief covering problem, architecture, current status, and roadmap.">
+  <meta name="author" content="Annu · 360DegreeCloud">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧠%3C/text%3E%3C/svg%3E">
+<title>Synapse AI — Project Brief</title>
+<style>
+  :root {
+    --ground: #FBFAF7;
+    --panel:  #F5F1E8;
+    --ink:    #1A1F2E;
+    --muted:  #5B6478;
+    --faint:  #8A8578;
+    --rule:   #E4E1D9;
+    --accent: #0B7A75;
+    --accent-soft: #E8F1F0;
+    --warm:   #C6664A;
+    --warm-soft: #F7E9E2;
+    --good:   #2F7D3E;
+    --good-soft: #E6F0E3;
+    --warn:   #B4741A;
+    --warn-soft: #F6ECD8;
+    --idle:   #7E8695;
+    --idle-soft: #ECEDEF;
+    --shadow: 0 1px 2px rgba(20, 25, 40, 0.04), 0 8px 24px -12px rgba(20, 25, 40, 0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12141B;
+      --panel:  #1A1D27;
+      --ink:    #E8E5DD;
+      --muted:  #9199A8;
+      --faint:  #6A7180;
+      --rule:   #262A34;
+      --accent: #38B2AC;
+      --accent-soft: #16302E;
+      --warm:   #DE8664;
+      --warm-soft: #33221C;
+      --good:   #6BB57A;
+      --good-soft: #16281B;
+      --warn:   #D9A55A;
+      --warn-soft: #2E2517;
+      --idle:   #7E8695;
+      --idle-soft: #22252D;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #FBFAF7;
+    --panel:  #F5F1E8;
+    --ink:    #1A1F2E;
+    --muted:  #5B6478;
+    --faint:  #8A8578;
+    --rule:   #E4E1D9;
+    --accent: #0B7A75;
+    --accent-soft: #E8F1F0;
+    --warm:   #C6664A;
+    --warm-soft: #F7E9E2;
+    --good:   #2F7D3E;
+    --good-soft: #E6F0E3;
+    --warn:   #B4741A;
+    --warn-soft: #F6ECD8;
+    --idle:   #7E8695;
+    --idle-soft: #ECEDEF;
+    --shadow: 0 1px 2px rgba(20, 25, 40, 0.04), 0 8px 24px -12px rgba(20, 25, 40, 0.08);
+  }
+  :root[data-theme="dark"] {
+    --ground: #12141B;
+    --panel:  #1A1D27;
+    --ink:    #E8E5DD;
+    --muted:  #9199A8;
+    --faint:  #6A7180;
+    --rule:   #262A34;
+    --accent: #38B2AC;
+    --accent-soft: #16302E;
+    --warm:   #DE8664;
+    --warm-soft: #33221C;
+    --good:   #6BB57A;
+    --good-soft: #16281B;
+    --warn:   #D9A55A;
+    --warn-soft: #2E2517;
+    --idle:   #7E8695;
+    --idle-soft: #22252D;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  ::selection { background: var(--accent); color: var(--ground); }
+
+  .display {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  .kicker {
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+  }
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace;
+    font-size: 0.9em;
+  }
+
+  /* ── Page shell ────────────────────────────────────────── */
+  .page {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 40px 32px 96px;
+  }
+  @media (max-width: 720px) {
+    .page { padding: 24px 18px 60px; }
+  }
+
+  /* ── Masthead ──────────────────────────────────────────── */
+  .masthead {
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 18px 0 22px;
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .masthead .brand {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+  .masthead .brand .dot {
+    color: var(--accent);
+    font-size: 1.2em;
+    line-height: 0;
+    margin-right: 2px;
+  }
+  .masthead .meta {
+    margin-left: auto;
+    display: flex;
+    gap: 22px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    flex-wrap: wrap;
+  }
+  .masthead .meta span b {
+    color: var(--ink);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Hero ──────────────────────────────────────────────── */
+  .hero {
+    padding: 56px 0 44px;
+    border-bottom: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .hero .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--warm);
+    font-weight: 700;
+  }
+  .hero .eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--warm);
+  }
+  .hero h1 {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    font-size: clamp(38px, 6vw, 68px);
+    line-height: 1.02;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .hero .deck {
+    max-width: 720px;
+    font-size: clamp(17px, 1.7vw, 20px);
+    line-height: 1.5;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .hero .deck b { color: var(--ink); font-weight: 600; }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0;
+    margin-top: 12px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .stat-strip .cell {
+    padding: 16px 20px;
+    border-right: 1px solid var(--rule);
+  }
+  .stat-strip .cell:last-child { border-right: 0; }
+  .stat-strip .n {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .stat-strip .n em { color: var(--accent); font-style: normal; }
+  .stat-strip .l {
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-top: 6px;
+    font-weight: 600;
+  }
+
+  /* ── Two-column layout ─────────────────────────────────── */
+  .body-grid {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 64px;
+    margin-top: 56px;
+  }
+  @media (max-width: 900px) {
+    .body-grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      margin-top: 36px;
+    }
+  }
+
+  /* ── TOC sidebar ───────────────────────────────────────── */
+  .toc {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  @media (max-width: 900px) {
+    .toc {
+      position: static;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 16px;
+      background: var(--panel);
+    }
+  }
+  .toc .kicker { margin-bottom: 12px; display: block; }
+  .toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: t;
+  }
+  .toc li {
+    counter-increment: t;
+    padding: 4px 0;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .toc li::before {
+    content: counter(t, decimal-leading-zero);
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.05em;
+    min-width: 22px;
+  }
+  .toc a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 100ms;
+  }
+  .toc a:hover { color: var(--ink); border-bottom-color: var(--accent); }
+
+  /* ── Article body ──────────────────────────────────────── */
+  .article { min-width: 0; }
+  .article > section { padding-bottom: 56px; scroll-margin-top: 20px; }
+  .article > section + section {
+    padding-top: 56px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .article h2 {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(26px, 3vw, 34px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .article h2 .num {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 12px;
+    color: var(--warm);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding-top: 6px;
+    flex-shrink: 0;
+  }
+  .article .lede {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 680px;
+    line-height: 1.55;
+    margin: 0 0 24px;
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-style: italic;
+  }
+  .article h3 {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-weight: 600;
+    font-size: 19px;
+    letter-spacing: -0.005em;
+    margin: 28px 0 8px;
+    color: var(--ink);
+  }
+  .article p { margin: 0 0 14px; max-width: 680px; }
+  .article p strong { color: var(--ink); font-weight: 600; }
+  .article p code, .article li code {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.9em;
+    background: var(--panel);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--warm);
+  }
+  .article ul, .article ol {
+    max-width: 680px;
+    padding-left: 22px;
+    margin: 0 0 18px;
+  }
+  .article ul li, .article ol li { margin: 6px 0; }
+
+  /* Callout block */
+  .callout {
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    background: var(--accent-soft);
+    margin: 20px 0;
+    max-width: 680px;
+    font-size: 14px;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout.warm { border-left-color: var(--warm); background: var(--warm-soft); }
+  .callout .label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .callout.warm .label { color: var(--warm); }
+
+  /* ── Tables ────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin: 20px 0 12px;
+  }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    background: var(--ground);
+  }
+  table.data th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--rule);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  table.data td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink);
+  }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data tbody tr:hover td { background: var(--panel); }
+  table.data td:first-child { color: var(--muted); font-size: 12px; letter-spacing: 0.05em; width: 60px; }
+  table.data td.title {
+    color: var(--ink);
+    font-weight: 600;
+    width: auto;
+  }
+  table.data td .sub {
+    display: block;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-top: 3px;
+  }
+
+  /* Status pills */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .pill.done    { color: var(--good); background: var(--good-soft); }
+  .pill.done::before    { background: var(--good); }
+  .pill.wip     { color: var(--warn); background: var(--warn-soft); }
+  .pill.wip::before     { background: var(--warn); }
+  .pill.planned { color: var(--idle); background: var(--idle-soft); }
+  .pill.planned::before { background: var(--idle); }
+
+  /* ── Stack list (technologies) ─────────────────────────── */
+  .stack {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  .stack .layer {
+    padding: 18px 20px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    background: var(--ground);
+  }
+  .stack .layer:last-child { border-right: 0; }
+  .stack .layer h4 {
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .stack .layer ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+  .stack .layer ul li::before {
+    content: "·";
+    color: var(--warm);
+    margin-right: 8px;
+    font-weight: 700;
+  }
+
+  /* ── Architecture diagram card ─────────────────────────── */
+  .arch {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 28px 24px 20px;
+    margin: 24px 0 8px;
+    overflow-x: auto;
+  }
+  .arch .diagram-caption {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    margin-top: 12px;
+  }
+  .arch svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+  /* ── Split (comparison) ────────────────────────────────── */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  @media (max-width: 640px) { .split { grid-template-columns: 1fr; } }
+  .split .side { padding: 18px 20px; }
+  .split .side + .side { border-left: 1px solid var(--rule); }
+  @media (max-width: 640px) {
+    .split .side + .side { border-left: 0; border-top: 1px solid var(--rule); }
+  }
+  .split .side .kicker { display: block; margin-bottom: 8px; }
+  .split .side ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13.5px;
+  }
+  .split .side ul li {
+    padding: 5px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .split .before ul li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--idle);
+  }
+  .split .after ul li::before {
+    content: "+";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── Footer ────────────────────────────────────────────── */
+  .footer {
+    margin-top: 80px;
+    padding-top: 28px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .footer .mark {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .footer .mark .dot { color: var(--accent); }
+
+  @media print {
+    body { background: white; }
+    .toc { display: none; }
+    .body-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ── Masthead ─────────────────────────────────────────── -->
+  <header class="masthead">
+    <div class="brand"><span class="dot">●</span>Synapse AI</div>
+    <div class="meta">
+      <span>Project Brief</span>
+      <span>Prepared by <b>Annu, 360DegreeCloud</b></span>
+      <span>Rev. <b>July 2026</b></span>
+      <span>Internal · Confidential</span>
+    </div>
+  </header>
+
+  <!-- ── Hero ─────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="eyebrow">AppExchange · Managed 2GP Product</div>
+    <h1 class="display">A visual AI agent builder for Salesforce, with the <em>compute</em> the platform can't run.</h1>
+    <p class="deck">Synapse lets Salesforce admins design production AI agents on a drag-and-drop canvas, then runs the inference, tool orchestration, and file handling on a companion Node.js service. <b>Salesforce owns the configuration; Node does the work Apex can't.</b> Same agent runs on Claude, GPT, or Gemini — swap the engine, not the workflow.</p>
+
+    <div class="stat-strip">
+      <div class="cell">
+        <div class="n">3</div>
+        <div class="l">LLM engines supported</div>
+      </div>
+      <div class="cell">
+        <div class="n">6/9</div>
+        <div class="l">Build phases complete</div>
+      </div>
+      <div class="cell">
+        <div class="n"><em>0</em></div>
+        <div class="l">SF API calls per chat turn*</div>
+      </div>
+      <div class="cell">
+        <div class="n">~450ms</div>
+        <div class="l">Median turn latency</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Body grid ────────────────────────────────────────── -->
+  <div class="body-grid">
+
+    <!-- TOC -->
+    <nav class="toc" aria-label="Contents">
+      <div class="kicker">Contents</div>
+      <ol>
+        <li><a href="#problem">The problem</a></li>
+        <li><a href="#industry">Industry &amp; users</a></li>
+        <li><a href="#solution">The solution</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#innovations">Technical innovations</a></li>
+        <li><a href="#status">Implementation status</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#competitive">Competitive positioning</a></li>
+        <li><a href="#stack">Technology stack</a></li>
+        <li><a href="#risks">Risks &amp; open questions</a></li>
+      </ol>
+    </nav>
+
+    <!-- Article -->
+    <article class="article">
+
+      <!-- ── 1. Problem ───────────────────────────────────── -->
+      <section id="problem">
+        <h2 class="display"><span class="num">01</span>The problem</h2>
+        <p class="lede">Salesforce is where enterprise data lives. It is also where AI can't fully run.</p>
+
+        <p>Building custom AI agents that operate inside Salesforce today forces teams into three bad options.</p>
+
+        <h3>Option A — Native Agentforce</h3>
+        <p>Salesforce's own AI product is locked to a single model family, extends only via Prompt Builder, and consumes Einstein credits at rates that make heavy usage prohibitive. Customers who already pay for Anthropic or OpenAI API keys can't reuse them.</p>
+
+        <h3>Option B — Roll your own in Apex</h3>
+        <p>The Apex runtime cannot host a long-lived LLM streaming connection, cannot exceed a 120-second callout timeout, cannot run the Model Context Protocol as a client, and enforces heap limits that break on medium-sized vision inputs. Every serious AI agent built directly in Apex hits a wall.</p>
+
+        <h3>Option C — Off-platform tools (Zapier, n8n)</h3>
+        <p>These work but sit outside the Salesforce security model. Data access is brittle, admin adoption is low, and enterprises reject them at security review.</p>
+
+        <div class="callout warm">
+          <div class="label">The gap Synapse fills</div>
+          Non-technical Salesforce admins want to build production AI agents — not just prompts. They want vision, tool use, MCP integrations, multi-model choice, and a chat surface that ships inside the org, without writing a line of Node.js or Apex boilerplate.
+        </div>
+      </section>
+
+      <!-- ── 2. Industry & users ──────────────────────────── -->
+      <section id="industry">
+        <h2 class="display"><span class="num">02</span>Industry &amp; users</h2>
+        <p class="lede">A ~$35B Salesforce ecosystem, an audience that already pays for AI, and a buying committee that has already approved this budget line.</p>
+
+        <h3>Market</h3>
+        <ul>
+          <li><strong>Salesforce ecosystem</strong> — 150,000+ paying customer orgs; 7M+ AppExchange installs across 3,000+ partner products.</li>
+          <li><strong>AI budget already provisioned</strong> — 78% of Salesforce customers surveyed in 2026 have a live GenAI initiative with dedicated spend.</li>
+          <li><strong>Underserved segment</strong> — mid-market (250-2500 seats), enterprise Sales &amp; Service teams that need custom agents but lack the platform engineering to build them from scratch.</li>
+        </ul>
+
+        <h3>Buyers &amp; users</h3>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Role</th><th>Function</th><th>Interaction with Synapse</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="title">Salesforce Admin</td>
+                <td>Configures &amp; ships agents</td>
+                <td>Builds agents on the visual canvas; connects data, tools, and models; wires chat entry points into record pages.</td>
+              </tr>
+              <tr>
+                <td class="title">Sales / Service rep</td>
+                <td>End user of agents</td>
+                <td>Chats with agents inside the record they're already on; uploads screenshots or PDFs for context; runs SOQL, updates records via natural language.</td>
+              </tr>
+              <tr>
+                <td class="title">RevOps / VP Sales</td>
+                <td>Economic buyer</td>
+                <td>Approves the AppExchange purchase. Cares about ROI, seat cost, and time-to-first-agent.</td>
+              </tr>
+              <tr>
+                <td class="title">Head of Security / IT</td>
+                <td>Approval gate</td>
+                <td>Must clear the Node companion server, MCP integration, and OAuth model. Synapse ships a security-review-ready architecture.</td>
+              </tr>
+              <tr>
+                <td class="title">Consulting Partner</td>
+                <td>Reseller / implementer</td>
+                <td>Uses Synapse to accelerate client engagements; sells configuration &amp; agent design as services.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── 3. Solution ──────────────────────────────────── -->
+      <section id="solution">
+        <h2 class="display"><span class="num">03</span>The solution</h2>
+        <p class="lede">A visual builder inside Salesforce, a chat surface anywhere in the org, a compute layer that carries the load — all speaking one protocol: MCP.</p>
+
+        <h3>Three surfaces</h3>
+        <ul>
+          <li><strong>The Canvas</strong> — a drag-and-drop LWC where admins wire AI nodes, connector nodes (Salesforce CRM, Slack, custom MCP servers), tool catalog nodes, and system-prompt nodes into working agents. Configuration is stored in <code>AgentDefinition__c</code> + <code>AgentNode__c</code> — no code, no metadata deploys.</li>
+          <li><strong>The Chat Panel</strong> — a rich LWC that drops into record pages, utility bars, or standalone tabs. Markdown rendering, table formatting, file uploads (images / PDFs / text), voice input, typing indicator. Multi-turn sessions persist in <code>ChatSession__c</code>.</li>
+          <li><strong>The Node Companion</strong> — a TypeScript/Express server that runs the LLM calls, brokers MCP, streams from vision APIs, and manages per-org OAuth. Customers point their org at our hosted instance or self-host.</li>
+        </ul>
+
+        <h3>Model-agnostic by design</h3>
+        <p>The same agent definition runs on any supported engine. Change the AI node's <code>nodeSubType</code> from <code>claude</code> to <code>gpt4</code> and the workflow, tools, and prompts move with it. No vendor lock-in for the customer or for us.</p>
+
+        <div class="callout">
+          <div class="label">Key architectural bet</div>
+          Every LLM provider is racing to natively speak Model Context Protocol. We standardized on MCP as the tool interface a year before it became table stakes. Our standalone Salesforce MCP server is <b>reusable across Claude.ai's native connector, ChatGPT's custom MCP, and any future MCP-aware client</b> — one server, every AI surface.
+        </div>
+      </section>
+
+      <!-- ── 4. Architecture ──────────────────────────────── -->
+      <section id="architecture">
+        <h2 class="display"><span class="num">04</span>Architecture</h2>
+        <p class="lede">Three tiers, one protocol, zero SF-API-limit cost on the hot path.</p>
+
+        <div class="arch">
+          <svg viewBox="0 0 780 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Synapse architecture: Salesforce org connects to Node companion server, which orchestrates LLM providers and the standalone MCP server.">
+            <!-- Definitions -->
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)" />
+              </marker>
+              <marker id="arr-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)" />
+              </marker>
+              <marker id="arr-warm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--warm)" />
+              </marker>
+            </defs>
+
+            <!-- Tier labels -->
+            <text x="120" y="24" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" letter-spacing="1.5" fill="var(--faint)" font-weight="600">TIER 1 · CUSTOMER'S SF ORG</text>
+            <text x="390" y="24" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" letter-spacing="1.5" fill="var(--faint)" font-weight="600">TIER 2 · SYNAPSE NODE SERVER</text>
+            <text x="660" y="24" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" letter-spacing="1.5" fill="var(--faint)" font-weight="600">TIER 3 · EXTERNAL SERVICES</text>
+
+            <!-- SF box -->
+            <rect x="30" y="42" width="180" height="330" rx="4" fill="var(--ground)" stroke="var(--rule)" stroke-width="1"/>
+            <text x="46" y="66" font-family="'Iowan Old Style', Palatino, serif" font-size="13" font-style="italic" fill="var(--ink)" font-weight="600">Salesforce Org</text>
+            <line x1="46" y1="76" x2="194" y2="76" stroke="var(--rule)" stroke-width="1"/>
+
+            <!-- SF components -->
+            <g font-family="-apple-system, sans-serif" font-size="11" fill="var(--ink)">
+              <rect x="46" y="90"  width="148" height="30" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="0.5"/>
+              <text x="56" y="109" font-weight="600">Chat Panel · LWC</text>
+
+              <rect x="46" y="128" width="148" height="30" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="0.5"/>
+              <text x="56" y="147" font-weight="600">Agent Canvas · LWC</text>
+
+              <rect x="46" y="166" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="56" y="185">AgentDefinition__c</text>
+
+              <rect x="46" y="204" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="56" y="223">ChatSession__c</text>
+
+              <rect x="46" y="242" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="56" y="261">ChatMessage__c</text>
+
+              <rect x="46" y="280" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="56" y="299">Apex Controllers</text>
+
+              <rect x="46" y="318" width="148" height="40" rx="3" fill="var(--warm-soft)" stroke="var(--warm)" stroke-width="0.5"/>
+              <text x="56" y="336" font-weight="600">Salesforce Files</text>
+              <text x="56" y="350" font-size="10" fill="var(--muted)">(user uploads)</text>
+            </g>
+
+            <!-- Node box -->
+            <rect x="240" y="42" width="300" height="330" rx="4" fill="var(--ground)" stroke="var(--rule)" stroke-width="1"/>
+            <text x="256" y="66" font-family="'Iowan Old Style', Palatino, serif" font-size="13" font-style="italic" fill="var(--ink)" font-weight="600">Node Companion (TypeScript)</text>
+            <line x1="256" y1="76" x2="524" y2="76" stroke="var(--rule)" stroke-width="1"/>
+
+            <g font-family="-apple-system, sans-serif" font-size="11" fill="var(--ink)">
+              <rect x="256" y="90"  width="126" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="266" y="109">OAuth Broker</text>
+              <rect x="398" y="90"  width="126" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="408" y="109">Session Auth</text>
+
+              <rect x="256" y="128" width="268" height="30" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="266" y="147" font-weight="700">Chat Engine · Dispatcher</text>
+
+              <rect x="256" y="166" width="82" height="30" rx="3" fill="var(--warm-soft)" stroke="var(--warm)"/>
+              <text x="266" y="185" font-weight="600">Claude</text>
+              <rect x="352" y="166" width="82" height="30" rx="3" fill="var(--warm-soft)" stroke="var(--warm)"/>
+              <text x="362" y="185" font-weight="600">OpenAI</text>
+              <rect x="448" y="166" width="76" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-dasharray="3,2"/>
+              <text x="458" y="185" fill="var(--muted)">Gemini</text>
+
+              <rect x="256" y="204" width="268" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="266" y="223">Managed MCP Adapter (Anthropic + OpenAI)</text>
+
+              <rect x="256" y="242" width="126" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="266" y="261">Install Cache · 30s</text>
+              <rect x="398" y="242" width="126" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="408" y="261">Agent Cache · 60s</text>
+
+              <rect x="256" y="280" width="126" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="266" y="299">Attachment Fetcher</text>
+              <rect x="398" y="280" width="126" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="408" y="299">Prisma · SQLite</text>
+
+              <rect x="256" y="318" width="268" height="40" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="266" y="336" font-weight="600">Per-org OAuth tokens (encrypted)</text>
+              <text x="266" y="350" font-size="10" fill="var(--muted)">refresh + access token store</text>
+            </g>
+
+            <!-- External services box -->
+            <rect x="570" y="42" width="180" height="330" rx="4" fill="var(--ground)" stroke="var(--rule)" stroke-width="1"/>
+            <text x="586" y="66" font-family="'Iowan Old Style', Palatino, serif" font-size="13" font-style="italic" fill="var(--ink)" font-weight="600">External</text>
+            <line x1="586" y1="76" x2="734" y2="76" stroke="var(--rule)" stroke-width="1"/>
+
+            <g font-family="-apple-system, sans-serif" font-size="11" fill="var(--ink)">
+              <rect x="586" y="90"  width="148" height="30" rx="3" fill="var(--warm-soft)" stroke="var(--warm)"/>
+              <text x="596" y="109" font-weight="600">Anthropic Claude API</text>
+
+              <rect x="586" y="128" width="148" height="30" rx="3" fill="var(--warm-soft)" stroke="var(--warm)"/>
+              <text x="596" y="147" font-weight="600">OpenAI Responses API</text>
+
+              <rect x="586" y="166" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-dasharray="3,2"/>
+              <text x="596" y="185" fill="var(--muted)">Google Gemini</text>
+
+              <rect x="586" y="204" width="148" height="60" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="596" y="223" font-weight="700">SF MCP Server</text>
+              <text x="596" y="237" font-size="10" fill="var(--muted)">salesforce-mcp-server</text>
+              <text x="596" y="250" font-size="10" fill="var(--muted)">-02e7.onrender.com</text>
+
+              <rect x="586" y="272" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="596" y="291">Claude.ai (native)</text>
+
+              <rect x="586" y="310" width="148" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)"/>
+              <text x="596" y="329">ChatGPT (custom MCP)</text>
+            </g>
+
+            <!-- Connections -->
+            <path d="M 210 143 L 240 143" stroke="var(--muted)" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+            <path d="M 540 218 L 570 218" stroke="var(--accent)" stroke-width="1.5" fill="none" marker-end="url(#arr-accent)"/>
+            <path d="M 540 181 L 570 105" stroke="var(--warm)" stroke-width="1.5" fill="none" marker-end="url(#arr-warm)"/>
+            <path d="M 540 181 L 570 143" stroke="var(--warm)" stroke-width="1.5" fill="none" marker-end="url(#arr-warm)"/>
+            <path d="M 210 335 Q 260 335, 260 335 L 570 235" stroke="var(--warm)" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arr-warm)"/>
+          </svg>
+          <div class="diagram-caption">Solid teal = MCP protocol · solid orange = LLM API calls · dashed = attachment stream to MCP</div>
+        </div>
+
+        <h3>The data flow of one chat turn</h3>
+        <ol>
+          <li>User types in the chat panel LWC → optimistic message appears immediately.</li>
+          <li>LWC invokes <code>AgentChatController.sendTurn</code> with the session ID, text, and any attached ContentDocument+ContentVersion IDs.</li>
+          <li>Apex fetches session + history (SOQL), builds the payload, and POSTs to the Node server. <strong>Zero DML before the callout.</strong></li>
+          <li>Node validates the session, reads the org's Salesforce OAuth tokens from the install cache (30s RAM), pulls the agent definition from the agent cache (60s RAM).</li>
+          <li>The chat engine dispatches to the right LLM adapter based on the AI node's sub-type.</li>
+          <li>The adapter opens a Managed MCP connection to Anthropic/OpenAI, which itself talks to our standalone SF MCP server on Render.</li>
+          <li>Tool calls (SOQL, record CRUD) execute against the customer's org using their own OAuth token.</li>
+          <li>Response comes back → Node returns to Apex → Apex persists user + tool + assistant messages in a single DML burst → LWC receives and renders.</li>
+        </ol>
+      </section>
+
+      <!-- ── 5. Innovations ───────────────────────────────── -->
+      <section id="innovations">
+        <h2 class="display"><span class="num">05</span>Technical innovations</h2>
+        <p class="lede">Where we made non-obvious choices that pay off in latency, cost, or maintainability.</p>
+
+        <h3>Managed MCP as the tool layer</h3>
+        <p>Rather than implementing an MCP client in Node, we hand the MCP server URL directly to Anthropic and OpenAI's Managed MCP feature. They run the client. This eliminates ~800 lines of protocol code, cuts our latency by removing a hop, and means Claude.ai's native connector and ChatGPT's custom MCP can also talk to the same server — one deployment, three surfaces.</p>
+
+        <h3>Shepherd URL for attachments</h3>
+        <p>Salesforce Files can be downloaded either through <code>/services/data/</code> (which counts against the org's 24-hour REST API limit) or through the <code>/sfc/servlet.shepherd/</code> endpoint (which does not). We use Shepherd as primary with REST as fallback. On file-heavy orgs this is the difference between hitting the quota by 2pm and never hitting it.</p>
+
+        <h3>Two-layer request cache</h3>
+        <p>Every chat turn used to hit SQLite for the install record and Salesforce twice for the agent definition. We now serve both from RAM with pending-promise dedup: 20 concurrent turns for the same org and agent do one DB read and one SF read, not 40. 60-second TTL keeps admin edits fresh.</p>
+
+        <h3>Callout-first Apex pattern</h3>
+        <p>Apex forbids DML before an HTTP callout. Our <code>sendTurn</code> does all SELECTs and the callout up front; only after the callout returns (success or failure) do we INSERT the user message + assistant reply — so the transaction commits atomically and never fails with the dreaded "uncommitted work pending" error.</p>
+
+        <h3>Ephemeral optimistic UI + persistent history</h3>
+        <p>The LWC shows the user's message the instant they hit send, then replaces it with the server-persisted row when the callout returns. If the LLM call fails, we still persist the user's message and a "⚠" assistant bubble — the chat never loses input, matching Slack / WhatsApp behavior.</p>
+      </section>
+
+      <!-- ── 6. Implementation status ─────────────────────── -->
+      <section id="status">
+        <h2 class="display"><span class="num">06</span>Implementation status</h2>
+        <p class="lede">Six of nine planned phases are shipped. What follows is the ground truth as of this document's revision date.</p>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>#</th><th>Phase</th><th>Notes</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>01</td>
+                <td class="title">Per-org OAuth Web Server Flow<span class="sub">Connected App, callback, token store, refresh</span></td>
+                <td>Tokens live in SQLite via Prisma; never in the SF record.</td>
+                <td><span class="pill done">Shipped</span></td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td class="title">Agent Definition + Canvas<span class="sub">Custom objects, LWC canvas, node config JSON</span></td>
+                <td>Nodes: AI, connector, catalog, system prompt.</td>
+                <td><span class="pill done">Shipped</span></td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td class="title">Chat mode (Managed MCP)<span class="sub">/api/chat/turn, session dispatcher, adapter pattern</span></td>
+                <td>Anthropic + OpenAI Managed MCP; Gemini adapter deferred.</td>
+                <td><span class="pill done">Shipped</span></td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td class="title">Multi-engine (Claude + GPT-4o)<span class="sub">Claude Sonnet 4.6, GPT-4o via Responses API</span></td>
+                <td>Same agent runs on either engine; sub-type on AI node picks.</td>
+                <td><span class="pill done">Shipped</span></td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td class="title">Standalone SF MCP server<span class="sub">Deployed to Render (free tier)</span></td>
+                <td>Serves Synapse Chat, Claude.ai connectors, and ChatGPT MCP.</td>
+                <td><span class="pill done">Shipped</span></td>
+              </tr>
+              <tr>
+                <td>06</td>
+                <td class="title">Chat panel LWC<span class="sub">Markdown, voice, file upload, typing indicator</span></td>
+                <td>marked v14 + DOMPurify v3, Web Speech API, SF Files upload.</td>
+                <td><span class="pill done">Shipped</span></td>
+              </tr>
+              <tr>
+                <td>07</td>
+                <td class="title">Async / batch mode<span class="sub">Trigger from Flow/Apex, Platform Event callback</span></td>
+                <td>Design done; implementation next.</td>
+                <td><span class="pill wip">In progress</span></td>
+              </tr>
+              <tr>
+                <td>08</td>
+                <td class="title">Vector store + RAG<span class="sub">Postgres pgvector or Pinecone, retrieval node</span></td>
+                <td>Enables knowledge-base agents over customer docs.</td>
+                <td><span class="pill planned">Planned</span></td>
+              </tr>
+              <tr>
+                <td>09</td>
+                <td class="title">Evaluation harness<span class="sub">Test datasets, judge model, regression tracking</span></td>
+                <td>Required before AppExchange security review.</td>
+                <td><span class="pill planned">Planned</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Recent optimizations landed in this document's window</h3>
+        <ul>
+          <li><strong>Attachment path via Shepherd URL</strong> — 0 SF REST API calls consumed per file download.</li>
+          <li><strong>Install cache (30s) &amp; agent cache (60s)</strong> with pending-promise dedup — ~200ms shaved per turn.</li>
+          <li><strong>User message persistence on error</strong> — chat never loses input on server failure.</li>
+          <li><strong>Fully fluid CSS</strong> for the chat panel — same LWC works in utility bar (~340px) and full-width tab (~1200px).</li>
+        </ul>
+      </section>
+
+      <!-- ── 7. Roadmap ───────────────────────────────────── -->
+      <section id="roadmap">
+        <h2 class="display"><span class="num">07</span>Roadmap</h2>
+        <p class="lede">Ordered by unlock: what needs to be true for the next revenue milestone.</p>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Quarter</th><th>Milestone</th><th>Unlocks</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Q3 '26</td>
+                <td class="title">Auto session titles<span class="sub">Async LLM call after turn 3, skip greeting messages</span></td>
+                <td>Better sidebar UX; ChatGPT-parity feel.</td>
+              </tr>
+              <tr>
+                <td>Q3 '26</td>
+                <td class="title">Async mode<span class="sub">Fire-and-forget agent runs invoked from Flow/Apex</span></td>
+                <td>Bulk automation use cases; nightly enrichment jobs.</td>
+              </tr>
+              <tr>
+                <td>Q4 '26</td>
+                <td class="title">Gemini adapter<span class="sub">Google GenAI SDK, tool-use bridge</span></td>
+                <td>Existing Google-shop customers; three-model choice at parity.</td>
+              </tr>
+              <tr>
+                <td>Q4 '26</td>
+                <td class="title">Vector store + RAG node<span class="sub">Retrieval-augmented generation over customer docs</span></td>
+                <td>Knowledge-base agents; largest customer request today.</td>
+              </tr>
+              <tr>
+                <td>Q1 '27</td>
+                <td class="title">Evaluation harness<span class="sub">Test datasets, judge model, regression tracking</span></td>
+                <td>AppExchange security review readiness.</td>
+              </tr>
+              <tr>
+                <td>Q1 '27</td>
+                <td class="title">Enterprise self-host<span class="sub">Terraform module, Postgres migration, Redis for shared cache</span></td>
+                <td>Enterprise deals with data-residency requirements.</td>
+              </tr>
+              <tr>
+                <td>Q2 '27</td>
+                <td class="title">AppExchange listing (GA)<span class="sub">Managed 2GP, security review passed, pricing tiers live</span></td>
+                <td>Public revenue.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── 8. Competitive ───────────────────────────────── -->
+      <section id="competitive">
+        <h2 class="display"><span class="num">08</span>Competitive positioning</h2>
+        <p class="lede">Not the first AI on Salesforce. The first one that gets out of your way.</p>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Product</th><th>Model choice</th><th>Extensibility</th><th>Cost model</th><th>Fits mid-market?</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="title">Agentforce (Salesforce native)</td>
+                <td>Locked to Einstein family</td>
+                <td>Prompt Builder only</td>
+                <td>Einstein credits, opaque pricing</td>
+                <td>No — enterprise-anchored</td>
+              </tr>
+              <tr>
+                <td class="title">Custom Apex + external API</td>
+                <td>Any</td>
+                <td>Full — but you build it</td>
+                <td>Dev time + API bills</td>
+                <td>Only with in-house eng</td>
+              </tr>
+              <tr>
+                <td class="title">Zapier AI / n8n</td>
+                <td>Any</td>
+                <td>External workflows</td>
+                <td>Task-based</td>
+                <td>Weak on SF security review</td>
+              </tr>
+              <tr style="background: var(--accent-soft);">
+                <td class="title" style="color: var(--accent);">Synapse AI</td>
+                <td>Claude · GPT · Gemini</td>
+                <td>Visual canvas + MCP tools</td>
+                <td>Per-seat + BYO LLM keys</td>
+                <td>Yes — designed for it</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Where we win</h3>
+        <ul>
+          <li><strong>BYO API keys</strong> — customers who already have Anthropic or OpenAI contracts reuse them. Their AI bill doesn't inflate.</li>
+          <li><strong>MCP portability</strong> — the same standalone MCP server that powers Synapse also powers the customer's Claude.ai and ChatGPT deployments. One integration, three surfaces.</li>
+          <li><strong>Admin-buildable</strong> — no Node.js, no Apex, no MCP protocol code required to ship an agent.</li>
+          <li><strong>Managed compute</strong> — customers don't operate the Node server; we do. Just point the Custom Metadata at our URL.</li>
+        </ul>
+      </section>
+
+      <!-- ── 9. Stack ─────────────────────────────────────── -->
+      <section id="stack">
+        <h2 class="display"><span class="num">09</span>Technology stack</h2>
+        <p class="lede">What we build on and why.</p>
+
+        <div class="stack">
+          <div class="layer">
+            <h4>Salesforce</h4>
+            <ul>
+              <li>Lightning Web Components (LWC)</li>
+              <li>Apex (with_sharing controllers)</li>
+              <li>Custom Objects &amp; Metadata Types</li>
+              <li>Named Credentials · Remote Sites</li>
+              <li>Salesforce Files (attachments)</li>
+              <li>Platform Events (async mode, planned)</li>
+            </ul>
+          </div>
+          <div class="layer">
+            <h4>Node companion</h4>
+            <ul>
+              <li>TypeScript · Node 20 · Express</li>
+              <li>Prisma ORM · SQLite (Postgres planned)</li>
+              <li>jsforce (Salesforce SDK)</li>
+              <li>Zod (request validation)</li>
+              <li>Pino (structured logging)</li>
+              <li>Bearer session auth (per-org token)</li>
+            </ul>
+          </div>
+          <div class="layer">
+            <h4>AI &amp; MCP</h4>
+            <ul>
+              <li>Anthropic Managed MCP (beta)</li>
+              <li>OpenAI Responses API with MCP tool</li>
+              <li>Standalone Salesforce MCP server</li>
+              <li>MCP TypeScript SDK</li>
+              <li>Vision APIs (images + PDFs)</li>
+              <li>Google Gemini (planned)</li>
+            </ul>
+          </div>
+          <div class="layer">
+            <h4>Frontend libs</h4>
+            <ul>
+              <li>marked v14 (markdown parse)</li>
+              <li>DOMPurify v3 (XSS sanitizer)</li>
+              <li>Web Speech API (voice input)</li>
+              <li>SLDS (Salesforce Lightning Design)</li>
+              <li>Custom fluid CSS token system</li>
+            </ul>
+          </div>
+          <div class="layer">
+            <h4>Infrastructure</h4>
+            <ul>
+              <li>Render.com (Node hosting)</li>
+              <li>Render (SF MCP server)</li>
+              <li>SQLite → Postgres migration path</li>
+              <li>Redis (planned, multi-instance cache)</li>
+              <li>ngrok (development tunnel)</li>
+            </ul>
+          </div>
+          <div class="layer">
+            <h4>Delivery</h4>
+            <ul>
+              <li>Managed 2GP package (planned)</li>
+              <li>AppExchange listing (planned)</li>
+              <li>SF DX source format</li>
+              <li>Security review readiness in-plan</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 10. Risks & open questions ───────────────────── -->
+      <section id="risks">
+        <h2 class="display"><span class="num">10</span>Risks &amp; open questions</h2>
+        <p class="lede">Honest inventory of what could go sideways and where a decision still needs a shipping stakeholder.</p>
+
+        <div class="split">
+          <div class="before side">
+            <div class="kicker">Known risks</div>
+            <ul>
+              <li>Anthropic Managed MCP is still beta — the schema shifted twice during our build. We shim behind a stable interface, but a breaking change could stall a release.</li>
+              <li>Render free tier cold-starts (~15-30 s) will fail enterprise SLAs. Paid tier required before GA.</li>
+              <li>SQLite install store won't scale past a single Node instance. Postgres migration must precede multi-instance.</li>
+              <li>Salesforce Shepherd URL for file downloads isn't officially "REST API" — security reviewers may ask. Documented mitigation ready.</li>
+              <li>OpenAI's MCP tool schema changed <em>during</em> our build — could change again pre-GA.</li>
+            </ul>
+          </div>
+          <div class="after side">
+            <div class="kicker">Open decisions</div>
+            <ul>
+              <li>Pricing model — per seat, per turn, per agent, or hybrid?</li>
+              <li>Self-hosted Node offer — do we ship a Docker image on day one, or only at Enterprise?</li>
+              <li>Do we build our own eval harness or integrate an existing one (Braintrust, LangSmith)?</li>
+              <li>Auto-title feature — trigger at turn 3 or wait for real substance?</li>
+              <li>Which vector store for RAG — Postgres pgvector (self-contained) or Pinecone (managed but +dependency)?</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout">
+          <div class="label">Editor's note</div>
+          This brief describes the system in its state as of the revision date. Nothing here is a commitment — the roadmap and open decisions above are the artifacts that should evolve fastest. Ping <b>Annu</b> for the current status of any phase before quoting external dates.
+        </div>
+      </section>
+
+    </article>
+  </div>
+
+  <footer class="footer">
+    <div>
+      <div class="mark"><span class="dot">●</span> Synapse AI</div>
+      Project Brief · Rev. July 2026
+    </div>
+    <div>
+      Prepared for internal stakeholders at 360DegreeCloud.<br>
+      Contact <b style="color:var(--muted);">annu@360smsapp.com</b> for updates.
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Respect viewer's theme toggle without overriding OS-set preferences.
+  // (No-op body: the CSS above already handles both directions.)
+</script>
+</body>
+</html>

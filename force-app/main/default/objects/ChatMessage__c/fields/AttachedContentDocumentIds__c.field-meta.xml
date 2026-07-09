@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>AttachedContentDocumentIds__c</fullName>
+    <label>Attached Content Document Ids</label>
+    <description>Comma-separated ContentDocumentIds attached to this user message. LWC uploads to Salesforce Files, sendTurn persists IDs here, and the Node server fetches the bytes to include in the LLM turn.</description>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>2</visibleLines>
+</CustomField>

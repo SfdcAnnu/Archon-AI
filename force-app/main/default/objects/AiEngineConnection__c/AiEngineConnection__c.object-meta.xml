@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>AI Engine Connection</label>
+    <pluralLabel>AI Engine Connections</pluralLabel>
+    <description>Stores API credentials for an AI engine (Claude, OpenAI, Gemini). Two ownership modes: Personal (owner-only) or Shared (admin-managed, granted via native record sharing). ApiKey is encrypted at rest; only users with 'View Encrypted Data' can see the plaintext.</description>
+    <nameField>
+        <label>Connection Name</label>
+        <displayFormat>AEC-{0000}</displayFormat>
+        <type>AutoNumber</type>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>Private</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <externalSharingModel>Private</externalSharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

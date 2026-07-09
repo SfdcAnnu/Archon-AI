@@ -1,0 +1,161 @@
+<template>
+    <template lwc:if={open}>
+        <div class="dir-backdrop" onclick={handleClose}></div>
+        <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="connectors-heading"
+            class="dir-modal"
+            onclick={stopProp}>
+
+            <!-- Header -->
+            <header class="dir-head">
+                <h2 id="connectors-heading" class="dir-title">Directory</h2>
+                <div class="dir-sub">Add connectors to power your agent's tool catalogs</div>
+                <lightning-button-icon
+                    icon-name="utility:close"
+                    size="small"
+                    variant="bare"
+                    alternative-text="Close"
+                    onclick={handleClose}
+                    class="dir-close">
+                </lightning-button-icon>
+            </header>
+
+            <!-- Body: left categories + right grid -->
+            <div class="dir-body">
+
+                <!-- Left rail -->
+                <aside class="dir-rail">
+                    <div class="rail-section-label">Browse</div>
+                    <ul class="cat-list">
+                        <template for:each={categoryItems} for:item="cat">
+                            <li key={cat.key}
+                                class={cat.cssClass}
+                                data-key={cat.key}
+                                onclick={handleCategoryClick}>
+                                <span class="cat-label">{cat.label}</span>
+                            </li>
+                        </template>
+                    </ul>
+                </aside>
+
+                <!-- Right content -->
+                <div class="dir-content">
+
+                    <!-- Search bar -->
+                    <div class="dir-toolbar">
+                        <div class="search-wrap">
+                            <lightning-icon icon-name="utility:search" size="x-small" class="search-icon"></lightning-icon>
+                            <input
+                                type="search"
+                                class="search-input"
+                                placeholder="Search connectors…"
+                                value={search}
+                                oninput={handleSearch}/>
+                        </div>
+                    </div>
+
+                    <!-- Loading -->
+                    <template lwc:if={loading}>
+                        <div class="dir-loading">
+                            <lightning-spinner size="small" alternative-text="Loading"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <!-- Grid -->
+                    <template lwc:if={visibleEntries.length}>
+                        <div class="dir-grid">
+                            <template for:each={visibleEntries} for:item="e">
+                                <article key={e.providerKey} class="conn-card">
+                                    <div class="conn-card-head">
+                                        <div class="conn-icon" style={e.iconTint}>
+                                            <template lwc:if={e.iconUrl}>
+                                                <img src={e.iconUrl} alt={e.displayName} class="conn-icon-img"/>
+                                            </template>
+                                            <template lwc:else>
+                                                <lightning-icon icon-name="utility:apps" size="x-small"></lightning-icon>
+                                            </template>
+                                        </div>
+                                        <div class="conn-title-wrap">
+                                            <div class="conn-title">{e.displayName}</div>
+                                            <div class="conn-cat">{e.category}</div>
+                                        </div>
+                                        <span class={e.statusPillClass}>{e.statusLabel}</span>
+                                    </div>
+
+                                    <p class="conn-desc">{e.description}</p>
+
+                                    <template lwc:if={e.connectedAsLine}>
+                                        <p class="conn-account">{e.connectedAsLine}</p>
+                                    </template>
+
+                                    <div class="conn-actions">
+                                        <template lwc:if={e.showConnectBtn}>
+                                            <button class="btn btn-primary"
+                                                    data-provider={e.providerKey}
+                                                    onclick={handleConnect}>
+                                                + Connect
+                                            </button>
+                                        </template>
+                                        <template lwc:if={e.showManageBtn}>
+                                            <button class="btn btn-secondary"
+                                                    data-id={e.connectorId}
+                                                    onclick={handleDisconnect}>
+                                                Disconnect
+                                            </button>
+                                        </template>
+                                        <template lwc:if={e.showRetryBtn}>
+                                            <button class="btn btn-secondary"
+                                                    data-provider={e.providerKey}
+                                                    onclick={handleConnect}>
+                                                Retry
+                                            </button>
+                                        </template>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Empty state -->
+                    <template lwc:if={isEmpty}>
+                        <div class="dir-empty">
+                            <lightning-icon icon-name="utility:search" size="small"></lightning-icon>
+                            <p>No connectors match.</p>
+                        </div>
+                    </template>
+
+                </div>
+            </div>
+
+        </section>
+
+        <!-- API key entry modal (for non-OAuth providers) -->
+        <template lwc:if={apiKeyModal}>
+            <div class="api-modal-backdrop" onclick={handleApiKeyCancel}></div>
+            <section role="dialog" aria-modal="true" class="api-modal" onclick={stopProp}>
+                <header class="api-modal-head">
+                    <h3>Connect {apiKeyModal.entry.displayName}</h3>
+                </header>
+                <div class="api-modal-body">
+                    <lightning-input
+                        label="Connection name"
+                        value={apiKeyModal.displayName}
+                        onchange={handleApiKeyName}>
+                    </lightning-input>
+                    <lightning-input
+                        label="API key"
+                        type="password"
+                        value={apiKeyModal.apiKey}
+                        onchange={handleApiKeyValue}>
+                    </lightning-input>
+                </div>
+                <footer class="api-modal-foot">
+                    <lightning-button label="Cancel" onclick={handleApiKeyCancel}></lightning-button>
+                    <lightning-button label="Save" variant="brand" onclick={handleApiKeySave} class="slds-m-left_small"></lightning-button>
+                </footer>
+            </section>
+        </template>
+    </template>
+</template>

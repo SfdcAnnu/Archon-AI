@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>Default</label>
+    <protected>false</protected>
+    <values>
+        <field>JwtSecret__c</field>
+        <value xsi:type="xsd:string">b1677e803ad32ef5c9c910ccc3cb0b80f9629f8fd279b5f9453b66d4b7356753</value>
+    </values>
+    <values>
+        <field>ServerUrl__c</field>
+        <value xsi:type="xsd:string">https://65f1-2401-4900-1c22-4709-f186-8f05-de00-f53a.ngrok-free.app</value>
+    </values>
+</CustomMetadata>

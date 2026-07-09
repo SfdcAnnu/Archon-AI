@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>Gmail</label>
+    <protected>false</protected>
+    <values><field>DisplayName__c</field><value xsi:type="xsd:string">Gmail</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Draft, send, and search Gmail messages.</value></values>
+    <values><field>Category__c</field><value xsi:type="xsd:string">Email</value></values>
+    <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_gmail</value></values>
+    <values><field>BrandColor__c</field><value xsi:type="xsd:string">#ea4335</value></values>
+    <values><field>AuthType__c</field><value xsi:type="xsd:string">OAuth2</value></values>
+    <values><field>AuthorizeUrl__c</field><value xsi:type="xsd:string">https://accounts.google.com/o/oauth2/v2/auth</value></values>
+    <values><field>TokenUrl__c</field><value xsi:type="xsd:string">https://oauth2.googleapis.com/token</value></values>
+    <values><field>Scopes__c</field><value xsi:type="xsd:string">https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly openid email profile</value></values>
+    <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">email_tools</value></values>
+    <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">true</value></values>
+    <values><field>SortOrder__c</field><value xsi:type="xsd:double">60</value></values>
+    <values><field>McpServerUrl__c</field><value xsi:type="xsd:string">https://gmail-mcp-server-baqd.onrender.com</value></values>
+</CustomMetadata>

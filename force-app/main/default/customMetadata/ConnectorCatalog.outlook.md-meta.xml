@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>Outlook</label>
+    <protected>false</protected>
+    <values><field>DisplayName__c</field><value xsi:type="xsd:string">Outlook</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Send and read mail through Microsoft Outlook / Microsoft 365.</value></values>
+    <values><field>Category__c</field><value xsi:type="xsd:string">Email</value></values>
+    <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_outlook</value></values>
+    <values><field>BrandColor__c</field><value xsi:type="xsd:string">#0078d4</value></values>
+    <values><field>AuthType__c</field><value xsi:type="xsd:string">OAuth2</value></values>
+    <values><field>AuthorizeUrl__c</field><value xsi:type="xsd:string">https://login.microsoftonline.com/common/oauth2/v2.0/authorize</value></values>
+    <values><field>TokenUrl__c</field><value xsi:type="xsd:string">https://login.microsoftonline.com/common/oauth2/v2.0/token</value></values>
+    <values><field>Scopes__c</field><value xsi:type="xsd:string">offline_access openid email profile Mail.ReadWrite Mail.Send</value></values>
+    <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">email_tools</value></values>
+    <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">true</value></values>
+    <values><field>SortOrder__c</field><value xsi:type="xsd:double">50</value></values>
+    <values><field>McpServerUrl__c</field><value xsi:type="xsd:string"></value></values>
+</CustomMetadata>

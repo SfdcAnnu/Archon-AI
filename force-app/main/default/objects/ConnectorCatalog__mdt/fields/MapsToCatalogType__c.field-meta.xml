@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MapsToCatalogType__c</fullName>
+    <label>Maps To Catalog Type</label>
+    <description>Which AgentNode catalog sub-type this connector powers (salesforce_crm_tools, storage_tools, email_tools, channel_tools).</description>
+    <type>Text</type>
+    <length>60</length>
+    <required>true</required>
+</CustomField>

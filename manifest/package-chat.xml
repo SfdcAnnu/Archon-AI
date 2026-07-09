@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+
+    <!-- ── ChatSession__c + 11 fields ──────────────────────────────── -->
+    <types>
+        <members>ChatSession__c</members>
+        <members>ChatMessage__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>ChatSession__c.AgentDefinition__c</members>
+        <members>ChatSession__c.User__c</members>
+        <members>ChatSession__c.RecordContextId__c</members>
+        <members>ChatSession__c.RecordContextType__c</members>
+        <members>ChatSession__c.Title__c</members>
+        <members>ChatSession__c.Status__c</members>
+        <members>ChatSession__c.LastActivityAt__c</members>
+        <members>ChatSession__c.ExpiresAt__c</members>
+        <members>ChatSession__c.Department__c</members>
+        <members>ChatSession__c.TotalTurns__c</members>
+        <members>ChatSession__c.TokensIn__c</members>
+        <members>ChatSession__c.TokensOut__c</members>
+        <members>ChatSession__c.PendingApprovalToken__c</members>
+
+        <members>ChatMessage__c.ChatSession__c</members>
+        <members>ChatMessage__c.Role__c</members>
+        <members>ChatMessage__c.Content__c</members>
+        <members>ChatMessage__c.ToolCallsJson__c</members>
+        <members>ChatMessage__c.ToolResultsJson__c</members>
+        <members>ChatMessage__c.ModelUsed__c</members>
+        <members>ChatMessage__c.TokensIn__c</members>
+        <members>ChatMessage__c.TokensOut__c</members>
+        <members>ChatMessage__c.SequenceNumber__c</members>
+        <members>ChatMessage__c.Sensitive__c</members>
+        <members>ChatMessage__c.RequiredApproval__c</members>
+        <members>ChatMessage__c.ApprovedAt__c</members>
+        <members>ChatMessage__c.ApprovalStatus__c</members>
+
+        <members>AgentDefinition__c.ExecuteType__c</members>
+        <name>CustomField</name>
+    </types>
+
+    <!-- ── Apex ───────────────────────────────────────────────────── -->
+    <types>
+        <members>AgentChatController</members>
+        <members>AgentChatControllerTest</members>
+        <name>ApexClass</name>
+    </types>
+
+    <!-- ── LWC ────────────────────────────────────────────────────── -->
+    <types>
+        <members>synapseChatPanel</members>
+        <members>synapseChat</members>
+        <name>LightningComponentBundle</name>
+    </types>
+
+    <!-- ── Tab ────────────────────────────────────────────────────── -->
+    <types>
+        <members>Synapse_Chat</members>
+        <name>CustomTab</name>
+    </types>
+
+    <!-- ── Permission set ─────────────────────────────────────────── -->
+    <types>
+        <members>AgentChatUser</members>
+        <name>PermissionSet</name>
+    </types>
+
+    <version>62.0</version>
+</Package>

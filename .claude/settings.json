@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" ./node_modules/.bin/tsc --noEmit)",
+      "Bash(BASE_URL=http://localhost:3131 PORT=3131 MS_CLIENT_ID=test MS_CLIENT_SECRET=test MS_TENANT=common MS_REDIRECT_URI=http://localhost:3131/auth/callback timeout 15 ./node_modules/.bin/tsx src/server.ts)",
+      "Bash(curl -s http://localhost:3131/)",
+      "Bash(curl -s http://localhost:3131/.well-known/oauth-authorization-server)",
+      "Bash(curl -s -X POST http://localhost:3131/mcp -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(BASE_URL=http://localhost:3132 PORT=3132 MS_CLIENT_ID=test MS_CLIENT_SECRET=test timeout 20 ./node_modules/.bin/tsx src/server.ts)",
+      "Bash(curl -s http://localhost:3132/)",
+      "Bash(curl -s http://localhost:3132/.well-known/oauth-authorization-server)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\" \"http://localhost:3132/authorize?response_type=code&client_id=dcr-random&redirect_uri=https://claude.ai/api/mcp/auth_callback&code_challenge=xyz&code_challenge_method=S256\")",
+      "Bash(BASE_URL=http://localhost:3233 PORT=3233 GOOGLE_CLIENT_ID=test-gid GOOGLE_CLIENT_SECRET=test-secret timeout 20 ./node_modules/.bin/tsx src/server.ts)",
+      "Bash(curl -s http://localhost:3233/)",
+      "Bash(curl -s http://localhost:3233/.well-known/oauth-authorization-server)",
+      "Bash(curl -s -X POST http://localhost:3233/mcp -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\" \"http://localhost:3233/authorize?response_type=code&client_id=dcr-random&redirect_uri=https://claude.ai/api/mcp/auth_callback\")",
+      "Bash(gh auth *)",
+      "Bash(git config *)"
+    ]
+  }
+}

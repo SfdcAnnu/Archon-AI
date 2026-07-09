@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>360 AI Agent</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  /* Salesforce Lightning Design System colors */
+  --sf-blue:       #0176d3;
+  --sf-blue-dark:  #014486;
+  --sf-blue-light: #eaf4ff;
+  --sf-blue-mid:   #d0e8ff;
+  --sf-navy:       #032d60;
+  --sf-teal:       #06a59a;
+  --sf-teal-bg:    #f0fafa;
+  --sf-green:      #2e844a;
+  --sf-green-bg:   #f3f9f0;
+  --sf-red:        #ba0517;
+  --sf-red-bg:     #fef0f0;
+  --sf-orange:     #dd5a00;
+  --sf-orange-bg:  #fff3e0;
+  --sf-purple:     #5a3fcf;
+  --sf-purple-bg:  #f4f0ff;
+  --sf-yellow:     #dd7a01;
+  --sf-yellow-bg:  #fffae0;
+
+  --bg:       #f3f3f3;
+  --sb-bg:    #032d60;
+  --sb-text:  #c9e0f8;
+  --sb-muted: #6eaad9;
+  --sb-hover: rgba(255,255,255,0.08);
+  --sb-active:rgba(255,255,255,0.14);
+
+  --panel:    #ffffff;
+  --panel-bd: #dddbda;
+  --panel-bd2:#c9c7c5;
+
+  --txt:      #181818;
+  --txt-2:    #444;
+  --txt-3:    #706e6b;
+  --txt-4:    #aeaeae;
+
+  --r:  8px;
+  --rs: 4px;
+  --f:  'Salesforce Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fm: 'SF Mono', 'Fira Code', monospace;
+}
+
+body { font-family:var(--f); background:var(--bg); color:var(--txt); height:100vh; display:flex; overflow:hidden; font-size:14px; line-height:1.5; }
+
+/* ══ SIDEBAR ══ */
+.sidebar {
+  width:260px; min-width:260px;
+  background:var(--sb-bg);
+  display:flex; flex-direction:column;
+  height:100vh; overflow-y:auto;
+  border-right:3px solid var(--sf-blue);
+  transition: width 0.25s ease, min-width 0.25s ease;
+  overflow-x: hidden;
+}
+.sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right: none;
+}
+.sidebar.collapsed * {
+  opacity: 0;
+  pointer-events: none;
+}
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); }
+
+.sb-logo {
+  padding:16px 16px 14px;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  display:flex; align-items:center; gap:10px;
+}
+.sb-logo-icon {
+  width:36px; height:36px;
+  background:var(--sf-blue);
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; flex-shrink:0;
+  box-shadow:0 2px 8px rgba(1,118,211,.4);
+}
+.sb-logo-name { font-size:14px; font-weight:700; color:#fff; }
+.sb-logo-sub  { font-size:11px; color:var(--sb-muted); margin-top:1px; }
+.sb-logo-text { flex:1; min-width:0; }
+.sb-collapse-btn {
+  width:24px; height:24px; border-radius:6px; border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.08); color:#c9e0f8; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; flex-shrink:0; transition:all .15s; line-height:1;
+  font-family:var(--f);
+}
+.sb-collapse-btn:hover { background:rgba(255,255,255,.18); }
+.sidebar-open-btn {
+  width:32px; height:32px; border-radius:6px; border:1px solid var(--panel-bd);
+  background:var(--sf-blue-light); color:var(--sf-blue); cursor:pointer;
+  font-size:16px; display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:all .15s; font-family:var(--f);
+}
+.sidebar-open-btn:hover { background:var(--sf-blue); color:#fff; }
+
+.new-btn {
+  margin:12px; padding:9px 14px;
+  background:var(--sf-blue);
+  border:none; border-radius:var(--r);
+  color:#fff; font-size:13px; font-weight:600;
+  cursor:pointer; font-family:var(--f);
+  display:flex; align-items:center; gap:8px;
+  transition:background .15s;
+  box-shadow:0 1px 4px rgba(0,0,0,.2);
+}
+.new-btn:hover { background:#0166bc; }
+
+/* Sidebar sections */
+.sb-section { padding:0 12px 12px; }
+.sb-section-title {
+  font-size:10px; font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--sb-muted);
+  padding:10px 4px 6px; margin-bottom:2px;
+}
+
+.cfg-card {
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:var(--r);
+  padding:12px;
+  margin-bottom:10px;
+}
+
+.cfg-label { font-size:11px; color:var(--sb-muted); margin-bottom:4px; }
+.cfg-input {
+  width:100%;
+  background:rgba(0,0,0,.3);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--rs);
+  padding:7px 9px;
+  color:#fff; font-size:12px;
+  font-family:var(--fm);
+  margin-bottom:8px; outline:none;
+  transition:border-color .15s;
+}
+.cfg-input:focus  { border-color:var(--sf-blue); }
+.cfg-input::placeholder { color:rgba(255,255,255,.3); font-family:var(--f); }
+.cfg-input.v-ok  { border-color:rgba(46,132,74,.7); }
+.cfg-input.v-err { border-color:rgba(186,5,23,.6); }
+
+.sf-status-row { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--sb-muted); margin-bottom:8px; }
+.sf-dot { width:7px; height:7px; border-radius:50%; background:var(--sb-muted); flex-shrink:0; transition:background .3s; }
+.sf-dot.ok  { background:#4bca81; }
+.sf-dot.err { background:#f4756b; }
+@keyframes blink { 0%,100%{opacity:.4} 50%{opacity:1} }
+.sf-dot.loading { background:var(--sf-blue); animation:blink .8s ease-in-out infinite; }
+
+.sandbox-row { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--sb-muted); margin-bottom:8px; cursor:pointer; }
+.sandbox-row input { cursor:pointer; accent-color:var(--sf-blue); }
+
+.sb-btn {
+  width:100%; padding:8px; border:none; border-radius:var(--rs);
+  font-size:12px; font-weight:600; cursor:pointer; font-family:var(--f);
+  transition:opacity .15s; display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.sb-btn.primary  { background:var(--sf-blue); color:#fff; }
+.sb-btn.success  { background:rgba(46,132,74,.15); color:#4bca81; border:1px solid rgba(75,202,129,.25); }
+.sb-btn.ghost    { background:rgba(255,255,255,.07); color:var(--sb-muted); border:1px solid rgba(255,255,255,.1); }
+.sb-btn:hover    { opacity:.85; }
+.sb-btn + .sb-btn { margin-top:6px; }
+
+.hist-item {
+  padding:8px 10px; border-radius:var(--rs);
+  cursor:pointer; font-size:12px; color:var(--sb-text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:background .12s;
+  display:flex; align-items:center; gap:8px;
+}
+.hist-item:hover { background:var(--sb-hover); }
+
+/* ══ MAIN ══ */
+.main { flex:1; display:flex; flex-direction:column; height:100vh; overflow:hidden; min-width:0; background:var(--bg); }
+
+/* Topbar */
+.topbar {
+  background:var(--panel);
+  border-bottom:1px solid var(--panel-bd);
+  padding:0 20px;
+  min-height:52px;
+  display:flex; align-items:center; justify-content:space-between;
+  box-shadow:0 2px 4px rgba(0,0,0,.06);
+  flex-shrink:0;
+}
+.topbar-l { display:flex; align-items:center; gap:8px; }
+.topbar-title { font-size:15px; font-weight:700; color:var(--sf-navy); }
+.topbar-divider { width:1px; height:18px; background:var(--panel-bd); }
+
+.pill {
+  display:inline-flex; align-items:center; gap:5px;
+  border-radius:20px; padding:4px 10px;
+  font-size:11px; font-weight:600;
+}
+.pill-blue   { background:var(--sf-blue-light); color:var(--sf-blue);  border:1px solid var(--sf-blue-mid); }
+.pill-navy   { background:#eaf0fb; color:var(--sf-navy);  border:1px solid #c5d5f0; }
+.pill-green  { background:var(--sf-green-bg); color:var(--sf-green); border:1px solid #b8dfc4; }
+.pill-red    { background:var(--sf-red-bg);   color:var(--sf-red);   border:1px solid #f5b8be; }
+.pill-teal   { background:var(--sf-teal-bg);  color:var(--sf-teal);  border:1px solid #b0deda; }
+
+@keyframes spin { to{transform:rotate(360deg)} }
+.spin { animation:spin .65s linear infinite; display:inline-block; }
+.tool-running-badge { display:none; align-items:center; gap:6px; font-size:11px; color:var(--sf-blue); background:var(--sf-blue-light); border:1px solid var(--sf-blue-mid); border-radius:20px; padding:4px 12px; }
+.tool-running-badge.show { display:flex; }
+
+/* Messages */
+.messages { flex:1; overflow-y:auto; padding:20px 0 10px; min-width:0; }
+.messages::-webkit-scrollbar { width:5px; }
+.messages::-webkit-scrollbar-thumb { background:var(--panel-bd); border-radius:3px; }
+.messages { scrollbar-width:thin; scrollbar-color:var(--panel-bd) transparent; }
+
+/* Welcome */
+.welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; padding:48px 24px; text-align:center; }
+.welcome-cloud { width:64px; height:64px; background:var(--sf-blue); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:30px; margin-bottom:20px; box-shadow:0 4px 16px rgba(1,118,211,.3); }
+.welcome h2 { font-size:22px; font-weight:700; color:var(--sf-navy); margin-bottom:8px; }
+.welcome p  { color:var(--txt-3); font-size:14px; max-width:420px; line-height:1.65; margin-bottom:28px; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:600px; }
+.chip {
+  background:var(--panel); border:1px solid var(--panel-bd);
+  border-radius:20px; padding:7px 14px; font-size:12px; font-weight:500;
+  color:var(--txt-2); cursor:pointer; transition:all .15s; font-family:var(--f);
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.chip:hover { border-color:var(--sf-blue); color:var(--sf-blue); background:var(--sf-blue-light); box-shadow:0 2px 6px rgba(1,118,211,.12); }
+
+/* Message rows */
+.msg-user { display:flex; justify-content:flex-end; padding:6px 24px; }
+.bubble-user {
+  background:var(--sf-blue);
+  color:#fff;
+  border-radius:18px 18px 4px 18px;
+  padding:10px 16px; font-size:14px; line-height:1.6;
+  max-width:560px; word-break:break-word;
+  box-shadow:0 2px 8px rgba(1,118,211,.25);
+}
+
+.asst-wrap { max-width:100%; margin:0 auto; padding:6px 16px; box-sizing:border-box; }
+.tool-wrap  { max-width:100%; margin:0 auto; padding:4px 16px; box-sizing:border-box; }
+
+/* ── LIVE TOOL TRACKER ── */
+.tool-tracker {
+  background:var(--panel);
+  border:1px solid var(--panel-bd);
+  border-left:3px solid var(--sf-blue);
+  border-radius:var(--r);
+  padding:10px 14px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.tool-tracker-hdr {
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--txt-3);
+  margin-bottom:8px; display:flex; align-items:center; gap:7px;
+}
+@keyframes pulse2 { 0%,100%{opacity:.4} 50%{opacity:1} }
+.tool-hdr-dot { width:6px; height:6px; border-radius:50%; background:var(--sf-blue); animation:pulse2 1.4s ease-in-out infinite; }
+
+.tool-row { display:flex; align-items:flex-start; gap:10px; padding:6px 0; border-bottom:1px solid #f3f3f3; }
+.tool-row:last-child { border-bottom:none; padding-bottom:2px; }
+.tool-row:first-child { padding-top:2px; }
+@keyframes fadeDown { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+.tool-row { animation:fadeDown .18s ease; }
+
+.tool-state { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:11px; font-weight:700; margin-top:1px; transition:all .25s; }
+.tool-state.running { background:var(--sf-blue-light); border:1px solid var(--sf-blue-mid); }
+.tool-state.done    { background:var(--sf-green-bg);   border:1px solid #b8dfc4; color:var(--sf-green); }
+.tool-state.error   { background:var(--sf-red-bg);     border:1px solid #f5b8be; color:var(--sf-red); }
+@keyframes rotate { to{transform:rotate(360deg)} }
+.tool-spinner { width:10px; height:10px; border:2px solid var(--sf-blue-mid); border-top-color:var(--sf-blue); border-radius:50%; animation:rotate .55s linear infinite; }
+.tool-info { flex:1; min-width:0; }
+.tool-nm { font-family:var(--fm); font-size:12px; color:var(--txt); font-weight:600; }
+.tool-mt { font-size:11px; color:var(--txt-3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Thinking */
+@keyframes pulse { 0%,100%{opacity:.25} 50%{opacity:1} }
+.thinking { display:flex; align-items:center; gap:5px; padding:10px 0; }
+.td { width:7px; height:7px; border-radius:50%; background:#c9c7c5; animation:pulse 1.3s ease-in-out infinite; }
+.td:nth-child(2){animation-delay:.18s} .td:nth-child(3){animation-delay:.36s}
+
+/* ── RICH OUTPUT ── */
+.res-hdr { display:flex; align-items:center; gap:8px; margin-bottom:12px; margin-top:4px; }
+.res-title { font-size:14px; font-weight:700; color:var(--sf-navy); }
+.res-count { font-size:11px; background:var(--sf-blue-light); color:var(--sf-blue); border:1px solid var(--sf-blue-mid); border-radius:10px; padding:2px 9px; font-weight:600; }
+
+/* Cards */
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; margin-bottom:16px; }
+.sf-card {
+  background:var(--panel);
+  border:1px solid var(--panel-bd);
+  border-radius:var(--r);
+  padding:14px 16px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+  transition:box-shadow .15s, border-color .15s;
+}
+.sf-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1); border-color:var(--sf-blue); }
+.sf-card-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.sf-card-type { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--txt-3); margin-bottom:3px; }
+.sf-card-name { font-size:14px; font-weight:700; color:var(--sf-navy); word-break:break-word; }
+.sf-card-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; margin-left:8px; }
+.sf-field { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:1px solid #f3f3f3; font-size:12px; gap:8px; }
+.sf-field:last-child { border-bottom:none; }
+.sf-fl { color:var(--txt-3); white-space:nowrap; flex-shrink:0; }
+.sf-fv { color:var(--txt); font-weight:500; text-align:right; word-break:break-word; max-width:60%; }
+
+/* Table */
+.table-wrap { overflow-x:auto; border:1px solid var(--panel-bd); border-radius:var(--r); margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.sf-table { width:100%; border-collapse:collapse; font-size:12px; background:var(--panel); table-layout:fixed; }
+.sf-table thead tr { background:var(--sf-blue); }
+.sf-table th { padding:8px 10px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#fff; white-space:normal; overflow:hidden; text-overflow:ellipsis; }
+.sf-table td { padding:8px 10px; border-bottom:1px solid #f0f0f0; color:var(--txt); vertical-align:middle; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sf-table tbody tr:last-child td { border-bottom:none; }
+.sf-table tbody tr:hover td { background:var(--sf-blue-light); }
+
+/* Stats */
+.stats-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:16px; }
+.stat-card {
+  background:var(--panel);
+  border:1px solid var(--panel-bd);
+  border-top:3px solid var(--sf-blue);
+  border-radius:var(--r);
+  padding:14px 16px;
+  box-shadow:0 1px 4px rgba(0,0,0,.05);
+}
+.stat-lbl { font-size:11px; font-weight:600; color:var(--txt-3); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em; }
+.stat-val { font-size:20px; font-weight:700; color:var(--sf-navy); line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stat-sub { font-size:11px; color:var(--txt-3); margin-top:4px; }
+.stat-trend { font-size:11px; font-weight:600; margin-top:4px; }
+.stat-trend.up   { color:var(--sf-green); }
+.stat-trend.down { color:var(--sf-red); }
+
+/* Badges */
+.ibadge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; }
+.ib-green  { background:var(--sf-green-bg);  color:var(--sf-green);  border:1px solid #b8dfc4; }
+.ib-blue   { background:var(--sf-blue-light); color:var(--sf-blue);  border:1px solid var(--sf-blue-mid); }
+.ib-red    { background:var(--sf-red-bg);    color:var(--sf-red);    border:1px solid #f5b8be; }
+.ib-orange { background:var(--sf-orange-bg); color:var(--sf-orange); border:1px solid #ffd0a0; }
+.ib-purple { background:var(--sf-purple-bg); color:var(--sf-purple); border:1px solid #c9bff0; }
+.ib-teal   { background:var(--sf-teal-bg);   color:var(--sf-teal);   border:1px solid #b0deda; }
+.ib-gray   { background:#f3f3f3; color:var(--txt-3); border:1px solid var(--panel-bd); }
+.ib-yellow { background:var(--sf-yellow-bg); color:var(--sf-yellow); border:1px solid #fce0a0; }
+
+/* Prose */
+.prose p  { margin-bottom:9px; font-size:14px; line-height:1.7; color:var(--txt); }
+.prose p:last-child { margin-bottom:0; }
+.prose ul,.prose ol { padding-left:20px; margin-bottom:9px; }
+.prose li { margin-bottom:4px; font-size:14px; color:var(--txt); }
+.prose strong { font-weight:700; color:var(--sf-navy); }
+.prose em { font-style:italic; color:var(--txt-2); }
+.prose code { background:var(--sf-blue-light); border:1px solid var(--sf-blue-mid); border-radius:3px; padding:1px 5px; font-family:var(--fm); font-size:12px; color:var(--sf-blue-dark); }
+.prose pre { background:#032d60; color:#c9e0f8; border-radius:var(--r); padding:14px 16px; overflow-x:auto; margin-bottom:10px; font-family:var(--fm); font-size:12px; line-height:1.6; }
+.prose h3 { font-size:15px; font-weight:700; color:var(--sf-navy); margin:14px 0 5px; }
+.prose h4 { font-size:13px; font-weight:700; color:var(--sf-navy); margin:10px 0 4px; }
+
+/* Input */
+.input-area {
+  padding:12px 20px 16px;
+  border-top:1px solid var(--panel-bd);
+  background:var(--panel);
+  flex-shrink:0;
+  box-shadow:0 -2px 8px rgba(0,0,0,.04);
+}
+.err-banner { max-width:100%; margin:0 auto 8px; padding:9px 14px; background:var(--sf-red-bg); border:1px solid #f5b8be; border-radius:var(--r); color:var(--sf-red); font-size:12px; display:none; font-weight:500; }
+.input-box {
+  max-width:100%; margin:0 auto;
+  background:#fff;
+  border:1px solid var(--panel-bd2);
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex; align-items:flex-end; gap:10px;
+  transition:border-color .15s, box-shadow .15s;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.input-box:focus-within { border-color:var(--sf-blue); box-shadow:0 0 0 3px rgba(1,118,211,.12); }
+#user-input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--f); font-size:14px; resize:none; max-height:160px; line-height:1.55; padding:2px 0; }
+#user-input::placeholder { color:var(--txt-4); }
+.send-btn {
+  width:36px; height:36px; border-radius:8px; border:none;
+  background:var(--sf-blue); color:#fff; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; font-size:16px;
+  transition:background .15s, transform .1s;
+  box-shadow:0 2px 6px rgba(1,118,211,.3);
+}
+.send-btn:hover   { background:var(--sf-blue-dark); }
+.send-btn:active  { transform:scale(.95); }
+.send-btn:disabled { opacity:.4; cursor:not-allowed; box-shadow:none; }
+.input-hint { max-width:100%; margin:5px auto 0; font-size:11px; color:var(--txt-4); text-align:center; }
+
+/* ── Responsive ── */
+
+/* Make main content area always fluid */
+.main { min-width:0; }
+.messages { overflow-x:hidden; }
+.asst-wrap, .tool-wrap { box-sizing:border-box; width:100%; }
+
+/* Table always scrolls horizontally — never pushes layout */
+.table-wrap { max-width:100%; }
+.sf-table { table-layout:fixed; }
+
+/* Stat value never overflows card */
+.stat-card { min-width:0; overflow:hidden; }
+
+/* Cards never overflow */
+.sf-card { min-width:0; overflow:hidden; }
+.sf-card-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+@media (max-width:1100px) {
+  .sf-table { font-size:11px; }
+  .sf-table th, .sf-table td { padding:7px 8px; }
+  .stat-val { font-size:18px; }
+}
+@media (max-width:900px) {
+  .sidebar { width:200px; min-width:200px; }
+  .asst-wrap { padding:6px 12px; }
+  .tool-wrap  { padding:4px 12px; }
+}
+@media (max-width:700px) {
+  .sidebar { display:none; }
+  .cards-grid { grid-template-columns:1fr 1fr; }
+  .stats-row  { grid-template-columns:1fr 1fr; }
+}
+
+
+
+/* ── Executing dots animation ── */
+@keyframes execDots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+.exec-dots::after {
+  content: '';
+  animation: execDots 1.6s steps(1) infinite;
+  letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar collapsed">
+  <div class="sb-logo">
+    <div class="sb-logo-icon">☁</div>
+    <div class="sb-logo-text">
+      <div class="sb-logo-name">360 AI Agent</div>
+      <div class="sb-logo-sub">360 Degree Cloud</div>
+    </div>
+    <button class="sb-collapse-btn" onclick="toggleSidebar()" title="Expand sidebar" id="collapse-btn">›</button>
+  </div>
+
+  <button class="new-btn" onclick="newChat()">＋ New Conversation</button>
+
+  <!-- Anthropic -->
+  <div class="sb-section">
+    <div class="sb-section-title">Anthropic</div>
+    <div class="cfg-card">
+      <div class="cfg-label">API Key</div>
+      <input class="cfg-input" type="password" id="cfg-key" placeholder="sk-ant-api03-…" oninput="liveVal()" autocomplete="off" />
+      <div class="sf-status-row">
+        <div class="sf-dot" id="dot-ant"></div>
+        <span id="lbl-ant">Enter API key</span>
+      </div>
+    </div>
+
+    <!-- Salesforce -->
+    <div class="sb-section-title">Salesforce</div>
+    <div class="cfg-card">
+      <div class="cfg-label">ECA Consumer Key</div>
+      <input class="cfg-input" type="text" id="cfg-cid" placeholder="3MVG9…" oninput="liveVal()" autocomplete="off" />
+      <div class="cfg-label">MCP Server URL</div>
+      <input class="cfg-input" type="text" id="cfg-url" placeholder="https://api.salesforce.com/…" oninput="liveVal()" autocomplete="off" />
+      <label class="sandbox-row"><input type="checkbox" id="sandbox"> Use Sandbox (test.salesforce.com)</label>
+      <div class="sf-status-row">
+        <div class="sf-dot" id="dot-sf"></div>
+        <span id="lbl-sf">Not connected</span>
+      </div>
+      <button class="sb-btn primary" id="btn-login" onclick="startLogin()">Login with Salesforce →</button>
+      <button class="sb-btn success" id="btn-refresh" onclick="refreshTok()" style="display:none">↻ Refresh Token</button>
+      <button class="sb-btn ghost"   id="btn-logout"  onclick="doLogout()"   style="display:none">Disconnect</button>
+    </div>
+
+    <div class="sb-section-title">Quick Queries</div>
+    <div class="hist-item" onclick="chip('Show all open opportunities')">📋 Open Opportunities</div>
+    <div class="hist-item" onclick="chip('List top 10 accounts by annual revenue')">🏢 Top Accounts</div>
+    <div class="hist-item" onclick="chip('Show leads created this month')">👤 Recent Leads</div>
+    <div class="hist-item" onclick="chip('Pipeline summary with total values')">💰 Pipeline Summary</div>
+    <div class="hist-item" onclick="chip('All contacts in New York')">📍 Contacts by City</div>
+    <div class="hist-item" onclick="chip('List all open support cases')">🎫 Open Cases</div>
+    <div class="hist-item" onclick="chip('Closed-won opportunities this quarter')">🏆 Won This Quarter</div>
+    <div class="hist-item" onclick="chip('Show me all loan applications')">📄 Loan Applications</div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-l">
+      <button class="sidebar-open-btn" id="sidebar-open-btn" onclick="toggleSidebar()" title="Open sidebar">☰</button>
+      <span class="topbar-title">360 AI Agent</span>
+      <div class="topbar-divider"></div>
+      <span class="pill pill-blue">☁ Salesforce MCP</span>
+      <span class="pill pill-navy">claude-sonnet-4-6</span>
+      <span class="pill pill-green"  id="pill-conn" style="display:none">● Connected</span>
+      <span class="pill pill-red"    id="pill-auth" style="display:none">⚠ Login Required</span>
+    </div>
+    <div class="tool-running-badge" id="tool-running">
+      <span class="spin">⟳</span> <span id="tool-running-txt">Calling tool…</span>
+    </div>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="welcome" id="welcome">
+      <div class="welcome-cloud">☁</div>
+      <h2>360 AI Agent</h2>
+      <p id="welcome-p">Login with Salesforce from the sidebar to get started, then ask anything about your CRM data.</p>
+      <div id="welcome-chips" style="display:none">
+        <div class="chips">
+          <div class="chip" onclick="chip('Show all open opportunities')">📋 Open opportunities</div>
+          <div class="chip" onclick="chip('List top 10 accounts by revenue')">🏢 Top accounts</div>
+          <div class="chip" onclick="chip('Show leads created this month')">👤 Recent leads</div>
+          <div class="chip" onclick="chip('Pipeline summary with totals')">💰 Pipeline</div>
+          <div class="chip" onclick="chip('Contacts in New York')">📍 By location</div>
+          <div class="chip" onclick="chip('List all open cases')">🎫 Open cases</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="err-banner" id="err"></div>
+    <div class="input-box">
+      <textarea id="user-input" rows="1"
+        placeholder="Ask about accounts, leads, opportunities, cases…"
+        onkeydown="onKey(event)" oninput="resize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="send()" title="Send (Enter)">▶</button>
+    </div>
+    <div class="input-hint">Shift+Enter for new line · OAuth via Salesforce · Proxy on localhost:3000</div>
+  </div>
+</main>
+
+<script>
+// ══════════════════════════════
+//  STATE
+// ══════════════════════════════
+let apiKey = '', sfAuthed = false, history = [], busy = false;
+
+
+// ══════════════════════════════
+//  INIT
+// ══════════════════════════════
+window.addEventListener('load', async () => {
+  await checkAuth();
+  window.addEventListener('message', async e => {
+    if (e.data?.type === 'SF_AUTH_SUCCESS') { await checkAuth(); hideErr(); }
+    if (e.data?.type === 'SF_AUTH_ERROR')   { setSF('err', 'Login failed: ' + e.data.error); }
+  });
+});
+
+async function checkAuth() {
+  try {
+    const r = await fetch('http://localhost:3000/auth/status');
+    const d = await r.json();
+    if (d.authenticated) {
+      sfAuthed = true;
+      const org = (d.instance_url||'').replace('https://','').split('.')[0];
+      setSF('ok', 'Connected · ' + org + ' · ' + d.age_minutes + 'm');
+      showLoggedIn();
+    } else {
+      sfAuthed = false;
+      setSF('', 'Not connected');
+      showLoggedOut();
+    }
+    updateUI();
+  } catch(e) { /* proxy not running yet */ }
+}
+
+// ══════════════════════════════
+//  SIDEBAR CONFIG
+// ══════════════════════════════
+function liveVal() {
+  apiKey = document.getElementById('cfg-key').value.trim();
+  const ok = apiKey.startsWith('sk-ant-') && apiKey.length > 20;
+  setV('cfg-key', ok);
+  setDot('dot-ant', ok ? 'ok' : 'err', ok ? 'Ready' : 'Invalid key');
+  updateUI();
+}
+
+function setV(id, ok) {
+  const el = document.getElementById(id), f = !!el.value.trim();
+  el.classList.toggle('v-ok',  f && ok);
+  el.classList.toggle('v-err', f && !ok);
+}
+
+function setDot(id, cls, txt) {
+  document.getElementById(id).className = 'sf-dot ' + cls;
+  const lbl = document.getElementById(id.replace('dot-','lbl-'));
+  if (lbl) lbl.textContent = txt;
+}
+
+function setSF(cls, txt) {
+  document.getElementById('dot-sf').className = 'sf-dot ' + cls;
+  document.getElementById('lbl-sf').textContent = txt;
+}
+
+function showLoggedIn()  {
+  document.getElementById('btn-login').style.display   = 'none';
+  document.getElementById('btn-refresh').style.display = 'flex';
+  document.getElementById('btn-logout').style.display  = 'flex';
+}
+function showLoggedOut() {
+  document.getElementById('btn-login').style.display   = 'flex';
+  document.getElementById('btn-refresh').style.display = 'none';
+  document.getElementById('btn-logout').style.display  = 'none';
+}
+
+function updateUI() {
+  const ready = sfAuthed && apiKey.startsWith('sk-ant-');
+  document.getElementById('pill-conn').style.display = sfAuthed ? 'inline-flex' : 'none';
+  document.getElementById('pill-auth').style.display = sfAuthed ? 'none' : 'inline-flex';
+  const wp = document.getElementById('welcome-p');
+  const wc = document.getElementById('welcome-chips');
+  if (wp) wp.textContent = ready
+    ? 'Ask anything about your Salesforce data below.'
+    : 'Enter your Anthropic API key and login with Salesforce to get started.';
+  if (wc) wc.style.display = ready ? 'block' : 'none';
+}
+
+// ══════════════════════════════
+//  OAUTH
+// ══════════════════════════════
+function startLogin() {
+  const cid = document.getElementById('cfg-cid').value.trim();
+  const url = document.getElementById('cfg-url').value.trim();
+  const sb  = document.getElementById('sandbox').checked;
+  if (!cid) { showErr('Enter your ECA Consumer Key first.'); return; }
+  if (!url) { showErr('Enter your Salesforce MCP Server URL first.'); return; }
+  hideErr();
+  setSF('loading', 'Opening Salesforce login…');
+  const popup = window.open(
+    'http://localhost:3000/auth/start?' + new URLSearchParams({clientId:cid, mcpUrl:url, sandbox:sb}),
+    'sf_oauth', 'width=620,height=720,left=200,top=80,scrollbars=yes'
+  );
+  if (!popup) { showErr('Popup blocked — allow popups for localhost:3000.'); setSF('err','Popup blocked'); return; }
+  const t = setInterval(() => { if (popup.closed) { clearInterval(t); setTimeout(checkAuth, 600); } }, 500);
+}
+
+async function refreshTok() {
+  setSF('loading', 'Refreshing…');
+  try {
+    const r = await fetch('http://localhost:3000/auth/refresh', {method:'POST'});
+    const d = await r.json();
+    if (d.success) await checkAuth();
+    else throw new Error(d.error);
+  } catch(e) { showErr('Refresh failed: ' + e.message); setSF('err','Refresh failed'); showLoggedOut(); sfAuthed=false; updateUI(); }
+}
+
+async function doLogout() {
+  await fetch('http://localhost:3000/auth/logout', {method:'POST'});
+  sfAuthed = false; setSF('','Not connected'); showLoggedOut(); updateUI();
+}
+
+// ══════════════════════════════
+//  CHAT UTILS
+// ══════════════════════════════
+function newChat() {
+  history = []; 
+  document.getElementById('messages').innerHTML = `
+    <div class="welcome" id="welcome">
+      <div class="welcome-cloud">☁</div>
+      <h2>360 AI Agent</h2>
+      <p id="welcome-p"></p>
+      <div id="welcome-chips" style="display:none"><div class="chips">
+        <div class="chip" onclick="chip('Show all open opportunities')">📋 Open opportunities</div>
+        <div class="chip" onclick="chip('List top 10 accounts by revenue')">🏢 Top accounts</div>
+        <div class="chip" onclick="chip('Show leads created this month')">👤 Recent leads</div>
+        <div class="chip" onclick="chip('Pipeline summary with totals')">💰 Pipeline</div>
+        <div class="chip" onclick="chip('Contacts in New York')">📍 By location</div>
+        <div class="chip" onclick="chip('List all open cases')">🎫 Open cases</div>
+      </div></div>
+    </div>`;
+  updateUI();
+}
+
+function chip(t) { document.getElementById('user-input').value = t; send(); }
+function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+function resize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,160)+'px'; }
+function rmWelcome() { const w=document.getElementById('welcome'); if(w) w.remove(); }
+function scrollBot() { const m=document.getElementById('messages'); requestAnimationFrame(()=>m.scrollTop=m.scrollHeight); }
+function showErr(msg) { const b=document.getElementById('err'); b.textContent='⚠ '+msg; b.style.display='block'; }
+function hideErr()    { document.getElementById('err').style.display='none'; }
+
+// ══════════════════════════════
+//  LIVE TOOL TRACKER
+// ══════════════════════════════
+
+
+
+
+
+// ══════════════════════════════
+//  TOOL CACHE — remember last tool names for spinner preview
+// ══════════════════════════════
+let lastToolNames = [];   // populated after each response
+
+// ══════════════════════════════
+//  SEND
+// ══════════════════════════════
+async function send() {
+  if (busy) return;
+  const input = document.getElementById('user-input');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  apiKey = document.getElementById('cfg-key').value.trim();
+  if (!apiKey.startsWith('sk-ant-')) { showErr('Enter your Anthropic API key in the sidebar.'); return; }
+  if (!sfAuthed) { showErr('Login with Salesforce first.'); return; }
+
+  hideErr(); busy = true;
+  document.getElementById('send-btn').disabled = true;
+  input.value = ''; resize(input);
+  rmWelcome();
+
+  addUserMsg(text);
+  addThinking();
+  history.push({ role:'user', content: text });
+
+  // Show live spinners — use cached tool names from last response
+  // On very first query, shows generic tools; after that shows real tool names
+  // Detect intent from user message for generic spinner label
+  const previewTools = lastToolNames.length > 0 ? lastToolNames : [];
+  const _msg = text.toLowerCase();
+  let genericLabel = 'Querying Salesforce';
+  let genericMeta  = 'Fetching data…';
+  if (/create|add|new|insert/i.test(_msg))        { genericLabel = 'Creating Record';  genericMeta = 'Writing to Salesforce…'; }
+  else if (/update|edit|change|modify|set|mark/i.test(_msg)) { genericLabel = 'Updating Record'; genericMeta = 'Saving changes…'; }
+  else if (/delete|remove|archive/i.test(_msg))   { genericLabel = 'Deleting Record';  genericMeta = 'Removing from Salesforce…'; }
+  else if (/send|email|notify|message/i.test(_msg)){ genericLabel = 'Sending';          genericMeta = 'Processing request…'; }
+
+  // After short delay, show tool spinners (don't show immediately — might be fast)
+  const spinnerTimer = setTimeout(() => showLiveSpinners(previewTools, genericLabel, genericMeta), 600);
+
+  try {
+    const resp = await fetch('http://localhost:3000/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey, system: SYS_PROMPT, messages: history })
+    });
+
+    clearTimeout(spinnerTimer);
+    const data = await resp.json();
+    rmThinking();
+    rmLiveSpinners();
+
+    if (!resp.ok) {
+      const msg = data?.error?.message || 'Error ' + resp.status;
+      if (resp.status === 401) { sfAuthed=false; showLoggedOut(); setSF('err','Token expired'); updateUI(); }
+      throw new Error(msg);
+    }
+
+    // Get actual tools used — update cache for next request
+    const tools = data._tools || [];
+    if (tools.length) {
+      lastToolNames = tools.map(t => t.name);   // cache for next spinner preview
+      showToolSummary(tools);
+    }
+
+    // Render response
+    const txt = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    if (txt.trim()) addAssistant(txt);
+
+    // Store sanitised history
+    const sanitised = (data.content||[]).map(b => {
+      if (b.type === 'mcp_tool_use')    return { ...b, server_name: b.server_name||'salesforce' };
+      if (b.type === 'mcp_tool_result') return { type:'mcp_tool_result', tool_use_id:b.tool_use_id, is_error:b.is_error||false, content:b.content||[] };
+      return b;
+    });
+    // Ensure every tool_use has a matching tool_result
+    const useIds = new Set(sanitised.filter(b=>b.type==='mcp_tool_use').map(b=>b.id));
+    const resIds = new Set(sanitised.filter(b=>b.type==='mcp_tool_result').map(b=>b.tool_use_id));
+    [...useIds].filter(id=>!resIds.has(id)).forEach(id =>
+      sanitised.push({ type:'mcp_tool_result', tool_use_id:id, is_error:false, content:[{type:'text',text:'No result'}] })
+    );
+    history.push({ role:'assistant', content: sanitised });
+
+  } catch(e) {
+    clearTimeout(spinnerTimer);
+    rmThinking(); rmLiveSpinners();
+    if (e.message.includes('Failed to fetch') || e.message.includes('fetch'))
+      showErr('Cannot reach proxy. Run: node server.js');
+    else showErr(e.message);
+  } finally {
+    busy = false;
+    document.getElementById('send-btn').disabled = false;
+    scrollBot();
+  }
+}
+
+// ── Show live spinners using known/cached tool names ──
+function showLiveSpinners(toolNames, genericLabel, genericMeta) {
+  genericLabel = genericLabel || 'Querying Salesforce';
+  genericMeta  = genericMeta  || 'Fetching data…';
+  if (document.getElementById('live-spinners')) return;
+  rmThinking();
+
+  const anchor = document.getElementById('user-anchor');
+  const msgs   = document.getElementById('messages');
+  const d      = document.createElement('div');
+  d.className  = 'tool-wrap';
+  d.id         = 'live-spinners';
+
+  // If we have cached tool names from last response, show them
+  // Otherwise show a single generic spinner — no hardcoded tool names
+  const rows = toolNames.length > 0
+    ? toolNames.map(name => `
+        <div class="tool-row">
+          <div class="tool-state running"><div class="tool-spinner"></div></div>
+          <div class="tool-info">
+            <div class="tool-nm">${esc(name)}</div>
+            <div class="tool-mt">Running…</div>
+          </div>
+        </div>`).join('')
+    : `<div class="tool-row">
+        <div class="tool-state running"><div class="tool-spinner"></div></div>
+        <div class="tool-info">
+          <div class="tool-nm">${esc(genericLabel)}</div>
+          <div class="tool-mt">${esc(genericMeta)}</div>
+        </div>
+      </div>
+      <div class="tool-row">
+        <div class="tool-state running"><div class="tool-spinner"></div></div>
+        <div class="tool-info">
+          <div class="tool-nm">Salesforce Tools Executing</div>
+          <div class="tool-mt" id="exec-dot-label">Please wait<span class="exec-dots"></span></div>
+        </div>
+      </div>`;
+
+  d.innerHTML = `<div class="tool-tracker">
+    <div class="tool-tracker-hdr"><div class="tool-hdr-dot"></div>Salesforce Tools Executing<span class="exec-dots"></span></div>
+    ${rows}
+  </div>`;
+
+  if (anchor && anchor.nextSibling) msgs.insertBefore(d, anchor.nextSibling);
+  else msgs.appendChild(d);
+  scrollBot();
+}
+
+function rmLiveSpinners() {
+  const el = document.getElementById('live-spinners');
+  if (el) el.remove();
+}
+
+// ── Tool summary: final state after response ──
+function showToolSummary(tools) {
+  const anchor = document.getElementById('user-anchor');
+  if (!anchor) return;
+  const d = document.createElement('div');
+  d.className = 'tool-wrap';
+  const rows = tools.map(t => `
+    <div class="tool-row">
+      <div class="tool-state ${t.is_error?'error':'done'}">${t.is_error?'✕':'✓'}</div>
+      <div class="tool-info">
+        <div class="tool-nm">${esc(t.name)}</div>
+        <div class="tool-mt">${esc(t.meta)}</div>
+      </div>
+    </div>`).join('');
+  d.innerHTML = `<div class="tool-tracker">
+    <div class="tool-tracker-hdr" style="animation:none">
+      <div class="tool-hdr-dot" style="animation:none;background:var(--sf-green)"></div>
+      ${tools.length} tool${tools.length!==1?'s':''} completed
+    </div>${rows}</div>`;
+  const msgs = document.getElementById('messages');
+  if (anchor.nextSibling) msgs.insertBefore(d, anchor.nextSibling);
+  else msgs.appendChild(d);
+  scrollBot();
+}
+
+
+const SYS_PROMPT = `You are a Salesforce CRM AI assistant with access to live Salesforce data via MCP tools.
+
+When users ask about Salesforce data, always use the MCP tools to query live data.
+
+IMPORTANT RESPONSE FORMATTING RULES:
+After fetching data, you MUST format it using one of these exact markers so the UI renders rich components.
+
+For records (accounts, contacts, leads, opportunities, cases, custom objects):
+[CARDS: JSON_ARRAY_HERE]
+
+For lists/comparisons with 5+ rows:
+[TABLE: {"title":"Title Here","headers":["Col1","Col2","Col3"],"rows":[["val1","val2","val3"]]}]
+
+For summary numbers, counts, totals, KPIs:
+[STATS: [{"label":"Total","value":"42","sub":"records","trend":"+5%"}]]
+
+CRITICAL RULES:
+- Always write 1-2 sentences of plain text before or after a data block
+- Use CARDS for fewer than 8 records, TABLE for 8+ records
+- For TABLE: headers and rows must be plain string arrays — NO nested objects or JSON inside cells
+- For CARDS: each item must be a flat JSON object with simple key:value pairs
+- Never show raw JSON to the user
+- Never leave data unformatted`;
+
+// ══════════════════════════════
+//  DOM BUILDERS
+// ══════════════════════════════
+function addUserMsg(t) {
+  // Remove previous anchor
+  const prev = document.getElementById('user-anchor');
+  if (prev) prev.removeAttribute('id');
+  const d=document.createElement('div');
+  d.className='msg-user';
+  d.id='user-anchor';   // tracker uses this to insert right after
+  d.innerHTML='<div class="bubble-user">'+esc(t)+'</div>';
+  document.getElementById('messages').appendChild(d); scrollBot();
+}
+function addThinking() {
+  const d=document.createElement('div'); d.className='asst-wrap'; d.id='thinking';
+  d.innerHTML='<div class="thinking"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
+  document.getElementById('messages').appendChild(d); scrollBot();
+}
+function rmThinking() { const t=document.getElementById('thinking'); if(t) t.remove(); }
+function addAssistant(raw) {
+  const d=document.createElement('div'); d.className='asst-wrap';
+  d.innerHTML=renderResponse(raw);
+  document.getElementById('messages').appendChild(d); scrollBot();
+}
+
+// ══════════════════════════════
+//  RESPONSE RENDERER
+// ══════════════════════════════
+function renderResponse(raw) {
+  // Split on markers — handle multiline JSON inside brackets
+  const parts = splitParts(raw);
+  return parts.map(p => {
+    if (p.type === 'cards') return renderCards(p.data);
+    if (p.type === 'table') return renderTable(p.data);
+    if (p.type === 'stats') return renderStats(p.data);
+    return renderMd(p.text || '');
+  }).join('');
+}
+
+function splitParts(raw) {
+  const parts = [];
+  let remaining = raw;
+  const markers = ['[CARDS:', '[TABLE:', '[STATS:'];
+  const typeMap  = {'[CARDS:':'cards','[TABLE:':'table','[STATS:':'stats'};
+
+  while (remaining.length > 0) {
+    // Find earliest marker
+    let earliest = -1, earliestType = null;
+    markers.forEach(m => {
+      const idx = remaining.indexOf(m);
+      if (idx !== -1 && (earliest === -1 || idx < earliest)) { earliest = idx; earliestType = m; }
+    });
+
+    if (earliest === -1) {
+      if (remaining.trim()) parts.push({type:'text', text:remaining});
+      break;
+    }
+
+    // Text before marker
+    if (earliest > 0) {
+      const before = remaining.slice(0, earliest);
+      if (before.trim()) parts.push({type:'text', text:before});
+    }
+
+    // Find end of JSON — must handle strings with escaped chars properly
+    const markerEnd = earliest + earliestType.length;
+    let depth = 0, found = -1;
+    let inStr = false, esc = false;
+
+    for (let i = markerEnd; i < remaining.length; i++) {
+      const ch = remaining[i];
+      if (esc)           { esc = false; continue; }
+      if (ch === '\\') { esc = true;  continue; }
+      if (ch === '"')    { inStr = !inStr; continue; }
+      if (inStr)         continue;
+      if (ch === '{' || ch === '[') depth++;
+      if (ch === '}' || ch === ']') { depth--; if (depth <= 0) { found = i; break; } }
+    }
+
+    if (found === -1) {
+      // Incomplete marker — treat rest as plain text
+      parts.push({type:'text', text:remaining.slice(earliest)});
+      break;
+    }
+
+    const jsonStr = remaining.slice(markerEnd, found + 1).trim();
+    // Skip the outer closing ] of the marker (e.g. the ] in [TABLE: {...}] )
+    let nextStart = found + 1;
+    if (remaining[nextStart] === ']') nextStart++;
+
+    try {
+      const parsed = JSON.parse(jsonStr);
+      parts.push({type: typeMap[earliestType], data: parsed});
+    } catch(e) {
+      // JSON parse failed — show as text so user doesn't see raw JSON
+      parts.push({type:'text', text:''});
+    }
+
+    remaining = remaining.slice(nextStart);
+  }
+
+  return parts;
+}
+
+// ── Cards ──
+function renderCards(records) {
+  if (!Array.isArray(records) || !records.length) return '';
+  const type = detectType(records[0]);
+  let html = `<div class="res-hdr">
+    <span class="res-title">${type.label}</span>
+    <span class="res-count">${records.length} record${records.length!==1?'s':''}</span>
+  </div><div class="cards-grid">`;
+
+  records.forEach(rec => {
+    const name   = rec.Name || [rec.FirstName,rec.LastName].filter(Boolean).join(' ') || rec.Subject || rec.Title || Object.values(rec)[0] || '—';
+    const fields = getFields(rec, type.key);
+    const status = rec.StageName || rec.Status || rec.Priority || rec.Phase || null;
+
+    html += `<div class="sf-card">
+      <div class="sf-card-top">
+        <div>
+          <div class="sf-card-type">${type.key}</div>
+          <div class="sf-card-name">${esc(String(name))}</div>
+        </div>
+        <div class="sf-card-icon" style="background:${type.bg}">${type.icon}</div>
+      </div>
+      ${status ? '<div style="margin-bottom:8px">'+ibadge(status)+'</div>' : ''}
+      ${fields.map(f =>
+        `<div class="sf-field">
+          <span class="sf-fl">${esc(f.label)}</span>
+          <span class="sf-fv">${fmtVal(f.value, f.label)}</span>
+        </div>`
+      ).join('')}
+    </div>`;
+  });
+  return html + '</div>';
+}
+
+// ── Table ──
+function renderTable(data) {
+  if (!data) return '';
+  // Normalise array-of-objects to {headers, rows}
+  if (Array.isArray(data)) {
+    if (!data.length) return '';
+    const headers = Object.keys(data[0]);
+    const rows    = data.map(r => headers.map(h => r[h] !== undefined ? String(r[h]) : ''));
+    data = {title:'Results', headers, rows};
+  }
+  if (!data.headers || !data.rows) return '';
+
+  const safeHeaders = data.headers.map(h => String(h));
+  const safeRows    = data.rows.map(row =>
+    (Array.isArray(row) ? row : Object.values(row)).map(cell =>
+      cell === null || cell === undefined ? '' :
+      typeof cell === 'object' ? JSON.stringify(cell) : String(cell)
+    )
+  );
+
+  // Smart column widths based on header name patterns
+  function colWidth(h) {
+    const lh = h.toLowerCase();
+    if (/^(id|no\.?|num|#)$/i.test(lh))                      return '80px';
+    if (/date|time/i.test(lh))                                return '110px';
+    if (/amount|value|revenue|total|balance|price|emi/i.test(lh)) return '110px';
+    if (/rate|%|percent|prob/i.test(lh))                      return '80px';
+    if (/tenure|term|months?|days?/i.test(lh))                return '80px';
+    if (/stage|status|type|phase/i.test(lh))                  return '120px';
+    if (/owner|source|origin/i.test(lh))                      return '100px';
+    return 'auto'; // name, account, applicant get remaining space
+  }
+
+  const colgroup = '<colgroup>' + safeHeaders.map(h => `<col style="width:${colWidth(h)}">`).join('') + '</colgroup>';
+
+  let html = `<div class="res-hdr">
+    <span class="res-title">${esc(data.title||'Results')}</span>
+    <span class="res-count">${safeRows.length} rows</span>
+  </div>
+  <div class="table-wrap"><table class="sf-table">
+    ${colgroup}
+    <thead><tr>${safeHeaders.map(h=>'<th>'+esc(h)+'</th>').join('')}</tr></thead>
+    <tbody>`;
+
+  safeRows.forEach(row => {
+    html += '<tr>' + row.map((cell, i) => '<td title="'+esc(cell)+'">' + fmtVal(cell, safeHeaders[i]) + '</td>').join('') + '</tr>';
+  });
+
+  return html + '</tbody></table></div>';
+}
+
+// ── Stats ──
+function renderStats(items) {
+  if (!Array.isArray(items)) return '';
+  let html = '<div class="stats-row">';
+  items.forEach(s => {
+    const tc  = s.trend ? (s.trend.startsWith('+') ? 'up' : 'down') : '';
+    const val = String(s.value || '');
+    // Long values get smaller font
+    const valStyle = val.length > 8 ? 'font-size:15px' : val.length > 5 ? 'font-size:18px' : '';
+    html += `<div class="stat-card">
+      <div class="stat-lbl">${esc(s.label||'')}</div>
+      <div class="stat-val" style="${valStyle}" title="${esc(val)}">${esc(val)}</div>
+      ${s.sub   ? '<div class="stat-sub">'+esc(s.sub)+'</div>'           : ''}
+      ${s.trend ? '<div class="stat-trend '+tc+'">'+esc(s.trend)+'</div>': ''}
+    </div>`;
+  });
+  return html + '</div>';
+}
+
+// ── Badge renderer ──
+function ibadge(val) {
+  if (!val) return '';
+  const v = String(val).toLowerCase();
+  let cls = 'ib-gray';
+  if (/open|active|new|prospect|won|approved|funded/i.test(v))          cls = 'ib-green';
+  else if (/closed|lost|inactive|rejected|cancelled/i.test(v))         cls = 'ib-red';
+  else if (/working|progress|negotiat|qualif|review|processing/i.test(v)) cls = 'ib-blue';
+  else if (/pending|proposal|warm|submitted/i.test(v))                  cls = 'ib-orange';
+  else if (/vip|enterprise|strategic|premium/i.test(v))                 cls = 'ib-purple';
+  else if (/high/i.test(v))                                             cls = 'ib-red';
+  else if (/medium|mid/i.test(v))                                       cls = 'ib-yellow';
+  else if (/low/i.test(v))                                              cls = 'ib-teal';
+  return '<span class="ibadge '+cls+'">' + esc(val) + '</span>';
+}
+
+// ── Field value formatting ──
+function fmtVal(val, label) {
+  if (val === null || val === undefined || val === '') return '<span style="color:var(--txt-4)">—</span>';
+  if (typeof val === 'object') val = JSON.stringify(val);
+  const s = String(val);
+  if (label && /amount|revenue|value|price|total|mrr|arr|salary|balance|loan/i.test(label)) {
+    const n = parseFloat(s.replace(/[^0-9.-]/g,''));
+    if (!isNaN(n)) return '<strong>$' + n.toLocaleString() + '</strong>';
+  }
+  if (label && /\bdate\b|closedate|createddate|modifieddate/i.test(label)) {
+    const d = new Date(s);
+    if (!isNaN(d)) return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+  if (label && /status|stage|type|priority|phase|grade/i.test(label)) return ibadge(s);
+  if (label && /percent|probability/i.test(label)) {
+    const n = parseFloat(s); if (!isNaN(n)) return n + '%';
+  }
+  if (s === 'true')  return '<span class="ibadge ib-green">Yes</span>';
+  if (s === 'false') return '<span class="ibadge ib-gray">No</span>';
+  return esc(s);
+}
+
+// ── Record type detection ──
+function detectType(rec) {
+  if (rec.StageName !== undefined || (rec.CloseDate !== undefined && rec.AccountId !== undefined))
+    return {key:'Opportunity', label:'Opportunities', icon:'💰', bg:'#f3f9f0'};
+  if (rec.AnnualRevenue !== undefined || (rec.NumberOfEmployees !== undefined))
+    return {key:'Account', label:'Accounts', icon:'🏢', bg:'#eaf4ff'};
+  if (rec.LeadSource !== undefined && rec.Company !== undefined && rec.AccountId === undefined)
+    return {key:'Lead', label:'Leads', icon:'🎯', bg:'#fff3e0'};
+  if (rec.Email !== undefined && rec.AccountId !== undefined && rec.StageName === undefined)
+    return {key:'Contact', label:'Contacts', icon:'👤', bg:'#f4f0ff'};
+  if (rec.CaseNumber !== undefined)
+    return {key:'Case', label:'Cases', icon:'🎫', bg:'#f0fafa'};
+  if (rec.LoanAmount !== undefined || rec.LoanNumber !== undefined || /loan/i.test(Object.keys(rec).join('')))
+    return {key:'Loan Application', label:'Loan Applications', icon:'📄', bg:'#fffae0'};
+  return {key:'Record', label:'Results', icon:'📋', bg:'#f3f3f3'};
+}
+
+// ── Extract display fields ──
+function getFields(rec, type) {
+  const skip = new Set(['Id','Name','FirstName','LastName','Subject','Title','attributes']);
+  const priority = {
+    Opportunity:       ['StageName','Amount','CloseDate','AccountName','Probability','Type'],
+    Account:           ['Industry','AnnualRevenue','Phone','BillingCity','Type','NumberOfEmployees'],
+    Contact:           ['Title','Email','Phone','MailingCity','Department','AccountName'],
+    Lead:              ['Company','Email','Phone','Status','LeadSource','City'],
+    Case:              ['Status','Priority','Origin','AccountName','CreatedDate'],
+    'Loan Application':['LoanAmount','Status','InterestRate','Term','ApplicantName','ApplicationDate'],
+    Record:            []
+  }[type] || [];
+
+  const fields = [];
+  priority.forEach(k => {
+    if (rec[k] !== undefined && rec[k] !== null && rec[k] !== '') fields.push({label:camel(k), value:rec[k]});
+  });
+  Object.keys(rec).forEach(k => {
+    if (!skip.has(k) && !priority.includes(k) && rec[k]!==null && rec[k]!==undefined && rec[k]!=='' && typeof rec[k]!=='object' && fields.length < 5)
+      fields.push({label:camel(k), value:rec[k]});
+  });
+  return fields.slice(0, 5);
+}
+
+function camel(s) { return s.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()).trim(); }
+
+// ── Markdown ──
+function renderMd(text) {
+  if (!text.trim()) return '';
+  let h = esc(text)
+    .replace(/```([\s\S]*?)```/g, (_,c) => '<pre>' + c.replace(/^[a-z]+\n/,'') + '</pre>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm,  '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm,   '<h3>$1</h3>')
+    .replace(/^\- (.+)$/gm,  '<li>$1</li>')
+    .replace(/(<li>[\s\S]+?<\/li>)/g, '<ul>$1</ul>')
+    .replace(/\n\n+/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  if (!h.startsWith('<')) h = '<p>' + h + '</p>';
+  return '<div class="prose">' + h + '</div>';
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Sidebar collapse ──
+function toggleSidebar() {
+  const sb      = document.querySelector('.sidebar');
+  const openBtn = document.getElementById('sidebar-open-btn');
+  const colBtn  = document.getElementById('collapse-btn');
+  const collapsed = sb.classList.toggle('collapsed');
+  if (openBtn) openBtn.style.display = collapsed ? 'flex' : 'none';
+  if (colBtn)  colBtn.textContent    = collapsed ? '›' : '‹';
+}
+</script>
+</body>
+</html>

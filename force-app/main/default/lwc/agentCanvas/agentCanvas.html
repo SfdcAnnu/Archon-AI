@@ -1,0 +1,387 @@
+<template>
+    <div class="builder-shell">
+
+        <!-- ── TOPBAR ─────────────────────────────────────────── -->
+        <div class="builder-topbar">
+            <div class="tb-left">
+                <lightning-button-icon
+                    icon-name="utility:back"
+                    variant="bare"
+                    alternative-text="Back"
+                    onclick={handleBack}>
+                </lightning-button-icon>
+                <div class="app-logo">
+                    <span class="logo-dot"></span>
+                    <span class="logo-text">Archon AI</span>
+                </div>
+                <div class="tb-sep"></div>
+                <span class="nav-tab nav-tab--active">Builder</span>
+                <span class="nav-tab" onclick={handleNavLogs}>Execution logs</span>
+                <div class="tb-sep"></div>
+                <lightning-input
+                    value={agentDef.Name}
+                    variant="label-hidden"
+                    class="agent-name-input"
+                    onchange={handleAgentNameChange}>
+                </lightning-input>
+                <span class={statusPillClass}>{agentDef.Status__c}</span>
+            </div>
+            <div class="tb-actions">
+                <lightning-button label="Auto layout" variant="base"  icon-name="utility:rows"           onclick={handleAutoLayout}></lightning-button>
+                <lightning-button label="Connectors"  variant="base"  icon-name="utility:connected_apps" onclick={handleOpenConnectors}></lightning-button>
+                <lightning-button label="Test run"                    icon-name="utility:apex"           onclick={handleTestRun}></lightning-button>
+                <lightning-button label="Save"                        icon-name="utility:save"           onclick={handleSave} disabled={isSaving}></lightning-button>
+                <lightning-button label="Deploy" variant="brand"      icon-name="utility:rocket"         onclick={handleDeploy}></lightning-button>
+            </div>
+        </div>
+
+        <!-- ── CANVAS TOOLBAR ─────────────────────────────────── -->
+        <div class="canvas-toolbar">
+            <span class="node-count">{nodeCount} nodes · {connectionCount} connections</span>
+            <div class="spacer"></div>
+            <div class="zoom-group">
+                <lightning-button-icon icon-name="utility:zoomout"    variant="bare" alternative-text="Zoom out"  onclick={handleZoomOut}></lightning-button-icon>
+                <span class="zoom-label">{zoomLabel}</span>
+                <lightning-button-icon icon-name="utility:zoomin"     variant="bare" alternative-text="Zoom in"   onclick={handleZoomIn}></lightning-button-icon>
+                <lightning-button-icon icon-name="utility:expand_alt" variant="bare" alternative-text="Reset"     onclick={handleZoomReset}></lightning-button-icon>
+            </div>
+        </div>
+
+        <!-- ── BODY ───────────────────────────────────────────── -->
+        <div class="builder-body">
+
+            <!-- LEFT PANEL: Nodes / Connectors tabs -->
+            <div class="lpanel">
+                <div class="ptabs">
+                    <div class={nodesTabClass} onclick={handleTabNodes}>Nodes</div>
+                    <div class={connectorsTabClass} onclick={handleTabConnectors}>Connectors</div>
+                </div>
+                <div class="psearch">
+                    <lightning-input
+                        type="search"
+                        placeholder="Search…"
+                        variant="label-hidden"
+                        onchange={handlePaletteSearch}>
+                    </lightning-input>
+                </div>
+
+                <!-- Nodes tab -->
+                <template lwc:if={showNodesTab}>
+                    <div class="pscroll">
+                        <template for:each={paletteNodeSections} for:item="category">
+                            <div key={category.category}>
+                                <div class="sec-head">{category.category}</div>
+                                <template for:each={category.nodes} for:item="node">
+                                    <div key={node.subType}
+                                         class="nitem"
+                                         draggable="true"
+                                         data-label={node.label}
+                                         data-type={node.type}
+                                         data-subtype={node.subType}
+                                         data-mcpserver={node.mcpServer}
+                                         data-mcptool={node.mcpTool}
+                                         ondragstart={handlePaletteDragStart}>
+                                        <div class={node.iconChipClass}>
+                                            <lightning-icon icon-name={node.icon} size="x-small"></lightning-icon>
+                                        </div>
+                                        <div class="ntext">
+                                            <div class="nm">{node.label}</div>
+                                            <template lwc:if={node.sub}>
+                                                <div class="ns">{node.sub}</div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Connectors tab -->
+                <template lwc:if={showConnectorsTab}>
+                    <div class="pscroll">
+                        <template for:each={connectorSections} for:item="section">
+                            <div key={section.category}>
+                                <div class="sec-head">{section.category}</div>
+                                <template for:each={section.items} for:item="tile">
+                                    <!-- Every tile is draggable (literal draggable="true" —
+                                         dynamic bindings render as a boolean attr = off).
+                                         Unconnected drops land with a red dot; user links
+                                         an account later via the node's Auth tab. -->
+                                    <div key={tile.key}
+                                         class="citem"
+                                         draggable="true"
+                                         data-connector-id={tile.connectorId}
+                                         data-provider={tile.providerKey}
+                                         data-label={tile.label}
+                                         data-catalog-type={tile.catalogType}
+                                         data-brand-color={tile.brandColor}
+                                         data-icon-url={tile.iconUrl}
+                                         data-account-email={tile.accountEmail}
+                                         ondragstart={handleConnectorDragStart}>
+                                        <template lwc:if={tile.iconUrl}>
+                                            <img src={tile.iconUrl} alt={tile.label} class="citem-img" draggable="false"/>
+                                        </template>
+                                        <template lwc:else>
+                                            <div class="nicon ic-blue">
+                                                <lightning-icon icon-name="utility:connected_apps" size="x-small"></lightning-icon>
+                                            </div>
+                                        </template>
+                                        <div class="ntext">
+                                            <div class="nm">{tile.label}</div>
+                                            <div class="ns">{tile.sub}</div>
+                                        </div>
+                                        <template lwc:if={tile.isConnected}>
+                                            <span class="cbadge cbadge-on">connected</span>
+                                        </template>
+                                        <template lwc:else>
+                                            <span class="add-btn"
+                                                  data-provider={tile.providerKey}
+                                                  onclick={handleConnectProvider}>+ Connect</span>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <div class="citem citem-more" onclick={handleOpenConnectors}>
+                            <div class="nicon ic-gray">
+                                <lightning-icon icon-name="utility:add" size="x-small"></lightning-icon>
+                            </div>
+                            <div class="ntext"><div class="nm">Browse all connectors</div></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- CENTRE: CANVAS -->
+            <div class="canvas-wrap">
+                <div class="canvas-crumb">
+                    <span class="crumb-link" onclick={handleBack}>Agents</span>
+                    <span class="crumb-sep">/</span>
+                    <span>{agentDef.Name}</span>
+                    <span class="crumb-sep">/</span>
+                    <span>Main flow</span>
+                </div>
+
+                <div class="canvas-area"
+                     ondragover={handleDragOver}
+                     ondrop={handleDrop}
+                     onclick={handleCanvasClick}
+                     onmousemove={handleCanvasMouseMove}
+                     onmouseup={handleCanvasMouseUp}>
+
+                    <div class="canvas-dots"></div>
+
+                    <!-- SVG connection layer -->
+                    <svg class="svg-layer">
+                        <template for:each={svgConnections} for:item="conn">
+                            <g key={conn.id}>
+                                <path
+                                    d={conn.d}
+                                    fill="none"
+                                    stroke={conn.color}
+                                    stroke-width="1.5"
+                                    stroke-dasharray={conn.dash}
+                                    class="conn-path"
+                                    data-id={conn.id}
+                                    onclick={handleDeleteConnection}>
+                                </path>
+                                <circle cx={conn.endX} cy={conn.endY} r="3" fill={conn.color} class="conn-tip"></circle>
+                            </g>
+                        </template>
+                        <template lwc:if={previewConnection}>
+                            <path
+                                d={previewConnection.d}
+                                fill="none"
+                                stroke="#378ADD"
+                                stroke-width="1.5"
+                                stroke-dasharray="4,3"
+                                class="conn-preview">
+                            </path>
+                        </template>
+                    </svg>
+
+                    <!-- CANVAS NODES -->
+                    <template for:each={canvasNodes} for:item="node">
+                        <div key={node.id}
+                             class={node.cardClass}
+                             style={node.positionStyle}
+                             data-id={node.id}
+                             onmousedown={handleNodeMouseDown}>
+
+                            <div class="cnh">
+                                <template lwc:if={node.connectorIconUrl}>
+                                    <img src={node.connectorIconUrl} alt={node.label} class="cnicon-img"/>
+                                </template>
+                                <template lwc:else>
+                                    <div class={node.iconChipClass}>
+                                        <lightning-icon icon-name={node.icon} size="xx-small"></lightning-icon>
+                                    </div>
+                                </template>
+                                <span class="cntitle">{node.label}</span>
+                                <template lwc:if={node.showStatusDot}>
+                                    <span class={node.statusDotClass} title={node.statusDotTitle}></span>
+                                </template>
+                                <lightning-button-icon
+                                    icon-name="utility:close"
+                                    size="x-small"
+                                    variant="bare"
+                                    alternative-text="Delete node"
+                                    data-id={node.id}
+                                    onclick={handleDeleteNode}
+                                    class="cn-delete">
+                                </lightning-button-icon>
+                            </div>
+
+                            <div class="cntype">{node.typeLabel}</div>
+                            <div class="cnsub">{node.subTitle}</div>
+
+                            <template lwc:if={node.hasToolChips}>
+                                <div class="tool-chips">
+                                    <template for:each={node.toolChips} for:item="chip">
+                                        <span key={chip} class="tchip">{chip}</span>
+                                    </template>
+                                    <template lwc:if={node.moreToolsLabel}>
+                                        <span class="tchip tchip-more">{node.moreToolsLabel}</span>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template lwc:if={node.mcpServer}>
+                                <span class="cnbadge">MCP: {node.mcpServer}</span>
+                            </template>
+
+                            <!-- Ports -->
+                            <template lwc:if={node.hasInputPort}>
+                                <div class="port port-in"
+                                     data-nodeid={node.id}
+                                     data-port="in"
+                                     onmouseup={handlePortMouseUp}
+                                     title="Input">
+                                </div>
+                            </template>
+                            <template lwc:if={node.hasOutputPort}>
+                                <div class="port port-out"
+                                     data-nodeid={node.id}
+                                     data-port="out"
+                                     onmousedown={handlePortMouseDown}
+                                     title="Connect output">
+                                </div>
+                            </template>
+                            <template lwc:if={node.isIfElse}>
+                                <div class="port port-yes" data-nodeid={node.id} data-port="yes" onmousedown={handlePortMouseDown} title="Yes branch"></div>
+                                <span class="port-lbl port-lbl-yes">Yes</span>
+                                <div class="port port-no" data-nodeid={node.id} data-port="no" onmousedown={handlePortMouseDown} title="No branch"></div>
+                                <span class="port-lbl port-lbl-no">No</span>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Empty state -->
+                    <template lwc:if={isEmpty}>
+                        <div class="canvas-empty">
+                            <lightning-icon icon-name="utility:drag_and_drop" size="medium" alternative-text="Drop nodes here"></lightning-icon>
+                            <p>Drag nodes from the left panel to start building</p>
+                            <p class="canvas-hint-sub">Add a Trigger first, then chain AI, Connector, and Logic nodes</p>
+                        </div>
+                    </template>
+
+                    <template lwc:if={isEmpty}>
+                        <div class="hint-bar">Drag connectors from left panel · click a node to configure</div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- RIGHT: INSPECTOR -->
+            <div class="props-panel">
+                <template lwc:if={selectedNode}>
+                    <c-agent-properties-panel
+                        node={selectedNode}
+                        onconfig={handleNodeConfigChange}
+                        onlabelchange={handleNodeLabelChange}
+                        onconnectprovider={handleConnectProviderEvent}>
+                    </c-agent-properties-panel>
+                </template>
+                <template lwc:else>
+                    <div class="props-empty">
+                        <lightning-icon icon-name="utility:touch_action" size="medium" alternative-text="Properties"></lightning-icon>
+                        <p>Select a node to configure</p>
+
+                        <div class="agent-settings">
+                            <div class="prop-sec-title">Agent settings</div>
+                            <div class="prop-field">
+                                <label class="prop-label">Department</label>
+                                <lightning-combobox
+                                    value={agentDef.Department__c}
+                                    options={deptOptions}
+                                    variant="label-hidden"
+                                    onchange={handleDeptChange}>
+                                </lightning-combobox>
+                            </div>
+                            <div class="prop-field">
+                                <label class="prop-label">Knowledge base</label>
+                                <lightning-button
+                                    label="Edit knowledge base"
+                                    icon-name="utility:edit"
+                                    onclick={handleOpenKb}>
+                                </lightning-button>
+                            </div>
+                            <div class="prop-field">
+                                <label class="prop-label">Status</label>
+                                <lightning-combobox
+                                    value={agentDef.Status__c}
+                                    options={statusOptions}
+                                    variant="label-hidden"
+                                    onchange={handleStatusChange}>
+                                </lightning-combobox>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+        </div>
+
+        <!-- Connectors directory modal -->
+        <c-agent-connectors-directory
+            open={showConnectorsModal}
+            start-provider={connectorsStartProvider}
+            onclose={handleCloseConnectors}>
+        </c-agent-connectors-directory>
+
+        <!-- Knowledge base modal -->
+        <template lwc:if={showKbModal}>
+            <div class="kb-modal-backdrop" onclick={handleCloseKb}></div>
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="kb-modal-heading"
+                class="kb-modal">
+                <header class="kb-modal-head">
+                    <h2 id="kb-modal-heading">Knowledge base — {agentDef.Name}</h2>
+                    <lightning-button-icon
+                        icon-name="utility:close"
+                        size="small"
+                        variant="bare"
+                        alternative-text="Close"
+                        onclick={handleCloseKb}>
+                    </lightning-button-icon>
+                </header>
+                <div class="kb-modal-body">
+                    <lightning-textarea
+                        label="Business rules and knowledge"
+                        value={agentDef.KnowledgeBase__c}
+                        rows="14"
+                        placeholder="Write your agent's rules in plain English. Example: Hot leads (score > 80) must be assigned to the AE via Slack."
+                        onchange={handleKbChange}>
+                    </lightning-textarea>
+                </div>
+                <footer class="kb-modal-foot">
+                    <lightning-button label="Cancel" onclick={handleCloseKb}></lightning-button>
+                    <lightning-button variant="brand" label="Save" onclick={handleCloseKb} class="slds-m-left_small"></lightning-button>
+                </footer>
+            </section>
+        </template>
+
+    </div>
+</template>

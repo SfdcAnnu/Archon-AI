@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+
+    <!-- ── SynapseConfig__mdt + Default record (ServerUrl + JwtSecret) ── -->
+    <types>
+        <members>SynapseConfig__mdt</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>SynapseConfig__mdt.JwtSecret__c</members>
+        <members>SynapseConfig__mdt.ServerUrl__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>SynapseConfig.Default</members>
+        <name>CustomMetadata</name>
+    </types>
+
+    <!-- ── Remote Site Setting (lets Apex callout reach the Node server) ── -->
+    <types>
+        <members>Synapse_Server</members>
+        <name>RemoteSiteSetting</name>
+    </types>
+
+    <!-- ── SynapseInstall__c Hierarchy Custom Setting ──────────────── -->
+    <types>
+        <members>SynapseInstall__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>SynapseInstall__c.SessionKey__c</members>
+        <members>SynapseInstall__c.ConfiguredAt__c</members>
+        <members>SynapseInstall__c.ConfiguredByEmail__c</members>
+        <name>CustomField</name>
+    </types>
+
+    <!-- ── ConnectorCatalog__mdt (CMT + 8 records) ─────────────────── -->
+    <types>
+        <members>ConnectorCatalog__mdt</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>ConnectorCatalog__mdt.DisplayName__c</members>
+        <members>ConnectorCatalog__mdt.Description__c</members>
+        <members>ConnectorCatalog__mdt.Category__c</members>
+        <members>ConnectorCatalog__mdt.IconStaticResource__c</members>
+        <members>ConnectorCatalog__mdt.BrandColor__c</members>
+        <members>ConnectorCatalog__mdt.AuthType__c</members>
+        <members>ConnectorCatalog__mdt.AuthorizeUrl__c</members>
+        <members>ConnectorCatalog__mdt.TokenUrl__c</members>
+        <members>ConnectorCatalog__mdt.Scopes__c</members>
+        <members>ConnectorCatalog__mdt.MapsToCatalogType__c</members>
+        <members>ConnectorCatalog__mdt.IsPopular__c</members>
+        <members>ConnectorCatalog__mdt.SortOrder__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>ConnectorCatalog.salesforce_mcp</members>
+        <members>ConnectorCatalog.gdrive</members>
+        <members>ConnectorCatalog.onedrive</members>
+        <members>ConnectorCatalog.sharepoint</members>
+        <members>ConnectorCatalog.outlook</members>
+        <members>ConnectorCatalog.gmail</members>
+        <members>ConnectorCatalog.slack</members>
+        <members>ConnectorCatalog.teams</members>
+        <name>CustomMetadata</name>
+    </types>
+
+    <!-- ── Apex (thin proxy + test + setup controller) ─────────────── -->
+    <types>
+        <members>AgentConnectorController</members>
+        <members>AgentConnectorControllerTest</members>
+        <members>SynapseSetupController</members>
+        <members>SynapseSetupControllerTest</members>
+        <name>ApexClass</name>
+    </types>
+
+    <!-- ── LWC ─────────────────────────────────────────────────────── -->
+    <types>
+        <members>agentConnectorsDirectory</members>
+        <members>agentCanvas</members>
+        <members>agentPropertiesPanel</members>
+        <members>synapseSetup</members>
+        <name>LightningComponentBundle</name>
+    </types>
+
+    <!-- ── Tab (Synapse Setup) ─────────────────────────────────────── -->
+    <types>
+        <members>Synapse_Setup</members>
+        <name>CustomTab</name>
+    </types>
+
+    <!-- ── 8 connector icons ───────────────────────────────────────── -->
+    <types>
+        <members>connector_salesforce</members>
+        <members>connector_gdrive</members>
+        <members>connector_onedrive</members>
+        <members>connector_sharepoint</members>
+        <members>connector_outlook</members>
+        <members>connector_gmail</members>
+        <members>connector_slack</members>
+        <members>connector_teams</members>
+        <name>StaticResource</name>
+    </types>
+
+    <!-- ── Permission set update ──────────────────────────────────── -->
+    <types>
+        <members>AgentBuilderUser</members>
+        <name>PermissionSet</name>
+    </types>
+
+    <version>62.0</version>
+</Package>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Agent Node</label>
+    <pluralLabel>Agent Nodes</pluralLabel>
+    <nameField>
+        <label>Node Label</label>
+        <type>Text</type>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <fields>
+        <fullName>AgentDefinition__c</fullName>
+        <label>Agent Definition</label>
+        <type>MasterDetail</type>
+        <referenceTo>AgentDefinition__c</referenceTo>
+        <relationshipName>Nodes</relationshipName>
+        <relationshipLabel>Agent Nodes</relationshipLabel>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+    </fields>
+    <fields>
+        <fullName>NodeType__c</fullName>
+        <label>Node Type</label>
+        <type>Picklist</type>
+        <valueSet>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>trigger</fullName><default>false</default></value>
+                <value><fullName>ai</fullName><default>false</default></value>
+                <value><fullName>action</fullName><default>false</default></value>
+                <value><fullName>logic</fullName><default>false</default></value>
+                <value><fullName>email</fullName><default>false</default></value>
+                <value><fullName>sms</fullName><default>false</default></value>
+                <value><fullName>storage</fullName><default>false</default></value>
+                <value><fullName>end</fullName><default>false</default></value>
+            </valueSetDefinition>
+        </valueSet>
+        <required>true</required>
+    </fields>
+    <fields>
+        <fullName>NodeSubType__c</fullName>
+        <label>Node Sub-Type</label>
+        <type>Text</type>
+        <length>100</length>
+    </fields>
+    <fields>
+        <fullName>ConfigJson__c</fullName>
+        <label>Configuration JSON</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <visibleLines>5</visibleLines>
+    </fields>
+    <fields>
+        <fullName>PositionX__c</fullName>
+        <label>Position X</label>
+        <type>Number</type>
+        <precision>6</precision>
+        <scale>0</scale>
+        <defaultValue>0</defaultValue>
+    </fields>
+    <fields>
+        <fullName>PositionY__c</fullName>
+        <label>Position Y</label>
+        <type>Number</type>
+        <precision>6</precision>
+        <scale>0</scale>
+        <defaultValue>0</defaultValue>
+    </fields>
+    <fields>
+        <fullName>SortOrder__c</fullName>
+        <label>Sort Order</label>
+        <type>Number</type>
+        <precision>5</precision>
+        <scale>0</scale>
+        <defaultValue>0</defaultValue>
+    </fields>
+    <fields>
+        <fullName>IsEnabled__c</fullName>
+        <label>Is Enabled</label>
+        <type>Checkbox</type>
+        <defaultValue>true</defaultValue>
+    </fields>
+    <fields>
+        <fullName>McpServer__c</fullName>
+        <label>MCP Server</label>
+        <type>Text</type>
+        <length>100</length>
+    </fields>
+    <fields>
+        <fullName>McpTool__c</fullName>
+        <label>MCP Tool</label>
+        <type>Text</type>
+        <length>100</length>
+    </fields>
+</CustomObject>

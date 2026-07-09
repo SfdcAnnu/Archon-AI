@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Chat Message</label>
+    <pluralLabel>Chat Messages</pluralLabel>
+    <description>One message within a Chat Session. Sharing inherited from parent session.</description>
+    <nameField>
+        <label>Message Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>MSG-{0000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableReports>true</enableReports>
+    <enableHistory>false</enableHistory>
+</CustomObject>

@@ -1,0 +1,276 @@
+<template>
+    <div class="props-wrap">
+
+        <!-- ── Header ─────────────────────────────────────── -->
+        <div class="rp-head">
+            <div class={headIconClass}>
+                <lightning-icon icon-name={headIcon} size="x-small" alternative-text={nodeTitle}></lightning-icon>
+            </div>
+            <div class="rp-meta">
+                <div class="rp-title">{nodeTitle}</div>
+                <div class="rp-sub">{headSubtitle}</div>
+            </div>
+        </div>
+
+        <div class="rp-body">
+
+            <!-- Credential warning (AI nodes without a bound key) -->
+            <template lwc:if={showKeyAlert}>
+                <div class="alert-w">
+                    <lightning-icon icon-name="utility:warning" size="xx-small"></lightning-icon>
+                    <span>API key required — add a {engineDisplayName} key to activate this node.</span>
+                </div>
+            </template>
+
+            <!-- ── Tabs ───────────────────────────────────── -->
+            <div class="itabs">
+                <template for:each={tabDefs} for:item="tab">
+                    <div key={tab.id}
+                         class={tab.cls}
+                         data-tab={tab.id}
+                         onclick={handleTabClick}>{tab.label}</div>
+                </template>
+            </div>
+
+            <!-- ══ CONFIG TAB (AI + generic nodes) ══════════ -->
+            <template lwc:if={showConfigTab}>
+
+                <div class="prop-field">
+                    <label class="prop-label">Node label</label>
+                    <lightning-input
+                        value={nodeTitle}
+                        variant="label-hidden"
+                        onchange={handleLabelChange}>
+                    </lightning-input>
+                </div>
+
+                <!-- Engine credentials (AI nodes) -->
+                <template lwc:if={isAiNode}>
+                    <div class="prop-field">
+                        <template lwc:if={canBindPicker}>
+                            <c-ai-engine-connection-picker
+                                engine-type={engineTypeForPicker}
+                                agent-node-id={agentNodeRecordId}
+                                selected-id={boundConnectionId}
+                                onconfigchange={handlePickerConfigChange}>
+                            </c-ai-engine-connection-picker>
+                        </template>
+                        <template lwc:else>
+                            <div class="prop-sec-title">Credentials</div>
+                            <div class="picker-blocked">{pickerBlockedMsg}</div>
+                        </template>
+                    </div>
+
+                    <!-- Model radio cards -->
+                    <div class="prop-field">
+                        <label class="prop-label">Model</label>
+                        <div class="engine-rows">
+                            <template for:each={modelRows} for:item="m">
+                                <div key={m.value}
+                                     class={m.rowClass}
+                                     data-value={m.value}
+                                     onclick={handleModelSelect}>
+                                    <span class={m.radioClass}></span>
+                                    <div class={m.chipClass}>
+                                        <lightning-icon icon-name="utility:einstein" size="xx-small"></lightning-icon>
+                                    </div>
+                                    <div class="er-text">
+                                        <div class="er-name">{m.value}</div>
+                                        <template lwc:if={m.hint}>
+                                            <div class="er-hint">{m.hint}</div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Remaining schema-driven fields -->
+                <template for:each={configFields} for:item="field">
+                    <div key={field.key} class="prop-field">
+                        <label class="prop-label">{field.label}</label>
+
+                        <template lwc:if={field.isText}>
+                            <lightning-input value={field.value} variant="label-hidden" placeholder={field.placeholder} data-key={field.key} onchange={handleFieldChange}></lightning-input>
+                        </template>
+                        <template lwc:if={field.isTextarea}>
+                            <lightning-textarea value={field.value} variant="label-hidden" placeholder={field.placeholder} max-length="10000" rows="4" data-key={field.key} onchange={handleFieldChange}></lightning-textarea>
+                        </template>
+                        <template lwc:if={field.isNumber}>
+                            <lightning-input type="number" value={field.value} variant="label-hidden" min={field.min} max={field.max} step={field.step} data-key={field.key} onchange={handleFieldChange}></lightning-input>
+                        </template>
+                        <template lwc:if={field.isPicklist}>
+                            <lightning-combobox value={field.value} options={field.picklistOptions} variant="label-hidden" data-key={field.key} onchange={handleFieldChange}></lightning-combobox>
+                        </template>
+                        <template lwc:if={field.isToggle}>
+                            <lightning-input type="toggle" checked={field.value} variant="label-hidden" message-toggle-active="Yes" message-toggle-inactive="No" data-key={field.key} onchange={handleFieldChange}></lightning-input>
+                        </template>
+                        <template lwc:if={field.isMultiselect}>
+                            <div class="multiselect-rows">
+                                <template for:each={field.multiselectOptions} for:item="opt">
+                                    <label key={opt.value} class="ms-row">
+                                        <input type="checkbox" checked={opt.checked} data-key={field.key} data-option={opt.value} onchange={handleMultiselectChange}/>
+                                        <span class="ms-label">{opt.label}</span>
+                                    </label>
+                                </template>
+                            </div>
+                        </template>
+                        <template lwc:if={field.isExamples}>
+                            <div class="examples-box">
+                                <template for:each={field.exampleRows} for:item="ex">
+                                    <div key={ex.idx} class="example-row">
+                                        <div class="example-head">
+                                            <span class="ex-title">Example {ex.idxOneBased}</span>
+                                            <lightning-button-icon icon-name="utility:close" size="x-small" variant="bare" alternative-text="Remove" data-key={field.key} data-idx={ex.idx} onclick={handleRemoveExample}></lightning-button-icon>
+                                        </div>
+                                        <lightning-textarea label="Input"  value={ex.input}  rows="2" max-length="2000" data-key={field.key} data-idx={ex.idx} data-which="input"  onchange={handleExampleChange}></lightning-textarea>
+                                        <lightning-textarea label="Output" value={ex.output} rows="2" max-length="2000" data-key={field.key} data-idx={ex.idx} data-which="output" onchange={handleExampleChange}></lightning-textarea>
+                                    </div>
+                                </template>
+                                <lightning-button label="+ Add example" variant="base" data-key={field.key} onclick={handleAddExample}></lightning-button>
+                            </div>
+                        </template>
+
+                        <template lwc:if={field.hint}>
+                            <div class="field-hint">{field.hint}</div>
+                        </template>
+                    </div>
+                </template>
+            </template>
+
+            <!-- ══ VARIABLES TAB ════════════════════════════ -->
+            <template lwc:if={showVarsTab}>
+                <div class="vars-note">Available in instructions and field mappings</div>
+                <div class="var-list">
+                    <div class="var-card">
+                        <code>&#123;!record.Field&#125;</code>
+                        <span>trigger record fields</span>
+                    </div>
+                    <div class="var-card">
+                        <code>&#123;!ai.score&#125;</code>
+                        <span>most recent AI score</span>
+                    </div>
+                    <div class="var-card">
+                        <code>&#123;!ai.priority&#125;</code>
+                        <span>most recent AI priority</span>
+                    </div>
+                    <div class="var-card">
+                        <code>&#123;!input.X&#125;</code>
+                        <span>values passed via inputPayload</span>
+                    </div>
+                </div>
+            </template>
+
+            <!-- ══ TOOLS TAB (catalog / connector nodes) ════ -->
+            <template lwc:if={showToolsTab}>
+                <div class="vars-note">Select which tools this node exposes to the AI</div>
+
+                <template lwc:if={descriptionField}>
+                    <div class="prop-field">
+                        <label class="prop-label">{descriptionField.label}</label>
+                        <lightning-textarea
+                            value={descriptionField.value}
+                            variant="label-hidden"
+                            placeholder={descriptionField.placeholder}
+                            rows="2"
+                            data-key="description"
+                            onchange={handleFieldChange}>
+                        </lightning-textarea>
+                    </div>
+                </template>
+
+                <div class="tool-grid">
+                    <template for:each={toolRows} for:item="tool">
+                        <div key={tool.value}
+                             class={tool.rowClass}
+                             data-option={tool.value}
+                             onclick={handleToolRowToggle}>
+                            <span class={tool.checkClass}></span>
+                            <div class="tool-text">
+                                <div class="tool-name">{tool.label}</div>
+                                <template lwc:if={tool.description}>
+                                    <div class="tool-desc">{tool.description}</div>
+                                </template>
+                            </div>
+                            <template lwc:if={tool.showBadge}>
+                                <span class={tool.badgeClass}>{tool.badgeLabel}</span>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+                <template lwc:if={noTools}>
+                    <div class="picker-blocked">No tools available. Bind a connector on the Auth tab first.</div>
+                </template>
+            </template>
+
+            <!-- ══ AUTH TAB (catalog / connector nodes) ═════ -->
+            <template lwc:if={showAuthTab}>
+                <template lwc:if={authPinned}>
+                    <div class="auth-ok">
+                        <lightning-icon icon-name="utility:success" size="xx-small"></lightning-icon>
+                        <span>Connected via OAuth · credentials active</span>
+                    </div>
+                    <div class="prop-field">
+                        <label class="prop-label">Connected as</label>
+                        <div class="fl-val">{pinnedConnectorAccount}</div>
+                    </div>
+                    <div class="prop-field">
+                        <label class="prop-label">Provider</label>
+                        <div class="fl-val">{authPinned.displayName}</div>
+                    </div>
+                    <template lwc:if={mcpServer}>
+                        <div class="prop-field">
+                            <label class="prop-label">MCP server</label>
+                            <div class="fl-val fl-val--accent">{mcpServer}</div>
+                        </div>
+                    </template>
+                    <lightning-button
+                        label="Change connector"
+                        icon-name="utility:switch"
+                        onclick={handleChangeConnector}
+                        class="full-width-btn">
+                    </lightning-button>
+                </template>
+                <template lwc:else>
+                    <div class="alert-w">
+                        <lightning-icon icon-name="utility:warning" size="xx-small"></lightning-icon>
+                        <span>No account connected — authenticate {providerDisplayName} to activate this node.</span>
+                    </div>
+                    <lightning-button
+                        variant="brand"
+                        label={connectButtonLabel}
+                        icon-name="utility:add"
+                        onclick={handleConnectProviderClick}
+                        class="full-width-btn connect-btn-space">
+                    </lightning-button>
+                    <template lwc:if={hasConnectorOptions}>
+                        <div class="prop-field">
+                            <label class="prop-label">Or pick an existing connection</label>
+                            <lightning-combobox
+                                value={boundConnectorIdValue}
+                                options={connectorOptions}
+                                variant="label-hidden"
+                                data-key="connectorId"
+                                onchange={handleFieldChange}>
+                            </lightning-combobox>
+                        </div>
+                    </template>
+                </template>
+            </template>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="prop-footer">
+            <lightning-button
+                variant="brand"
+                label="Test this node"
+                icon-name="utility:apex"
+                onclick={handleTestNode}
+                class="full-width-btn">
+            </lightning-button>
+        </div>
+
+    </div>
+</template>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Sensitive__c</fullName>
+    <label>Sensitive</label>
+    <description>True when this message body includes record data the AI fetched. Lets admins filter sensitive content out of certain reports.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

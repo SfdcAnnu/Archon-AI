@@ -1,0 +1,111 @@
+<template>
+    <section role="dialog" aria-modal="true" class="modal-backdrop">
+        <div class="modal-card">
+            <header class="modal-head">
+                <h2>{title}</h2>
+                <div class="engine-tag">{engineDisplay}</div>
+            </header>
+
+            <div class="form-body">
+                <lightning-combobox
+                    label="Engine"
+                    required
+                    placeholder="Select an engine…"
+                    value={currentEngine}
+                    options={engineOptions}
+                    data-field="engineType"
+                    onchange={handleFieldChange}>
+                </lightning-combobox>
+
+                <lightning-input
+                    label="Display Label"
+                    placeholder="e.g. My Claude Key"
+                    required
+                    value={label}
+                    data-field="label"
+                    onchange={handleFieldChange}>
+                </lightning-input>
+
+                <lightning-input
+                    label="API Key"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder={apiKeyPlaceholder}
+                    value={apiKey}
+                    data-field="apiKey"
+                    onchange={handleFieldChange}>
+                </lightning-input>
+                <template lwc:if={isEdit}>
+                    <p class="hint">Leave blank to keep the existing key.</p>
+                </template>
+
+                <lightning-input
+                    label="Default Model (optional)"
+                    placeholder="claude-sonnet-4-6, gpt-4o, gemini-1.5-pro…"
+                    value={defaultModel}
+                    data-field="defaultModel"
+                    onchange={handleFieldChange}>
+                </lightning-input>
+
+                <lightning-input
+                    label="Endpoint URL (optional)"
+                    type="url"
+                    autocomplete="off"
+                    placeholder="Azure OpenAI or self-hosted proxy"
+                    value={endpoint}
+                    data-field="endpoint"
+                    onchange={handleFieldChange}>
+                </lightning-input>
+
+                <lightning-combobox
+                    label="Ownership"
+                    value={ownershipType}
+                    options={ownershipOptions}
+                    data-field="ownershipType"
+                    onchange={handleFieldChange}>
+                </lightning-combobox>
+
+                <template lwc:if={isShared}>
+                    <lightning-input
+                        type="checkbox"
+                        label="Grant read access to all users in this org"
+                        checked={isPublicShared}
+                        data-field="isPublicShared"
+                        onchange={handleFieldChange}>
+                    </lightning-input>
+                    <p class="hint">Admin-only. Leave off to share with specific users via the standard Sharing button.</p>
+                </template>
+
+                <div class="switch-row">
+                    <lightning-input
+                        type="checkbox"
+                        label="Active"
+                        checked={isActive}
+                        data-field="isActive"
+                        onchange={handleFieldChange}>
+                    </lightning-input>
+                    <lightning-input
+                        type="checkbox"
+                        label="Preferred for this engine"
+                        checked={isPreferred}
+                        data-field="isPreferred"
+                        onchange={handleFieldChange}>
+                    </lightning-input>
+                </div>
+
+                <lightning-textarea
+                    label="Notes"
+                    placeholder="Rotation date, billing owner, purpose…"
+                    value={notes}
+                    data-field="notes"
+                    onchange={handleFieldChange}>
+                </lightning-textarea>
+            </div>
+
+            <footer class="modal-foot">
+                <lightning-button label="Cancel" onclick={handleCancel} disabled={saving}></lightning-button>
+                <lightning-button label="Save" variant="brand" onclick={handleSave} disabled={saving} class="slds-m-left_small"></lightning-button>
+            </footer>
+        </div>
+    </section>
+</template>

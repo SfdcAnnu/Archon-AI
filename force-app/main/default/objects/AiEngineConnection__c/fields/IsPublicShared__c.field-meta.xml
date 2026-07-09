@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>IsPublicShared__c</fullName>
+    <label>Publicly Shared</label>
+    <description>Admin-only. When true on a Shared connection, an Apex trigger grants Read access to every user in the org. When false, use the standard Sharing button to grant individual users/roles.</description>
+    <defaultValue>false</defaultValue>
+    <type>Checkbox</type>
+</CustomField>

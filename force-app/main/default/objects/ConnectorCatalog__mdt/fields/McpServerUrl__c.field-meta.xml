@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>McpServerUrl__c</fullName>
+    <label>MCP Server URL</label>
+    <description>Base URL of this provider's standalone MCP server (no trailing slash, no /mcp suffix). Used for the design-time GET /tools catalog fetch and sent to the Node companion each chat turn so the LLM's Managed MCP points at the right server.</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

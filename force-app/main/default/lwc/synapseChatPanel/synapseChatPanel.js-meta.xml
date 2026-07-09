@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>false</isExposed>
+    <masterLabel>Archon Chat Panel</masterLabel>
+    <description>Inner chat panel — message list, input, End button, approval modal. Embedded by synapseChat (standalone tab) and synapseChatWidget (record pages, Phase 2).</description>
+</LightningComponentBundle>

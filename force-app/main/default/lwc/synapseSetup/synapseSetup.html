@@ -1,0 +1,47 @@
+<template>
+    <div class="setup-shell">
+        <header class="setup-head">
+            <h1 class="setup-title">Archon Setup</h1>
+            <p class="setup-sub">Connect your Salesforce org to the Archon AI Node server. One-time authorization, no shared secrets.</p>
+        </header>
+
+        <section class="card">
+            <div class="card-row">
+                <div class="card-meta">
+                    <div class="card-label">Connection status</div>
+                    <div class="card-value">
+                        <span class={statusBadgeClass}>{statusLabel}</span>
+                    </div>
+                    <template lwc:if={configuredLine}>
+                        <div class="card-acct">{configuredLine}</div>
+                    </template>
+                </div>
+
+                <div class="card-actions">
+                    <template lwc:if={loading}>
+                        <lightning-spinner size="small" alternative-text="Loading"></lightning-spinner>
+                    </template>
+                    <template lwc:elseif={status.configured}>
+                        <lightning-button label="Re-authorize" onclick={handleAuthorize} disabled={authorizing}></lightning-button>
+                        <lightning-button label="Reset"  variant="destructive-text" onclick={handleReset}></lightning-button>
+                    </template>
+                    <template lwc:else>
+                        <lightning-button variant="brand" label="Authorize" icon-name="utility:identity" onclick={handleAuthorize} disabled={authorizing}></lightning-button>
+                    </template>
+                </div>
+            </div>
+
+            <div class="explainer">
+                <h3>How it works</h3>
+                <ol>
+                    <li>You click <b>Authorize</b> below.</li>
+                    <li>You're redirected to Salesforce login → consent to the Archon Agent Platform app.</li>
+                    <li>Salesforce sends the auth code to the Archon server.</li>
+                    <li>The server exchanges it for access + refresh tokens and stores them in its database for this org.</li>
+                    <li>You're redirected back here with a one-time pickup token; this page exchanges it for a long-lived session key that all future Apex callouts use.</li>
+                </ol>
+                <p class="explainer-foot">After setup, the <b>Salesforce MCP</b> connector tile in the Agent Builder automatically shows as Connected — no separate flow.</p>
+            </div>
+        </section>
+    </div>
+</template>

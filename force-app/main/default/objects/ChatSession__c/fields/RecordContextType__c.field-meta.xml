@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>RecordContextType__c</fullName>
+    <label>Record Context Type</label>
+    <description>SObject API name of the record this chat is anchored to (e.g. Account, Lead). Null in standalone tab mode.</description>
+    <type>Text</type>
+    <length>80</length>
+    <required>false</required>
+</CustomField>

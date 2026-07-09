@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>Microsoft Teams</label>
+    <protected>false</protected>
+    <values><field>DisplayName__c</field><value xsi:type="xsd:string">Microsoft Teams</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Post messages to Teams channels and chats.</value></values>
+    <values><field>Category__c</field><value xsi:type="xsd:string">Channels</value></values>
+    <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_teams</value></values>
+    <values><field>BrandColor__c</field><value xsi:type="xsd:string">#4b53bc</value></values>
+    <values><field>AuthType__c</field><value xsi:type="xsd:string">OAuth2</value></values>
+    <values><field>AuthorizeUrl__c</field><value xsi:type="xsd:string">https://login.microsoftonline.com/common/oauth2/v2.0/authorize</value></values>
+    <values><field>TokenUrl__c</field><value xsi:type="xsd:string">https://login.microsoftonline.com/common/oauth2/v2.0/token</value></values>
+    <values><field>Scopes__c</field><value xsi:type="xsd:string">offline_access openid email profile ChannelMessage.Send Chat.ReadWrite</value></values>
+    <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">channel_tools</value></values>
+    <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">false</value></values>
+    <values><field>SortOrder__c</field><value xsi:type="xsd:double">80</value></values>
+</CustomMetadata>

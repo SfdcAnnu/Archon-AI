@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Agent Execution</label>
+    <pluralLabel>Agent Executions</pluralLabel>
+    <nameField>
+        <label>Execution Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>EXEC-{0000000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <fields>
+        <fullName>AgentDefinition__c</fullName>
+        <label>Agent Definition</label>
+        <type>Lookup</type>
+        <referenceTo>AgentDefinition__c</referenceTo>
+        <relationshipName>Executions</relationshipName>
+        <relationshipLabel>Executions</relationshipLabel>
+    </fields>
+    <fields>
+        <fullName>CorrelationId__c</fullName>
+        <label>Correlation ID</label>
+        <type>Text</type>
+        <length>50</length>
+        <externalId>true</externalId>
+        <unique>true</unique>
+    </fields>
+    <fields>
+        <fullName>RecordId__c</fullName>
+        <label>Target Record ID</label>
+        <type>Text</type>
+        <length>18</length>
+    </fields>
+    <fields>
+        <fullName>Status__c</fullName>
+        <label>Status</label>
+        <type>Picklist</type>
+        <valueSet>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value><fullName>QUEUED</fullName><default>true</default></value>
+                <value><fullName>RUNNING</fullName><default>false</default></value>
+                <value><fullName>SUCCESS</fullName><default>false</default></value>
+                <value><fullName>ERROR</fullName><default>false</default></value>
+                <value><fullName>TIMEOUT</fullName><default>false</default></value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>AgentScore__c</fullName>
+        <label>Agent Score</label>
+        <type>Number</type>
+        <precision>5</precision>
+        <scale>0</scale>
+    </fields>
+    <fields>
+        <fullName>AgentPriority__c</fullName>
+        <label>Agent Priority</label>
+        <type>Text</type>
+        <length>50</length>
+    </fields>
+    <fields>
+        <fullName>AgentReason__c</fullName>
+        <label>Agent Reason</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <visibleLines>5</visibleLines>
+    </fields>
+    <fields>
+        <fullName>ToolsUsed__c</fullName>
+        <label>Tools Used</label>
+        <type>Text</type>
+        <length>255</length>
+    </fields>
+    <fields>
+        <fullName>ExecutionMs__c</fullName>
+        <label>Execution Time (ms)</label>
+        <type>Number</type>
+        <precision>8</precision>
+        <scale>0</scale>
+    </fields>
+    <fields>
+        <fullName>InputPayload__c</fullName>
+        <label>Input Payload</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>OutputPayload__c</fullName>
+        <label>Output Payload</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>ErrorMessage__c</fullName>
+        <label>Error Message</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Department__c</fullName>
+        <label>Department</label>
+        <type>Text</type>
+        <length>100</length>
+    </fields>
+    <fields>
+        <fullName>RunMode__c</fullName>
+        <label>Run Mode</label>
+        <type>Text</type>
+        <length>20</length>
+    </fields>
+</CustomObject>

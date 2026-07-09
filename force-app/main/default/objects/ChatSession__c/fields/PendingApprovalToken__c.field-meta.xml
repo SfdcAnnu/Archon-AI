@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>PendingApprovalToken__c</fullName>
+    <label>Pending Approval Token</label>
+    <description>Server-issued approval token when the AI proposed a write tool. Cleared after the user Approves or Declines. Survives LWC page refresh so the modal can resume.</description>
+    <type>Text</type>
+    <length>64</length>
+</CustomField>

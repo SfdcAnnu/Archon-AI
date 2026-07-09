@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>LastUsedAt__c</fullName>
+    <label>Last Used At</label>
+    <description>Timestamp of the most recent successful chat turn that used this connection. Updated by the Node server after each successful LLM call.</description>
+    <type>DateTime</type>
+</CustomField>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>IconStaticResource__c</fullName>
+    <label>Icon Static Resource</label>
+    <description>Name of the static resource holding the SVG icon for this connector.</description>
+    <type>Text</type>
+    <length>120</length>
+</CustomField>

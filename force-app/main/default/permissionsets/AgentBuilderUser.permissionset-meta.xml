@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Agent Builder User</label>
+    <description>Full access to Agent Builder app, custom objects, and Apex classes</description>
+    <hasActivationRequired>false</hasActivationRequired>
+
+    <classAccesses>
+        <apexClass>AgentBuilderController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentRunner</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>LeadAgentTriggerHandler</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentExecutionResultHandler</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>JwtSigner</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentConnectorController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>SynapseSetupController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentDefinition__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentNode__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentExecution__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>ApiEnabled</name>
+    </userPermissions>
+
+    <!-- ── AgentDefinition__c field permissions (required fields omitted — implicit) ── -->
+    <fieldPermissions><field>AgentDefinition__c.Description__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.Status__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.KnowledgeBase__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.Version__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.CanvasJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.ExternalServerUrl__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.TotalExecutions__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.SuccessRate__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
+    <!-- ── AgentNode__c field permissions (NodeType__c and master-detail AgentDefinition__c are required — implicit) ── -->
+    <fieldPermissions><field>AgentNode__c.NodeSubType__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.ConfigJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.PositionX__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.PositionY__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.SortOrder__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.IsEnabled__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.McpServer__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.McpTool__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
+    <!-- ── AgentExecution__c field permissions ── -->
+    <fieldPermissions><field>AgentExecution__c.AgentDefinition__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.CorrelationId__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.RecordId__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.Status__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.AgentScore__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.AgentPriority__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.AgentReason__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.ToolsUsed__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.ExecutionMs__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.InputPayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.OutputPayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.ErrorMessage__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.Department__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentExecution__c.RunMode__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
+    <!-- Required fields (ApiName__c, Department__c on AgentDefinition__c; NodeType__c on AgentNode__c; -->
+    <!-- master-detail AgentDefinition__c on AgentNode__c) cannot have explicit fieldPermissions — -->
+    <!-- they're auto-granted when the user has object access. -->
+
+    <tabSettings>
+        <tab>Synapse_AI</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>Synapse_Setup</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>AgentDefinition__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>AgentNode__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>AgentExecution__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+
+    <applicationVisibilities>
+        <application>Synapse_AI</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+</PermissionSet>

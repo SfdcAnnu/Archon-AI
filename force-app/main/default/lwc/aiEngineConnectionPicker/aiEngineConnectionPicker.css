@@ -1,0 +1,322 @@
+/* ── Enterprise credential picker — state-driven visuals ──
+   A single wrapping card whose left rail + banner colors
+   express current state at a glance:
+     • unconfigured  → amber   (call to action)
+     • needs-select  → blue    (choose)
+     • untested      → amber   (gentle nudge)
+     • failed        → red     (warning)
+     • ready         → green   (confident) */
+
+.picker {
+    font-family: 'Salesforce Sans', Arial, sans-serif;
+    font-size: 13px;
+    color: #181818;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    /* Frame */
+    padding: 0;
+    border: 1px solid var(--syn-frame-border, #d0d5dd);
+    border-left: 4px solid var(--syn-frame-rail, #d0d5dd);
+    border-radius: 8px;
+    background: var(--syn-frame-bg, #fff);
+    overflow: hidden;
+    transition: border-color 160ms, box-shadow 160ms;
+}
+
+/* State palette — sets the CSS vars the frame reads */
+.picker-unconfigured {
+    --syn-frame-rail:   #E1A21E;
+    --syn-frame-border: #F1D993;
+    --syn-frame-bg:     #FFFBEE;
+    --syn-icon:         #B4741A;
+    --syn-title:        #6B4A0F;
+    --syn-sub:          #8A6A25;
+    animation: gentlePulse 3s ease-in-out infinite;
+}
+.picker-needs-select {
+    --syn-frame-rail:   #0176D3;
+    --syn-frame-border: #B8DBF7;
+    --syn-frame-bg:     #F4F9FE;
+    --syn-icon:         #0176D3;
+    --syn-title:        #05427D;
+    --syn-sub:          #33587C;
+}
+.picker-untested {
+    --syn-frame-rail:   #E1A21E;
+    --syn-frame-border: #EAD9AC;
+    --syn-frame-bg:     #FFFBEE;
+    --syn-icon:         #B4741A;
+    --syn-title:        #6B4A0F;
+    --syn-sub:          #8A6A25;
+}
+.picker-failed {
+    --syn-frame-rail:   #B3261E;
+    --syn-frame-border: #F0A7A0;
+    --syn-frame-bg:     #FEF2F1;
+    --syn-icon:         #B3261E;
+    --syn-title:        #7A1A14;
+    --syn-sub:          #8A342E;
+}
+.picker-ready {
+    --syn-frame-rail:   #2F7D3E;
+    --syn-frame-border: #C8E6C9;
+    --syn-frame-bg:     #F4FBF5;
+    --syn-icon:         #2F7D3E;
+    --syn-title:        #0F4E1F;
+    --syn-sub:          #305937;
+}
+
+@keyframes gentlePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(225, 162, 30, 0); }
+    50%      { box-shadow: 0 0 0 3px rgba(225, 162, 30, 0.15); }
+}
+
+/* ── State banner (top of the frame) ───────────────────── */
+.state-banner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 11px 12px;
+    background: var(--syn-frame-bg);
+    border-bottom: 1px solid var(--syn-frame-border);
+}
+.state-body {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    min-width: 0;
+    flex: 1;
+}
+.state-icon {
+    color: var(--syn-icon);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.state-labels { min-width: 0; }
+.state-title {
+    font-weight: 700;
+    color: var(--syn-title);
+    font-size: 12.5px;
+    letter-spacing: -0.005em;
+    line-height: 1.35;
+}
+.state-sub {
+    font-size: 11.5px;
+    color: var(--syn-sub);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+.add-btn { flex-shrink: 0; }
+
+/* ── Loading skeleton ──────────────────────────────────── */
+.skeleton {
+    height: 46px;
+    margin: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #f2f4f7 0%, #e6e9ee 50%, #f2f4f7 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+/* ── Select prompt (dropdown) ──────────────────────────── */
+.select-wrap {
+    padding: 12px;
+}
+
+/* ── Bound card ───────────────────────────────────────── */
+.bound-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #fff;
+    position: relative;
+}
+.bound-body {
+    min-width: 0;
+    flex: 1;
+}
+.bound-name {
+    font-weight: 600;
+    color: #181818;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bound-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    color: #747474;
+    margin-top: 3px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.meta-model {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 11px;
+    color: #4b5563;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.meta-dot { color: #cbd5e0; }
+
+.bound-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+/* Small status dot (used in switch popover) */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.status-ok       { background: #2f7d3e; }
+.status-fail     { background: #b3261e; }
+.status-untested { background: #cbcbcb; }
+
+/* ── Badges ───────────────────────────────────────────── */
+.badge {
+    font-size: 9.5px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.4;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.badge-personal { background: #edf5fd; color: #0176d3; border: 1px solid #b8dbf7; }
+.badge-shared   { background: #fff4e5; color: #a34a00; border: 1px solid #f5c98a; }
+
+/* ── Kebab menu popover ───────────────────────────────── */
+.menu-pop {
+    position: absolute;
+    right: 8px;
+    top: calc(100% + 4px);
+    z-index: 20;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+    padding: 4px;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: 0;
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    color: #181818;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.menu-item:hover   { background: #f4f6f9; }
+.menu-item lightning-icon { color: #706e6b; flex-shrink: 0; }
+.menu-danger { color: #b3261e; }
+.menu-danger lightning-icon { color: #b3261e; }
+.menu-divider {
+    height: 1px;
+    background: #eaeaea;
+    margin: 3px 0;
+}
+
+/* ── Change popover (switch credential) ───────────────── */
+.change-pop {
+    background: #fff;
+    border-top: 1px solid #eaeaea;
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.change-head {
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eaeaea;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #444;
+    background: #fafbfc;
+}
+.pop-close {
+    background: none;
+    border: 0;
+    font-size: 18px;
+    color: #706e6b;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+}
+.pop-close:hover { color: #b3261e; }
+
+.opt-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: none;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+    border-bottom: 1px solid #f2f4f7;
+    font-family: inherit;
+    color: inherit;
+    width: 100%;
+}
+.opt-row:last-child { border-bottom: 0; }
+.opt-row:hover      { background: #f4f6f9; }
+.opt-row--current   { background: #edf5fd; }
+.opt-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+}
+.opt-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #181818;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.opt-meta {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 11.5px;
+    color: #747474;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}

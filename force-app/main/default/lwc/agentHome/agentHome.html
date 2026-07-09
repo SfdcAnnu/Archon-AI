@@ -1,0 +1,141 @@
+<template>
+    <div class="agent-app">
+
+        <!-- TOP NAV -->
+        <div class="top-nav">
+            <div class="nav-logo">
+                <lightning-icon icon-name="utility:connected_apps" size="small" alternative-text="Agent Builder"></lightning-icon>
+                <span class="nav-title">Agent Builder</span>
+            </div>
+            <div class="nav-spacer"></div>
+            <template lwc:if={showHome}>
+                <lightning-button-group>
+                    <lightning-button label="Logs" icon-name="utility:list" onclick={handleViewLogs}></lightning-button>
+                    <lightning-button variant="brand" label="+ New Agent" onclick={handleNewAgent}></lightning-button>
+                </lightning-button-group>
+            </template>
+        </div>
+
+        <!-- SUB NAV TABS -->
+        <div class="sub-nav">
+            <button class={homeTabClass} onclick={handleNavHome}>All agents</button>
+            <button class={logsTabClass} onclick={handleViewLogs}>Execution logs</button>
+            <button class="sub-tab" disabled>MCP servers</button>
+            <button class="sub-tab" disabled>Settings</button>
+        </div>
+
+        <!-- HOME VIEW -->
+        <template lwc:if={showHome}>
+            <div class="app-body">
+
+                <!-- SIDEBAR -->
+                <div class="sidebar">
+                    <div class="sb-header">
+                        <span class="sb-title">Departments</span>
+                    </div>
+                    <div class="dept-group" onclick={handleClearDept}>
+                        <div class="dept-header">
+                            <span class="dept-dot" style="background:#706e6b"></span>
+                            <span class="dept-name">All departments</span>
+                            <span class="dept-count">{totalAgents}</span>
+                        </div>
+                    </div>
+                    <template for:each={deptStats} for:item="dept">
+                        <div key={dept.department} class={dept.rowClass}>
+                            <div class="dept-header" data-dept={dept.department} onclick={handleDeptSelect}>
+                                <span class="dept-dot" style={dept.dotStyle}></span>
+                                <span class="dept-name">{dept.department}</span>
+                                <span class="dept-count">{dept.agentCount}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- MAIN CONTENT -->
+                <div class="main-content">
+                    <!-- STATS ROW -->
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="stat-number">{totalAgents}</div>
+                            <div class="stat-label">Total agents</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">{activeAgents}</div>
+                            <div class="stat-label">Active</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">{totalRuns}</div>
+                            <div class="stat-label">Total executions</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">6</div>
+                            <div class="stat-label">MCP servers</div>
+                        </div>
+                    </div>
+
+                    <!-- AGENT CARDS GRID -->
+                    <div class="agents-grid">
+                        <template for:each={agents} for:item="agent">
+                            <div key={agent.Id} class="agent-card"
+                                 style={agent.cardStyle}
+                                 data-id={agent.Id}
+                                 onclick={handleAgentClick}>
+                                <div class="ac-dept">{agent.Department__c}</div>
+                                <div class="ac-name">{agent.Name}</div>
+                                <div class="ac-desc">{agent.Description__c}</div>
+                                <div class="ac-footer">
+                                    <lightning-badge label={agent.Status__c}
+                                        class={agent.statusBadgeClass}>
+                                    </lightning-badge>
+                                    <span class="ac-runs">{agent.TotalExecutions__c} runs</span>
+                                </div>
+                                <div class="ac-actions" onclick={stopProp}>
+                                    <lightning-button-icon
+                                        icon-name="utility:delete"
+                                        size="x-small"
+                                        variant="border"
+                                        alternative-text="Delete"
+                                        data-id={agent.Id}
+                                        onclick={handleDeleteAgent}>
+                                    </lightning-button-icon>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- NEW AGENT CARD -->
+                        <div class="agent-card agent-card--new" onclick={handleNewAgent}>
+                            <lightning-icon icon-name="utility:add" size="small" alternative-text="New agent"></lightning-icon>
+                            <div class="ac-name" style="color: #0176d3;">New agent</div>
+                            <div class="ac-desc">Build a new AI agent for your department</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- BUILDER VIEW -->
+        <template lwc:if={showBuilder}>
+            <c-agent-canvas
+                agent-id={selectedAgentId}
+                onback={handleBuilderBack}
+                ontest={handleTestRunner}>
+            </c-agent-canvas>
+        </template>
+
+        <!-- TEST RUNNER VIEW -->
+        <template lwc:if={showTestRunner}>
+            <c-agent-test-runner
+                agent={selectedAgent}
+                onback={handleTestRunnerBack}>
+            </c-agent-test-runner>
+        </template>
+
+        <!-- LOGS VIEW -->
+        <template lwc:if={showLogs}>
+            <c-agent-execution-logs
+                onback={handleBuilderBack}>
+            </c-agent-execution-logs>
+        </template>
+
+    </div>
+</template>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ApprovedAt__c</fullName>
+    <label>Approved At</label>
+    <description>Timestamp when the chatter clicked Approve on the approval modal. Null if Declined or not required.</description>
+    <type>DateTime</type>
+</CustomField>

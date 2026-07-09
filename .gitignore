@@ -67,3 +67,6 @@ Gmail MCP Server/
 hs_err_pid*.log
 boot*.log
 tools-out.json
+
+# ── Archon Server — lives in its own repo (Archon-Server) ──
+server/

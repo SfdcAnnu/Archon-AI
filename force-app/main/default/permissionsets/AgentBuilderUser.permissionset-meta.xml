@@ -241,6 +241,7 @@
     <fieldPermissions><field>ChatMessage__c.RequiredApproval__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.AttachedContentDocumentIds__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ── AiEngineConnection__c field permissions (merged from ArchonAiEngineAdmin) ── -->

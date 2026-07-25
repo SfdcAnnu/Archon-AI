@@ -123,6 +123,7 @@
     <fieldPermissions><field>ChatMessage__c.RequiredApproval__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.AttachedContentDocumentIds__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- AgentDefinition__c FLS — read only what the chat runtime needs -->
     <fieldPermissions><field>AgentDefinition__c.Description__c</field><readable>true</readable><editable>false</editable></fieldPermissions>

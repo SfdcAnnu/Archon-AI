@@ -311,6 +311,17 @@ public with sharing class AgentChatController {
     private static List<Map<String, Object>> buildConnectorsPayload(Id agentDefinitionId) {
         List<Map<String, Object>> out = new List<Map<String, Object>>();
 
+        // Access mode travels with the salesforce_mcp connector so the
+        // server refuses to fall back to the org token on PerUser agents.
+        String accessMode = 'Org';
+        List<AgentDefinition__c> agentRows = [
+            SELECT AccessMode__c FROM AgentDefinition__c
+            WHERE Id = :agentDefinitionId WITH USER_MODE LIMIT 1
+        ];
+        if (!agentRows.isEmpty() && String.isNotBlank(agentRows[0].AccessMode__c)) {
+            accessMode = agentRows[0].AccessMode__c;
+        }
+
         Map<String, String> urlByProvider = new Map<String, String>();
         for (ConnectorCatalog__mdt cat : [
             SELECT DeveloperName, McpServerUrl__c FROM ConnectorCatalog__mdt
@@ -344,11 +355,30 @@ public with sharing class AgentChatController {
                 }
             }
 
+            // Custom tools (org's own Apex actions / Flows) selected on the
+            // node — sent as {type, name} pairs; server wires them into the
+            // MCP session dynamically.
+            List<Map<String, Object>> customTools = new List<Map<String, Object>>();
+            if (cfg.get('customTools') instanceof List<Object>) {
+                for (Object ctObj : (List<Object>) cfg.get('customTools')) {
+                    if (!(ctObj instanceof Map<String, Object>)) continue;
+                    Map<String, Object> ct = (Map<String, Object>) ctObj;
+                    String ctType = (String) ct.get('type');
+                    String ctName = (String) ct.get('name');
+                    if (String.isBlank(ctType) || String.isBlank(ctName)) continue;
+                    customTools.add(new Map<String, Object>{
+                        'type' => ctType, 'name' => ctName, 'label' => (String) ct.get('label')
+                    });
+                }
+            }
+
             out.add(new Map<String, Object>{
                 'provider'     => provider,
                 'mcpServerUrl' => urlByProvider.get(provider),
                 'allowedTools' => allowedTools,
-                'connectorId'  => (String) cfg.get('connectorId')
+                'connectorId'  => (String) cfg.get('connectorId'),
+                'accessMode'   => provider == 'salesforce_mcp' ? accessMode : null,
+                'customTools'  => customTools
             });
         }
         return out;

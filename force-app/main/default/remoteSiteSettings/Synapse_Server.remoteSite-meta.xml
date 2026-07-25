@@ -3,5 +3,5 @@
     <description>Archon Node server endpoint. Must match ServerUrl__c on ArchonConfig.Default.</description>
     <disableProtocolSecurity>false</disableProtocolSecurity>
     <isActive>true</isActive>
-    <url>https://65f1-2401-4900-1c22-4709-f186-8f05-de00-f53a.ngrok-free.app</url>
+    <url>https://archon-server-d31n.onrender.com</url>
 </RemoteSiteSetting>

@@ -3,8 +3,10 @@ private class AgentRunnerTest {
 
     private class MockEngine implements HttpCalloutMock {
         public Boolean success;
+        public String lastRequestBody;
         public MockEngine(Boolean success) { this.success = success; }
         public HttpResponse respond(HttpRequest req) {
+            this.lastRequestBody = req.getBody();
             HttpResponse res = new HttpResponse();
             res.setStatusCode(success ? 200 : 500);
             res.setBody('{"success":' + success + ',"correlationId":"corr-runner","agentStatus":"' +
@@ -17,6 +19,11 @@ private class AgentRunnerTest {
     static void setup() {
         insert new AgentDefinition__c(
             Name='Runner Agent', ApiName__c='runner_agent', Department__c='Sales', Status__c='Active'
+        );
+        insert new SynapseInstall__c(
+            SetupOwnerId    = UserInfo.getOrganizationId(),
+            SessionKey__c   = 'sk-test',
+            ConfiguredAt__c = System.now()
         );
     }
 
@@ -42,7 +49,6 @@ private class AgentRunnerTest {
         inp.agentApiName = 'runner_agent';
         inp.recordId = '00Q000000000000';
         inp.runMode = 'sync';
-        JwtSigner.overrideSecret = 'unit-test-secret';
 
         Test.setMock(HttpCalloutMock.class, new MockEngine(true));
         Test.startTest();
@@ -55,11 +61,38 @@ private class AgentRunnerTest {
     }
 
     @IsTest
+    static void run_attaches_engine_override_when_ai_node_and_connection_exist() {
+        AgentDefinition__c agent = [SELECT Id FROM AgentDefinition__c WHERE ApiName__c = 'runner_agent' LIMIT 1];
+        insert new AgentNode__c(
+            Name = 'AI Node', AgentDefinition__c = agent.Id,
+            NodeType__c = 'ai', NodeSubType__c = 'claude', SortOrder__c = 0
+        );
+        insert new AiEngineConnection__c(
+            Label__c = 'My Claude Key', User__c = UserInfo.getUserId(),
+            OwnershipType__c = 'Personal', EngineType__c = 'claude',
+            ApiKey__c = 'sk-ant-test', IsActive__c = true, IsPreferred__c = true
+        );
+
+        AgentRunner.AgentInput inp = new AgentRunner.AgentInput();
+        inp.agentApiName = 'runner_agent';
+        inp.recordId = '00Q000000000000';
+
+        MockEngine mock = new MockEngine(true);
+        Test.setMock(HttpCalloutMock.class, mock);
+        Test.startTest();
+        List<AgentRunner.AgentOutput> outs = AgentRunner.run(new List<AgentRunner.AgentInput>{ inp });
+        Test.stopTest();
+
+        System.assertEquals(true, outs[0].success);
+        System.assert(mock.lastRequestBody.contains('engineOverride'), 'Resolved AI Engine Connection should ride along in the payload');
+        System.assert(mock.lastRequestBody.contains('sk-ant-test'), 'The resolved API key should be in the payload');
+    }
+
+    @IsTest
     static void run_creates_execution_log() {
         AgentRunner.AgentInput inp = new AgentRunner.AgentInput();
         inp.agentApiName = 'runner_agent';
         inp.recordId = '00Q000000000000';
-        JwtSigner.overrideSecret = 'unit-test-secret';
 
         Test.setMock(HttpCalloutMock.class, new MockEngine(true));
         Test.startTest();

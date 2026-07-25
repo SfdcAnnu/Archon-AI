@@ -15,7 +15,11 @@ private class LeadAgentTriggerHandlerTest {
         insert new AgentDefinition__c(
             Name='Lead Qualifier', ApiName__c='lead_qualifier', Department__c='Sales', Status__c='Active'
         );
-        JwtSigner.overrideSecret = 'unit-test-secret';
+        insert new SynapseInstall__c(
+            SetupOwnerId    = UserInfo.getOrganizationId(),
+            SessionKey__c   = 'sk-test',
+            ConfiguredAt__c = System.now()
+        );
 
         Test.setMock(HttpCalloutMock.class, new MockEngine());
         Test.startTest();

@@ -24,6 +24,10 @@ export default class SynapseChat extends LightningElement {
     @track loadingAgents = false;
     @track loadingSessions = false;
 
+    get noAgents() {
+        return !this.loadingAgents && (!this.agents || this.agents.length === 0);
+    }
+
     connectedCallback() {
         this.refreshSessions();
     }

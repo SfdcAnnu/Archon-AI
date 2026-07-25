@@ -4,11 +4,116 @@ import getStatus     from '@salesforce/apex/SynapseSetupController.getStatus';
 import refreshStatus from '@salesforce/apex/SynapseSetupController.refreshStatus';
 import startSetup    from '@salesforce/apex/SynapseSetupController.startSetup';
 import resetSetup    from '@salesforce/apex/SynapseSetupController.resetSetup';
+import listAccessibleForEngine from '@salesforce/apex/AiEngineConnectionController.listAccessibleForEngine';
+import deleteConnection         from '@salesforce/apex/AiEngineConnectionController.deleteConnection';
+import testConnectionApex       from '@salesforce/apex/AiEngineConnectionController.testConnection';
+
+const ENGINES = [
+    { value: 'claude', label: 'Claude (Anthropic)' },
+    { value: 'openai', label: 'OpenAI (GPT)' },
+    { value: 'gemini', label: 'Google Gemini' },
+    { value: 'custom', label: 'Custom / Self-hosted' }
+];
 
 export default class SynapseSetup extends LightningElement {
     @track status = null;
     @track loading = false;
     @track authorizing = false;
+
+    @track activeTab = 'salesforce';
+    get isSalesforceTab() { return this.activeTab === 'salesforce'; }
+    get isAiTab()          { return this.activeTab === 'ai'; }
+    get salesforceTabClass() { return this.isSalesforceTab ? 'setup-tab setup-tab--on' : 'setup-tab'; }
+    get aiTabClass()          { return this.isAiTab ? 'setup-tab setup-tab--on' : 'setup-tab'; }
+    handleTabSalesforce() { this.activeTab = 'salesforce'; }
+    handleTabAi() {
+        this.activeTab = 'ai';
+        if (!this._connectionsLoaded) this.loadConnections();
+    }
+
+    // ── AI Provider Setup ────────────────────────────────────────
+    @track _connections = [];
+    @track connectionsLoading = false;
+    @track showConnectionForm = false;
+    @track editingConnectionId = null;
+    @track editingConnectionSummary = null;
+    _connectionsLoaded = false;
+
+    async loadConnections() {
+        this.connectionsLoading = true;
+        try {
+            const results = await Promise.all(
+                ENGINES.map(e => listAccessibleForEngine({ engineType: e.value }))
+            );
+            this._connections = results.flat();
+            this._connectionsLoaded = true;
+        } catch (err) {
+            this.toastError('Could not load AI Engine Connections', err);
+        } finally {
+            this.connectionsLoading = false;
+        }
+    }
+
+    get noConnections() { return !this.connectionsLoading && this._connections.length === 0; }
+
+    get connectionRows() {
+        const ENGINE_LABEL = { claude: 'Claude', openai: 'OpenAI', gemini: 'Gemini', custom: 'Custom' };
+        const ENGINE_CLASS = { claude: 'chip-engine chip-engine--claude', openai: 'chip-engine chip-engine--openai',
+                                gemini: 'chip-engine chip-engine--gemini', custom: 'chip-engine chip-engine--custom' };
+        return this._connections.map(c => ({
+            ...c,
+            engineLabel: ENGINE_LABEL[c.engineType] || c.engineType,
+            engineBadgeClass: ENGINE_CLASS[c.engineType] || 'chip-engine',
+            isShared: c.ownershipType === 'Shared',
+            isMine: c.isMine === true,
+            isInactive: c.isActive === false,
+            validationLabel: c.validationStatus || 'Untested',
+            validationClass: c.validationStatus === 'Valid' ? 'val-ok'
+                            : c.validationStatus === 'Invalid' ? 'val-err' : 'val-unk',
+            testing: false
+        }));
+    }
+
+    handleAddConnection() {
+        this.editingConnectionId = null;
+        this.editingConnectionSummary = null;
+        this.showConnectionForm = true;
+    }
+    handleEditConnection(e) {
+        const id = e.currentTarget.dataset.id;
+        this.editingConnectionId = id;
+        this.editingConnectionSummary = this._connections.find(c => c.id === id) || null;
+        this.showConnectionForm = true;
+    }
+    handleConnectionFormCancel() { this.showConnectionForm = false; }
+    async handleConnectionSaved() {
+        this.showConnectionForm = false;
+        await this.loadConnections();
+    }
+
+    async handleDeleteConnection(e) {
+        const id = e.currentTarget.dataset.id;
+        // eslint-disable-next-line no-alert
+        if (!window.confirm('Delete this AI Engine Connection? Any agent nodes bound to it will need a new one.')) return;
+        try {
+            await deleteConnection({ recordId: id });
+            this.toast('Deleted', 'Connection removed.', 'success');
+            await this.loadConnections();
+        } catch (err) {
+            this.toastError('Delete failed', err);
+        }
+    }
+
+    async handleTestConnection(e) {
+        const id = e.currentTarget.dataset.id;
+        try {
+            const result = await testConnectionApex({ recordId: id });
+            this.toast(result.success ? 'Connection OK' : 'Connection failed', result.message, result.success ? 'success' : 'error');
+            await this.loadConnections();
+        } catch (err) {
+            this.toastError('Test failed', err);
+        }
+    }
 
     connectedCallback() {
         console.log('[SynapseSetup] connectedCallback fired. URL =', window.location.href);

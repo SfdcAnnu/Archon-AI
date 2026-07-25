@@ -72,6 +72,7 @@
 .status-ok  { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2e844a; }
 .status-err { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c23934; }
 .status-run { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff9900; }
+.status-wait { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #0b7bd1; }
 
 .td-agent { font-weight: 600; color: #032d60; }
 .td-dept  { color: #706e6b; }
@@ -82,6 +83,7 @@
 .badge-ok  lightning-badge { --sds-c-badge-color-background: #eaf4ed; --sds-c-badge-text-color: #1e5630; }
 .badge-err lightning-badge { --sds-c-badge-color-background: #fef0f0; --sds-c-badge-text-color: #7a1f1f; }
 .badge-run lightning-badge { --sds-c-badge-color-background: #fff3e0; --sds-c-badge-text-color: #7a3d00; }
+.badge-wait lightning-badge { --sds-c-badge-color-background: #eaf3fc; --sds-c-badge-text-color: #0b5a9e; }
 
 .empty-logs {
     padding: 40px;
@@ -173,3 +175,57 @@
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+/* ── Node-by-node trace ─────────────────────────────────────────── */
+.detail-section-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 14px 0 6px;
+}
+.detail-section-row .detail-section { margin: 0; }
+.trace-empty {
+    font-size: 11px;
+    color: #706e6b;
+    background: #f8f7f6;
+    border-radius: 4px;
+    padding: 10px;
+    line-height: 1.5;
+}
+.trace-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.trace-step {
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #fafafa;
+}
+.trace-step-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+.trace-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.trace-dot--ok  { background: #2e844a; }
+.trace-dot--err { background: #c23934; }
+.trace-step-label { font-size: 12px; font-weight: 600; color: #032d60; }
+.trace-step-sub { font-size: 10px; color: #706e6b; text-transform: uppercase; letter-spacing: 0.04em; }
+.trace-step-error { font-size: 11px; color: #a32d2d; margin-top: 4px; }
+.trace-io {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 6px;
+}
+.trace-io-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #83868f;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 3px;
+}
+.detail-json--sm { font-size: 9px; padding: 7px; max-height: 160px; overflow-y: auto; }

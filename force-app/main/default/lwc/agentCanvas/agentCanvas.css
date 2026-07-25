@@ -518,6 +518,8 @@
 }
 .canvas-empty p { margin: 10px 0 0; font-size: 13px; }
 .canvas-hint-sub { font-size: 11px !important; color: var(--a-text-3); }
+.canvas-empty-or { font-size: 11px; color: var(--a-text-3); margin: 14px 0 10px; }
+.canvas-empty lightning-button { pointer-events: auto; }
 .hint-bar {
     position: absolute;
     bottom: 14px;
@@ -617,4 +619,11 @@
     padding: 12px 20px;
     border-top: 1px solid var(--a-border);
     background: var(--a-surface-1);
+}
+
+.prop-hint {
+    font-size: 11px;
+    color: #83868F;
+    line-height: 1.45;
+    margin-top: 4px;
 }

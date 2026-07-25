@@ -1,0 +1,96 @@
+:host {
+    font-family: 'Salesforce Sans', -apple-system, Arial, sans-serif;
+    font-size: 13px;
+    color: #17181C;
+}
+.asc-backdrop { position: fixed; inset: 0; background: rgba(10, 14, 20, 0.45); z-index: 9000; }
+.asc-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(560px, 92vw);
+    max-height: 80vh;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    z-index: 9001;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.asc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #E4E5E9;
+    flex-shrink: 0;
+}
+.asc-head h2 { font-size: 15px; font-weight: 700; margin: 0; }
+.asc-body { padding: 14px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+.asc-note { font-size: 11px; color: #83868F; margin-bottom: 12px; line-height: 1.5; }
+.asc-all-done { font-size: 12.5px; color: #2F7D3E; text-align: center; padding: 20px; }
+
+.asc-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 11px;
+    border: 1px solid #E4E5E9;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    background: #FAFAFB;
+}
+.asc-row:hover { border-color: #B9D9F3; }
+.asc-row--done { opacity: 0.55; }
+.asc-row--done .asc-title { text-decoration: line-through; }
+
+.asc-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid #CDCFD6;
+    flex-shrink: 0;
+    margin-top: 2px;
+    background: #fff;
+}
+.asc-row--done .asc-check {
+    background: #0B7BD1;
+    border-color: #0B7BD1;
+    position: relative;
+}
+.asc-row--done .asc-check::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 6px;
+    height: 9px;
+    border-right: 1.5px solid #fff;
+    border-bottom: 1.5px solid #fff;
+    transform: rotate(40deg);
+}
+.asc-icon { flex-shrink: 0; margin-top: 1px; --sds-c-icon-color-foreground-default: #6B7280; }
+.asc-text { min-width: 0; }
+.asc-title { font-size: 12.5px; font-weight: 600; }
+.asc-desc { font-size: 11px; color: #83868F; margin-top: 2px; line-height: 1.4; }
+.asc-category {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6B7280;
+    margin-top: 4px;
+}
+
+.asc-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 20px;
+    border-top: 1px solid #E4E5E9;
+    background: #FAFAFB;
+    flex-shrink: 0;
+}

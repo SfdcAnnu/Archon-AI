@@ -24,6 +24,23 @@ public with sharing class AgentRunner {
             agentMap.put(a.ApiName__c, a);
         }
 
+        // One AI node per agent (bulkified) — used to resolve the running
+        // user's engine credential, same pattern AgentChatController uses.
+        Set<Id> agentIds = new Set<Id>();
+        for (AgentDefinition__c a : agentMap.values()) agentIds.add(a.Id);
+        Map<Id, AgentNode__c> aiNodeByAgentId = new Map<Id, AgentNode__c>();
+        for (AgentNode__c n : [
+            SELECT Id, AgentDefinition__c, NodeSubType__c, AiEngineConnection__c
+            FROM AgentNode__c
+            WHERE AgentDefinition__c IN :agentIds AND NodeType__c = 'ai'
+            WITH USER_MODE
+            ORDER BY SortOrder__c ASC
+        ]) {
+            if (!aiNodeByAgentId.containsKey(n.AgentDefinition__c)) {
+                aiNodeByAgentId.put(n.AgentDefinition__c, n);
+            }
+        }
+
         List<AgentOutput> results    = new List<AgentOutput>();
         List<AgentExecution__c> logs = new List<AgentExecution__c>();
 
@@ -42,7 +59,7 @@ public with sharing class AgentRunner {
             }
 
             try {
-                out = callExternalEngine(inp, def.Id);
+                out = callExternalEngine(inp, def.Id, aiNodeByAgentId.get(def.Id));
             } catch (Exception e) {
                 out.success     = false;
                 out.agentStatus = 'ERROR';
@@ -57,11 +74,10 @@ public with sharing class AgentRunner {
         return results;
     }
 
-    private static AgentOutput callExternalEngine(AgentInput inp, String defId) {
+    private static AgentOutput callExternalEngine(AgentInput inp, String defId, AgentNode__c aiNode) {
         Map<String, Object> payload = new Map<String, Object>{
             'agentApiName' => inp.agentApiName,
             'recordId'     => inp.recordId,
-            'orgId'        => UserInfo.getOrganizationId(),
             'userId'       => UserInfo.getUserId(),
             'runMode'      => String.isBlank(inp.runMode) ? 'sync' : inp.runMode,
             'inputPayload' => String.isNotBlank(inp.inputPayload)
@@ -69,16 +85,31 @@ public with sharing class AgentRunner {
                                 : new Map<String, Object>()
         };
 
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Agent_Platform/agent/execute');
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Authorization', JwtSigner.mintBearer(inp.agentApiName));
-        req.setHeader('X-SF-Org-Id', UserInfo.getOrganizationId());
-        req.setBody(JSON.serialize(payload));
-        req.setTimeout(25000);
+        // Resolve the running user's AI Engine Connection — may be null,
+        // in which case the Node server falls back to its .env keys.
+        if (aiNode != null && String.isNotBlank(aiNode.NodeSubType__c)) {
+            AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime(
+                aiNode.NodeSubType__c, aiNode.AiEngineConnection__c
+            );
+            if (cred != null) {
+                payload.put('engineOverride', new Map<String, Object>{
+                    'engineType'   => cred.EngineType__c,
+                    'apiKey'       => cred.ApiKey__c,
+                    'endpoint'     => cred.Endpoint__c,
+                    'defaultModel' => cred.DefaultModel__c,
+                    'connectionId' => cred.Id
+                });
+            }
+        }
 
-        HttpResponse res = new Http().send(req);
+        HttpResponse res = ArchonServerClient.callout('POST', '/api/agent/execute', JSON.serialize(payload));
+        if (res.getStatusCode() >= 400) {
+            AgentOutput errOut = new AgentOutput();
+            errOut.success     = false;
+            errOut.agentStatus = 'ERROR';
+            errOut.agentReason = ArchonServerClient.extractServerError(res);
+            return errOut;
+        }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
 
         AgentOutput out        = new AgentOutput();

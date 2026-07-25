@@ -8,6 +8,8 @@
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
     <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
     <tabs>Synapse_AI</tabs>
+    <tabs>Synapse_Setup</tabs>
+    <tabs>Synapse_Chat</tabs>
     <tabs>AgentDefinition__c</tabs>
     <tabs>AgentNode__c</tabs>
     <tabs>AgentExecution__c</tabs>

@@ -41,7 +41,8 @@ public with sharing class AgentBuilderController {
         List<AgentDefinition__c> agents = [
             SELECT Id, Name, ApiName__c, Department__c, Description__c,
                    KnowledgeBase__c, Status__c, Version__c, CanvasJson__c,
-                   ExternalServerUrl__c, TotalExecutions__c, SuccessRate__c,
+                   ExternalServerUrl__c, TotalExecutions__c, SuccessRate__c, AccessMode__c,
+                   SetupChecklistJson__c,
                    (SELECT Id, Name, NodeType__c, NodeSubType__c, ConfigJson__c,
                            PositionX__c, PositionY__c, SortOrder__c,
                            IsEnabled__c, McpServer__c, McpTool__c,
@@ -109,30 +110,49 @@ public with sharing class AgentBuilderController {
             LIMIT 1
         ];
         if (agents.isEmpty()) throw new AuraHandledException('Agent not found: ' + agentApiName);
-        if (agents[0].Status__c != 'Active') throw new AuraHandledException('Agent is not active');
+        if (agents[0].Status__c == 'Inactive') throw new AuraHandledException('Agent is Inactive and cannot be run.');
 
         Map<String, Object> payload = new Map<String, Object>{
             'agentApiName' => agentApiName,
             'recordId'     => recordId,
-            'orgId'        => UserInfo.getOrganizationId(),
             'userId'       => UserInfo.getUserId(),
             'department'   => agents[0].Id,
             'runMode'      => String.isBlank(runMode) ? 'sync' : runMode,
             'inputPayload' => String.isNotBlank(inputPayloadJson)
                                 ? JSON.deserializeUntyped(inputPayloadJson)
-                                : new Map<String, Object>()
+                                : new Map<String, Object>(),
+            // This method is only ever called by the builder's Test Runner UI —
+            // real automation (triggers, AgentRunner Flow invocable) posts to the
+            // Node server directly and never sets this, so it still requires Active.
+            'isTestRun' => true
         };
 
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Agent_Platform/agent/execute');
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Authorization', JwtSigner.mintBearer(agentApiName));
-        req.setHeader('X-SF-Org-Id', UserInfo.getOrganizationId());
-        req.setBody(JSON.serialize(payload));
-        req.setTimeout(25000);
+        // Resolve the running user's AI Engine Connection — same pattern
+        // AgentChatController uses. May be null → Node falls back to .env.
+        List<AgentNode__c> aiNodes = [
+            SELECT Id, NodeSubType__c, AiEngineConnection__c
+            FROM AgentNode__c
+            WHERE AgentDefinition__c = :agents[0].Id AND NodeType__c = 'ai'
+            WITH USER_MODE
+            ORDER BY SortOrder__c ASC
+            LIMIT 1
+        ];
+        if (!aiNodes.isEmpty() && String.isNotBlank(aiNodes[0].NodeSubType__c)) {
+            AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime(
+                aiNodes[0].NodeSubType__c, aiNodes[0].AiEngineConnection__c
+            );
+            if (cred != null) {
+                payload.put('engineOverride', new Map<String, Object>{
+                    'engineType'   => cred.EngineType__c,
+                    'apiKey'       => cred.ApiKey__c,
+                    'endpoint'     => cred.Endpoint__c,
+                    'defaultModel' => cred.DefaultModel__c,
+                    'connectionId' => cred.Id
+                });
+            }
+        }
 
-        HttpResponse res = new Http().send(req);
+        HttpResponse res = ArchonServerClient.callout('POST', '/api/agent/execute', JSON.serialize(payload));
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
 
         insertExecutionLog(agents[0].Id, agentApiName, recordId, runMode, body);
@@ -145,51 +165,88 @@ public with sharing class AgentBuilderController {
     public static ExecutionPage getExecutionLogs(
         String agentId,
         Integer pageSize,
-        Integer pageOffset
+        Integer pageOffset,
+        String status
     ) {
         Integer pSize   = pageSize   != null ? Math.min(pageSize, 50)   : 20;
         Integer pOffset = pageOffset != null ? pageOffset                : 0;
 
-        List<AgentExecution__c> logs;
-        Integer total;
+        List<String> wheres = new List<String>();
+        if (String.isNotBlank(agentId)) wheres.add('AgentDefinition__c = :agentId');
+        if (String.isNotBlank(status))  wheres.add('Status__c = :status');
+        String whereClause = wheres.isEmpty() ? '' : (' WHERE ' + String.join(wheres, ' AND '));
 
-        if (String.isBlank(agentId)) {
-            logs = [
-                SELECT Id, Name, AgentDefinition__r.Name, AgentDefinition__r.Department__c,
-                       CorrelationId__c, RecordId__c, Status__c, AgentScore__c,
-                       AgentPriority__c, AgentReason__c, ToolsUsed__c, ExecutionMs__c,
-                       Department__c, CreatedDate
-                FROM AgentExecution__c
-                WITH USER_MODE
-                ORDER BY CreatedDate DESC
-                LIMIT :pSize
-                OFFSET :pOffset
-            ];
-            total = [
-                SELECT COUNT() FROM AgentExecution__c
-                WITH USER_MODE
-            ];
-        } else {
-            logs = [
-                SELECT Id, Name, AgentDefinition__r.Name, AgentDefinition__r.Department__c,
-                       CorrelationId__c, RecordId__c, Status__c, AgentScore__c,
-                       AgentPriority__c, AgentReason__c, ToolsUsed__c, ExecutionMs__c,
-                       Department__c, CreatedDate
-                FROM AgentExecution__c
-                WHERE AgentDefinition__c = :agentId
-                WITH USER_MODE
-                ORDER BY CreatedDate DESC
-                LIMIT :pSize
-                OFFSET :pOffset
-            ];
-            total = [
-                SELECT COUNT() FROM AgentExecution__c
-                WHERE AgentDefinition__c = :agentId
-                WITH USER_MODE
-            ];
-        }
+        List<AgentExecution__c> logs = Database.query(
+            'SELECT Id, Name, AgentDefinition__r.Name, AgentDefinition__r.Department__c, ' +
+            'CorrelationId__c, RecordId__c, Status__c, AgentScore__c, AgentPriority__c, ' +
+            'AgentReason__c, ToolsUsed__c, OutputPayload__c, ExecutionMs__c, Department__c, CreatedDate ' +
+            'FROM AgentExecution__c' + whereClause + ' WITH USER_MODE ' +
+            'ORDER BY CreatedDate DESC LIMIT :pSize OFFSET :pOffset'
+        );
+        Integer total = Database.countQuery(
+            'SELECT COUNT() FROM AgentExecution__c' + whereClause + ' WITH USER_MODE'
+        );
 
         return new ExecutionPage(logs, total, pSize, pOffset);
+    }
+
+    /**
+     * Per-node trace for one run — Execution Logs' "Node detail" view.
+     * Durable-run steps live in the Node server's Postgres (RunStep), not
+     * Salesforce, so this is a thin callout proxy keyed by CorrelationId__c
+     * (the one identifier both sides share).
+     */
+    @AuraEnabled
+    public static RunStepsResult getRunSteps(String correlationId) {
+        if (String.isBlank(correlationId)) throw new AuraHandledException('correlationId is required.');
+        HttpResponse res = ArchonServerClient.callout(
+            'GET', '/api/agent/runs/by-correlation/' + EncodingUtil.urlEncode(correlationId, 'UTF-8') + '/steps', null
+        );
+        if (res.getStatusCode() == 404) {
+            RunStepsResult empty = new RunStepsResult();
+            empty.status = 'NOT_FOUND';
+            empty.steps = new List<RunStepDto>();
+            return empty;
+        }
+        if (res.getStatusCode() >= 400) {
+            throw new AuraHandledException('Could not load node trace: ' + ArchonServerClient.extractServerError(res));
+        }
+        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        RunStepsResult result = new RunStepsResult();
+        result.status = (String) body.get('status');
+        result.steps = new List<RunStepDto>();
+        for (Object s : (List<Object>) body.get('steps')) {
+            Map<String, Object> sm = (Map<String, Object>) s;
+            RunStepDto dto = new RunStepDto();
+            dto.nodeId      = (String) sm.get('nodeId');
+            dto.nodeLabel   = (String) sm.get('nodeLabel');
+            dto.nodeSubType = (String) sm.get('nodeSubType');
+            dto.inputJson   = sm.get('input')  != null ? JSON.serializePretty(sm.get('input'))  : null;
+            dto.outputJson  = sm.get('output') != null ? JSON.serializePretty(sm.get('output')) : null;
+            dto.success     = (Boolean) sm.get('success');
+            dto.errorMsg    = (String) sm.get('error');
+            dto.startedAt   = (String) sm.get('startedAt');
+            dto.finishedAt  = (String) sm.get('finishedAt');
+            result.steps.add(dto);
+        }
+        return result;
+    }
+
+    public class RunStepsResult {
+        @AuraEnabled public String status;
+        @AuraEnabled public List<RunStepDto> steps;
+    }
+
+    public class RunStepDto {
+        @AuraEnabled public String nodeId;
+        @AuraEnabled public String nodeLabel;
+        @AuraEnabled public String nodeSubType;
+        @AuraEnabled public String inputJson;
+        @AuraEnabled public String outputJson;
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String errorMsg;
+        @AuraEnabled public String startedAt;
+        @AuraEnabled public String finishedAt;
     }
 
     // GET: Department summary stats
@@ -248,7 +305,9 @@ public with sharing class AgentBuilderController {
             Description__c    = inp.description,
             KnowledgeBase__c  = inp.knowledgeBase,
             Status__c         = inp.status != null ? inp.status : 'Draft',
-            CanvasJson__c     = inp.canvasJson
+            AccessMode__c     = inp.accessMode != null ? inp.accessMode : 'Org',
+            CanvasJson__c     = inp.canvasJson,
+            SetupChecklistJson__c = inp.setupChecklistJson
         );
     }
 
@@ -327,7 +386,9 @@ public with sharing class AgentBuilderController {
         @AuraEnabled public String description;
         @AuraEnabled public String knowledgeBase;
         @AuraEnabled public String status;
+        @AuraEnabled public String accessMode;
         @AuraEnabled public String canvasJson;
+        @AuraEnabled public String setupChecklistJson;
     }
 
     public class AgentNodeInput {

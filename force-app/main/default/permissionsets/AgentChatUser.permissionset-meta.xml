@@ -1,14 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <label>Agent Chat User</label>
-    <description>Lets a user open the Archon Chat tab and have conversations with chat-enabled agents the user already has record access to. Does NOT grant the ability to build agents.</description>
+    <label>Archon Agent Invoker</label>
+    <description>The one non-admin permission set for Archon AI: chat with/run agents shared with the user, decide assigned approvals, manage own personal AI Engine Connections. Read-only agent visibility; no build/share/config access, no org-wide keys.</description>
     <hasActivationRequired>false</hasActivationRequired>
 
     <classAccesses>
         <apexClass>AgentChatController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>AgentChatAttachmentController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentUserConnectionController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentApprovalController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AiEngineConnectionController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 
+    <!-- Chat conversations: users create/read their own (OWD Private keeps them private) -->
     <objectPermissions>
         <allowCreate>true</allowCreate>
         <allowDelete>false</allowDelete>
@@ -28,9 +45,57 @@
         <viewAllRecords>false</viewAllRecords>
     </objectPermissions>
 
+    <!-- Approvals: approvers decide (edit Status__c/Comments__c) their own
+         assigned rows; the Node server creates them, not the user. -->
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentApproval__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+
+    <!-- Agent definitions: READ ONLY. Sharing (OWD Private + shares created
+         from the builder's Share panel) controls which agents appear. -->
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentDefinition__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentNode__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <!-- Merged from the former ArchonAiEngineUser permission set — own
+         connections only, no org-wide/Shared visibility. -->
+    <objectPermissions>
+        <object>AiEngineConnection__c</object>
+        <allowCreate>true</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>true</allowEdit>
+        <allowDelete>true</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+
     <userPermissions>
         <enabled>true</enabled>
         <name>ApiEnabled</name>
+    </userPermissions>
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>ViewEncryptedData</name>
     </userPermissions>
 
     <!-- ChatSession__c FLS (Name + AgentDefinition__c required → implicit) -->
@@ -59,8 +124,48 @@
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
-    <!-- Visibility for the new picklist on AgentDefinition__c so chat users can read it -->
+    <!-- AgentDefinition__c FLS — read only what the chat runtime needs -->
+    <fieldPermissions><field>AgentDefinition__c.Description__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.Status__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.CanvasJson__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.KnowledgeBase__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.Version__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.ExternalServerUrl__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExecuteType__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.AccessMode__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+
+    <!-- AgentNode__c FLS — read only (chat runtime resolves the flow + tools) -->
+    <fieldPermissions><field>AgentNode__c.NodeSubType__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.ConfigJson__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.SortOrder__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.IsEnabled__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.McpServer__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.McpTool__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+
+    <!-- AgentApproval__c FLS (Status__c is required → implicit) -->
+    <fieldPermissions><field>AgentApproval__c.AgentRunId__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.AgentApiName__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.NodeLabel__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.RecordId__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.ApproverId__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.ApprovalToken__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.Comments__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.TimeoutAt__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.DecidedAt__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+
+    <!-- ── AiEngineConnection__c field permissions (merged from ArchonAiEngineUser) ── -->
+    <fieldPermissions><field>AiEngineConnection__c.User__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.Endpoint__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.DefaultModel__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.IsActive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.IsPreferred__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.IsPublicShared__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.LastValidatedAt__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.LastUsedAt__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.ValidationStatus__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.Notes__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.AiEngineConnection__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
 
     <tabSettings>
         <tab>Synapse_Chat</tab>

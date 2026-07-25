@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <label>Agent Builder User</label>
-    <description>Full access to Agent Builder app, custom objects, and Apex classes</description>
+    <label>Archon Admin</label>
+    <description>The one admin permission set for Archon AI: build/share/deploy agents, run Archon Setup (Salesforce + AI Provider), manage AI Engine Connections org-wide (incl. Shared keys), connect providers, curate tools, chat with any agent.</description>
     <hasActivationRequired>false</hasActivationRequired>
 
     <classAccesses>
         <apexClass>AgentBuilderController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AiEngineConnectionController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -21,7 +25,7 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>JwtSigner</apexClass>
+        <apexClass>ArchonServerClient</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -29,7 +33,35 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
+        <apexClass>AgentKbController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentApprovalController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentGeneratorController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>SynapseSetupController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentChatController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentChatAttachmentController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentSharingController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentUserConnectionController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
 
@@ -60,9 +92,73 @@
         <object>AgentExecution__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>AgentKbChunk__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <!-- The Node server creates these via the Setup admin's own connection
+         (getOrgConnection) — that admin's permission set needs full CRUD,
+         not just the approver's decide-only grant on AgentChatUser. -->
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <object>AgentApproval__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>ChatSession__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>ChatMessage__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <!-- Merged from the former ArchonAiEngineAdmin permission set — full
+         admin over AI engine credentials, including Shared/org-wide keys. -->
+    <objectPermissions>
+        <object>AiEngineConnection__c</object>
+        <allowCreate>true</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>true</allowEdit>
+        <allowDelete>true</allowDelete>
+        <viewAllRecords>true</viewAllRecords>
+        <modifyAllRecords>true</modifyAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>CustomMcpServer__c</object>
+        <allowCreate>true</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>true</allowEdit>
+        <allowDelete>true</allowDelete>
+        <viewAllRecords>true</viewAllRecords>
+        <modifyAllRecords>true</modifyAllRecords>
+    </objectPermissions>
+
     <userPermissions>
         <enabled>true</enabled>
         <name>ApiEnabled</name>
+    </userPermissions>
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>ViewEncryptedData</name>
     </userPermissions>
 
     <!-- ── AgentDefinition__c field permissions (required fields omitted — implicit) ── -->
@@ -74,6 +170,9 @@
     <fieldPermissions><field>AgentDefinition__c.ExternalServerUrl__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.TotalExecutions__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.SuccessRate__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.ExecuteType__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.AccessMode__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.SetupChecklistJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ── AgentNode__c field permissions (NodeType__c and master-detail AgentDefinition__c are required — implicit) ── -->
     <fieldPermissions><field>AgentNode__c.NodeSubType__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
@@ -84,6 +183,24 @@
     <fieldPermissions><field>AgentNode__c.IsEnabled__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentNode__c.McpServer__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentNode__c.McpTool__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
+    <!-- ── AgentKbChunk__c field permissions (Salesforce-native RAG backend storage) ── -->
+    <!-- AgentApiName__c and DocumentExternalId__c are required fields — implicitly granted with object access. -->
+    <fieldPermissions><field>AgentKbChunk__c.DocumentTitle__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentKbChunk__c.ChunkIndex__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentKbChunk__c.Content__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
+    <!-- ── AgentApproval__c field permissions (Status__c is required — implicit) ── -->
+    <!-- Node server creates these via the Setup admin's REST connection, which DOES enforce real FLS (unlike Apex DML). -->
+    <fieldPermissions><field>AgentApproval__c.AgentRunId__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.AgentApiName__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.NodeLabel__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.RecordId__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.ApproverId__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.ApprovalToken__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.Comments__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.TimeoutAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentApproval__c.DecidedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ── AgentExecution__c field permissions ── -->
     <fieldPermissions><field>AgentExecution__c.AgentDefinition__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
@@ -101,6 +218,46 @@
     <fieldPermissions><field>AgentExecution__c.Department__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentExecution__c.RunMode__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
+    <!-- ── ChatSession__c / ChatMessage__c FLS (admins test agents in chat) ── -->
+    <fieldPermissions><field>ChatSession__c.User__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.RecordContextId__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.RecordContextType__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.Title__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.Status__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.LastActivityAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.ExpiresAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.Department__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.TotalTurns__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.TokensIn__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.TokensOut__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.PendingApprovalToken__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.Content__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ToolCallsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ToolResultsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ModelUsed__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.TokensIn__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.TokensOut__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.Sensitive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.RequiredApproval__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
+    <!-- ── AiEngineConnection__c field permissions (merged from ArchonAiEngineAdmin) ── -->
+    <fieldPermissions><field>AiEngineConnection__c.User__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.Endpoint__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.DefaultModel__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.IsActive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.IsPreferred__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.IsPublicShared__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.LastValidatedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.LastUsedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.ValidationStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.Notes__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentNode__c.AiEngineConnection__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>CustomMcpServer__c.Description__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>CustomMcpServer__c.IsActive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+
     <!-- Required fields (ApiName__c, Department__c on AgentDefinition__c; NodeType__c on AgentNode__c; -->
     <!-- master-detail AgentDefinition__c on AgentNode__c) cannot have explicit fieldPermissions — -->
     <!-- they're auto-granted when the user has object access. -->
@@ -111,6 +268,10 @@
     </tabSettings>
     <tabSettings>
         <tab>Synapse_Setup</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>Synapse_Chat</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>

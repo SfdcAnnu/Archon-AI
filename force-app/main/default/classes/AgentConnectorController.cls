@@ -11,7 +11,9 @@
 @SuppressWarnings('PMD.ApexCRUDViolation')
 public with sharing class AgentConnectorController {
 
-    private static final Integer CALLOUT_TIMEOUT_MS = 25000;
+    // Apex max. Render free-tier services cold-start in 30-60s; the tool
+    // catalog fetch traverses TWO of them (Node server → MCP server).
+    private static final Integer CALLOUT_TIMEOUT_MS = 120000;
 
     // ── DIRECTORY ────────────────────────────────────────────────────
 
@@ -57,7 +59,75 @@ public with sharing class AgentConnectorController {
             }
             out.add(e);
         }
+
+        // Custom/client-added MCP servers — an open extension point alongside
+        // the packaged (protected) catalog above. No OAuth handshake at this
+        // layer: the URL is trusted directly, same as Claude's own "add a
+        // custom MCP server" flow — any auth the server itself requires
+        // happens when it's actually called.
+        for (CustomMcpServer__c c : [
+            SELECT Id, Name, McpServerUrl__c, Description__c, Category__c, CatalogType__c, IsActive__c
+            FROM CustomMcpServer__c
+            WHERE IsActive__c = true
+            WITH USER_MODE
+            ORDER BY Name ASC
+        ]) {
+            DirectoryEntry e = new DirectoryEntry();
+            e.providerKey       = 'custom_' + c.Id;
+            e.displayName       = c.Name;
+            e.description       = c.Description__c;
+            e.category          = c.Category__c;
+            e.mapsToCatalogType = c.CatalogType__c;
+            e.mcpServerUrl      = c.McpServerUrl__c;
+            e.status            = 'Connected'; // no separate connect step — the URL itself is the config
+            e.isCustom          = true;
+            e.connectorId       = c.Id;
+            out.add(e);
+        }
         return out;
+    }
+
+    // ── CUSTOM MCP SERVERS ───────────────────────────────────────────
+    // User/client-added servers — see DirectoryEntry.isCustom above for how
+    // they surface in the same directory as the packaged catalog.
+
+    @AuraEnabled(cacheable=true)
+    public static List<CustomMcpServer__c> listCustomMcpServers() {
+        return [
+            SELECT Id, Name, McpServerUrl__c, Description__c, Category__c, CatalogType__c, IsActive__c
+            FROM CustomMcpServer__c
+            WITH USER_MODE
+            ORDER BY Name ASC
+        ];
+    }
+
+    @AuraEnabled
+    public static Id saveCustomMcpServer(
+        String recordId, String serverName, String mcpServerUrl,
+        String description, String category, String catalogType
+    ) {
+        if (String.isBlank(serverName))   throw new AuraHandledException('Server name is required.');
+        if (String.isBlank(mcpServerUrl)) throw new AuraHandledException('MCP Server URL is required.');
+        if (String.isBlank(category))     throw new AuraHandledException('Category is required.');
+        if (String.isBlank(catalogType))  throw new AuraHandledException('Catalog type is required.');
+
+        CustomMcpServer__c rec = String.isNotBlank(recordId)
+            ? new CustomMcpServer__c(Id = recordId)
+            : new CustomMcpServer__c(IsActive__c = true);
+        rec.Name             = serverName;
+        rec.McpServerUrl__c  = mcpServerUrl;
+        rec.Description__c   = description;
+        rec.Category__c      = category;
+        rec.CatalogType__c   = catalogType;
+
+        upsert as user rec;
+        return rec.Id;
+    }
+
+    @AuraEnabled
+    public static void deleteCustomMcpServer(Id recordId) {
+        if (recordId == null) throw new AuraHandledException('recordId is required.');
+        delete as user new CustomMcpServer__c(Id = recordId);
     }
 
     /** For the properties-panel dropdown — connectors that power a given catalog type. */
@@ -111,6 +181,36 @@ public with sharing class AgentConnectorController {
     }
 
     /**
+     * AUTHENTICATED tools/list WITH real input schemas — for ANY provider,
+     * not just Salesforce. Powers the "Call a Tool" action node's param-field
+     * UI (schema-driven, same pattern as the custom-tools picker).
+     */
+    @AuraEnabled
+    public static List<RemoteTool> getMcpToolSchemas(String providerKey, String connectorId) {
+        if (String.isBlank(providerKey)) return new List<RemoteTool>();
+        Map<String, Object> reqBody = new Map<String, Object>{ 'provider' => providerKey, 'userId' => UserInfo.getUserId() };
+        // Non-Salesforce connectorIds are Node-side UUIDs, not Salesforce Ids —
+        // kept as a plain String end to end (see resolveProviderToken on the server).
+        if (String.isNotBlank(connectorId)) reqBody.put('connectorId', connectorId);
+        HttpResponse res = callout('POST', '/api/mcp-tool-schemas', JSON.serialize(reqBody));
+        throwIfServerWaking(res);
+        if (res.getStatusCode() >= 400) {
+            throw new AuraHandledException('Could not load tool schemas: ' + res.getBody());
+        }
+        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        List<RemoteTool> out = new List<RemoteTool>();
+        for (Object item : (List<Object>) body.get('tools')) {
+            Map<String, Object> t = (Map<String, Object>) item;
+            RemoteTool rt = new RemoteTool();
+            rt.name        = (String) t.get('name');
+            rt.description = (String) t.get('description');
+            rt.inputSchema = t.get('inputSchema') != null ? JSON.serialize(t.get('inputSchema')) : null;
+            out.add(rt);
+        }
+        return out;
+    }
+
+    /**
      * Public tool catalog for a provider — no auth against the MCP server
      * needed (its GET /tools is metadata-only). URL comes from
      * ConnectorCatalog__mdt.McpServerUrl__c; the Node companion proxies the
@@ -128,6 +228,7 @@ public with sharing class AgentConnectorController {
         }
         HttpResponse res = callout('POST', '/api/mcp-tools',
             JSON.serialize(new Map<String, Object>{ 'url' => rows[0].McpServerUrl__c }));
+        throwIfServerWaking(res);
         if (res.getStatusCode() >= 400) {
             throw new AuraHandledException('Could not load tool catalog: ' + res.getBody());
         }
@@ -144,6 +245,52 @@ public with sharing class AgentConnectorController {
         return out;
     }
 
+    // ── CUSTOM TOOLS (org's own Apex actions / Flows) ─────────────────
+
+    /**
+     * Lists the org's invocable Apex actions + autolaunched Flows for the
+     * custom-tool picker. Returns the server's raw JSON — the LWC parses
+     * it (primitive return avoids wrapper-deserialization pitfalls).
+     */
+    @AuraEnabled
+    public static String getCustomActionCatalog() {
+        HttpResponse res = callout('POST', '/api/sf/custom-actions',
+            JSON.serialize(new Map<String, Object>{ 'mode' => 'list' }));
+        throwIfServerWaking(res);
+        if (res.getStatusCode() >= 400) {
+            throw new AuraHandledException('Could not load custom actions: ' + res.getBody());
+        }
+        return res.getBody();
+    }
+
+    /** Input/output schema of one action — powers the picker's preview pane. */
+    @AuraEnabled
+    public static String describeCustomAction(String actionType, String name) {
+        HttpResponse res = callout('POST', '/api/sf/custom-actions',
+            JSON.serialize(new Map<String, Object>{
+                'mode' => 'describe', 'type' => actionType, 'name' => name
+            }));
+        throwIfServerWaking(res);
+        if (res.getStatusCode() >= 400) {
+            throw new AuraHandledException('Could not describe action: ' + res.getBody());
+        }
+        return res.getBody();
+    }
+
+    /**
+     * Free-tier Render sleeps idle services; while one wakes (~30-60s) its
+     * edge answers requests with an HTML "Application loading" page. Turn
+     * that into a machine-readable signal the LWCs auto-retry on, instead
+     * of dumping raw HTML at the user.
+     */
+    private static void throwIfServerWaking(HttpResponse res) {
+        String body = res.getBody();
+        Boolean htmlBody = body != null && body.trim().startsWith('<');
+        if (htmlBody || res.getStatusCode() == 502 || res.getStatusCode() == 503) {
+            throw new AuraHandledException('SERVER_WAKING: The Archon server is waking up from idle — this usually takes under a minute.');
+        }
+    }
+
     // ── OAUTH START / DISCONNECT ──────────────────────────────────────
 
     /**
@@ -155,7 +302,9 @@ public with sharing class AgentConnectorController {
         Map<String, Object> body = new Map<String, Object>{
             'providerKey' => providerKey,
             'displayName' => String.isBlank(displayName) ? providerKey : displayName,
-            'returnUrl'   => returnUrl
+            'returnUrl'   => returnUrl,
+            // Connections are per user — the server keys tokens by this id.
+            'userId'      => UserInfo.getUserId()
         };
         HttpResponse res = callout('POST', '/api/connectors/oauth/start', JSON.serialize(body));
         if (res.getStatusCode() >= 400) {
@@ -252,6 +401,7 @@ public with sharing class AgentConnectorController {
         @AuraEnabled public String   accountEmail;
         @AuraEnabled public DateTime lastConnectedAt;
         @AuraEnabled public String   lastErrorMessage;
+        @AuraEnabled public Boolean  isCustom;
     }
 
     public class ConnectorOption {

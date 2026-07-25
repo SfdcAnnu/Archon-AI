@@ -1,0 +1,68 @@
+<template>
+    <section class="share-backdrop" onclick={handleClose}>
+        <div class="share-modal" onclick={stop} role="dialog" aria-label="Share agent">
+            <header class="share-head">
+                <h2>Share “{agentName}”</h2>
+                <lightning-button-icon icon-name="utility:close" variant="bare"
+                    alternative-text="Close" onclick={handleClose}></lightning-button-icon>
+            </header>
+
+            <div class="share-body">
+                <p class="share-hint">People and groups you add here can <b>chat</b> with this agent. Only you (and admins) can edit it.</p>
+
+                <lightning-input
+                    type="search"
+                    variant="label-hidden"
+                    placeholder="Search users, public groups, roles…"
+                    value={searchTerm}
+                    onchange={handleSearchChange}>
+                </lightning-input>
+
+                <template lwc:if={searching}>
+                    <div class="share-searching"><lightning-spinner size="x-small" alternative-text="Searching"></lightning-spinner></div>
+                </template>
+                <template lwc:if={hasResults}>
+                    <ul class="share-results">
+                        <template for:each={results} for:item="r">
+                            <li key={r.id} class="share-row">
+                                <lightning-icon icon-name={r.icon} size="x-small"></lightning-icon>
+                                <span class="share-name">{r.name}</span>
+                                <span class="share-type">{r.typeLabel}</span>
+                                <lightning-button label="Add" variant="brand-outline" data-id={r.id} onclick={handleAdd}></lightning-button>
+                            </li>
+                        </template>
+                    </ul>
+                </template>
+
+                <h3 class="share-subhead">Currently shared with</h3>
+                <template lwc:if={loading}>
+                    <div class="share-searching"><lightning-spinner size="small" alternative-text="Loading"></lightning-spinner></div>
+                </template>
+                <template lwc:if={hasShares}>
+                    <ul class="share-results">
+                        <template for:each={shares} for:item="s">
+                            <li key={s.shareId} class="share-row">
+                                <lightning-icon icon-name={s.icon} size="x-small"></lightning-icon>
+                                <span class="share-name">{s.name}</span>
+                                <span class="share-type">{s.typeLabel}</span>
+                                <lightning-button-icon icon-name="utility:delete" variant="bare"
+                                    alternative-text="Remove" data-id={s.shareId} onclick={handleRemove}></lightning-button-icon>
+                            </li>
+                        </template>
+                    </ul>
+                </template>
+                <template lwc:if={noShares}>
+                    <p class="share-empty">Not shared with anyone yet — only you and admins can see this agent in chat.</p>
+                </template>
+
+                <template lwc:if={errorMessage}>
+                    <p class="share-error">{errorMessage}</p>
+                </template>
+            </div>
+
+            <footer class="share-foot">
+                <lightning-button variant="brand" label="Done" onclick={handleClose}></lightning-button>
+            </footer>
+        </div>
+    </section>
+</template>

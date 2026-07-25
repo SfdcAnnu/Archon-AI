@@ -8,6 +8,8 @@ import getSession   from '@salesforce/apex/AgentChatController.getSession';
 import sendTurn     from '@salesforce/apex/AgentChatController.sendTurn';
 import endSession   from '@salesforce/apex/AgentChatController.endSession';
 import uploadChatFile from '@salesforce/apex/AgentChatAttachmentController.uploadChatFile';
+import getGate           from '@salesforce/apex/AgentUserConnectionController.getGate';
+import startMyConnection from '@salesforce/apex/AgentUserConnectionController.startMyConnection';
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5 MB per file
 const MAX_ATTACHMENTS_PER_TURN = 5;
@@ -31,13 +33,66 @@ export default class SynapseChatPanel extends LightningElement {
     _recognition = null;
     _voiceSupported = false;
 
+    // ── PerUser access gate ────────────────────────────────────────
+    // Agents with AccessMode__c = 'PerUser' require the chatting user's
+    // own Salesforce connection. Until it exists, the composer is
+    // replaced by a one-click connect card.
+    @track _gate = { accessMode: 'Org', connected: true };
+    @track connectPolling = false;
+    _gatePollTimer = null;
+
+    get needsConnection() {
+        return this._gate.accessMode === 'PerUser' && !this._gate.connected;
+    }
+    get connectButtonLabel() {
+        return this.connectPolling ? 'Waiting for Salesforce…' : 'Connect my Salesforce';
+    }
+
+    async refreshGate() {
+        if (!this.agentApiName) return;
+        try {
+            const gate = await getGate({ agentApiName: this.agentApiName });
+            this._gate = { accessMode: gate.accessMode, connected: gate.connected === true };
+        } catch (e) {
+            // Gate failure must never block Org-mode chat — default open.
+            this._gate = { accessMode: 'Org', connected: true };
+        }
+    }
+
+    async handleConnectMyAccount() {
+        try {
+            const res = await startMyConnection({ returnUrl: window.location.href });
+            window.open(res.authorizeUrl, 'archon_sf_oauth', 'width=620,height=720,scrollbars=yes');
+            // Poll until the server records the connection (max ~3 min)
+            this.connectPolling = true;
+            let tries = 0;
+            clearInterval(this._gatePollTimer);
+            this._gatePollTimer = setInterval(async () => {
+                tries++;
+                await this.refreshGate();
+                if (!this.needsConnection || tries > 60) {
+                    clearInterval(this._gatePollTimer);
+                    this.connectPolling = false;
+                    if (!this.needsConnection) {
+                        this.toast('Success', 'Your Salesforce account is connected — you can chat now.', 'success');
+                    }
+                }
+            }, 3000);
+        } catch (e) {
+            this.connectPolling = false;
+            this.toast('Connection failed', e?.body?.message || e?.message || 'Could not start the connection.', 'error');
+        }
+    }
+
     connectedCallback() {
         this.setupSpeechRecognition();
         this.loadMarkdownLibs().then(() => this.bootstrap());
+        this.refreshGate();
     }
 
     disconnectedCallback() {
         this.stopVoiceRecognition();
+        clearInterval(this._gatePollTimer);
     }
 
     // ── Markdown libs ──────────────────────────────────────────────
@@ -336,7 +391,14 @@ export default class SynapseChatPanel extends LightningElement {
 
     // ── Render assistant markdown after DOM updates ────────────────
 
+    _gateAgent = null;
     renderedCallback() {
+        // Re-check the access gate when the panel is reused for a
+        // different agent (same instance, new agentApiName prop).
+        if (this.agentApiName !== this._gateAgent) {
+            this._gateAgent = this.agentApiName;
+            this.refreshGate();
+        }
         if (!this.mdReady) return;
         const nodes = this.template.querySelectorAll('[data-md-id]');
         for (const el of nodes) {

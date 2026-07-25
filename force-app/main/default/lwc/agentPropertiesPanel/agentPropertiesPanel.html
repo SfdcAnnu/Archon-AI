@@ -86,16 +86,218 @@
                     </div>
                 </template>
 
+                <!-- ── If/Else condition builder ── -->
+                <template lwc:if={isIfElseNode}>
+                    <div class="prop-field">
+                        <label class="prop-label">Condition</label>
+                        <div class="cond-builder">
+                            <div class="cond-side">
+                                <lightning-input
+                                    value={conditionParts.lhs}
+                                    variant="label-hidden"
+                                    placeholder="\{!ai.score}"
+                                    data-part="lhs"
+                                    onchange={handleConditionLhsChange}>
+                                </lightning-input>
+                                <lightning-button-menu
+                                    icon-name="utility:merge_field"
+                                    icon-size="x-small"
+                                    variant="border-filled"
+                                    alternative-text="Insert a field or variable"
+                                    menu-alignment="right"
+                                    data-part="lhs"
+                                    onselect={handleInsertConditionToken}
+                                    class="insert-btn">
+                                    <template for:each={availableVariables} for:item="v">
+                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                    </template>
+                                </lightning-button-menu>
+                            </div>
+                            <lightning-combobox
+                                value={conditionParts.op}
+                                options={conditionOperatorOptions}
+                                variant="label-hidden"
+                                class="cond-op"
+                                onchange={handleConditionOpChange}>
+                            </lightning-combobox>
+                            <div class="cond-side">
+                                <lightning-input
+                                    value={conditionParts.rhs}
+                                    variant="label-hidden"
+                                    placeholder="80"
+                                    data-part="rhs"
+                                    onchange={handleConditionRhsChange}>
+                                </lightning-input>
+                                <lightning-button-menu
+                                    icon-name="utility:merge_field"
+                                    icon-size="x-small"
+                                    variant="border-filled"
+                                    alternative-text="Insert a field or variable"
+                                    menu-alignment="right"
+                                    data-part="rhs"
+                                    onselect={handleInsertConditionToken}
+                                    class="insert-btn">
+                                    <template for:each={availableVariables} for:item="v">
+                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                    </template>
+                                </lightning-button-menu>
+                            </div>
+                        </div>
+                        <div class="field-hint">Either side can be a plain value or a variable — click the 🔤 icon to insert a record field, AI output, current user, or org value. Text values don't need quotes.</div>
+                        <div class="field-hint">{ifElseScoreHint}</div>
+                    </div>
+                </template>
+
+                <!-- ── Call a Tool (generic action node) ── -->
+                <template lwc:if={isCallToolNode}>
+                    <div class="prop-field">
+                        <label class="prop-label">Connector</label>
+                        <lightning-combobox
+                            value={callToolProvider}
+                            options={callToolProviderOptions}
+                            variant="label-hidden"
+                            onchange={handleCallToolProviderChange}>
+                        </lightning-combobox>
+                    </div>
+
+                    <template lwc:if={callToolProvider}>
+                        <div class="prop-field">
+                            <label class="prop-label">Tool type</label>
+                            <lightning-combobox
+                                value={callToolKind}
+                                options={callToolKindOptions}
+                                variant="label-hidden"
+                                onchange={handleCallToolKindChange}>
+                            </lightning-combobox>
+                        </div>
+
+                        <!-- Standard tool from the connector's live catalog -->
+                        <template lwc:if={isCallToolStandard}>
+                            <div class="prop-field">
+                                <label class="prop-label">Tool</label>
+                                <template lwc:if={callToolStandardLoading}>
+                                    <div class="catalog-loading">
+                                        <lightning-spinner alternative-text="Loading tools" size="small"></lightning-spinner>
+                                        <p class="catalog-loading-text">Loading tools from the MCP server…</p>
+                                    </div>
+                                </template>
+                                <template lwc:elseif={callToolStandardError}>
+                                    <div class="picker-blocked">{callToolStandardError}</div>
+                                </template>
+                                <template lwc:else>
+                                    <div class="tool-grid">
+                                        <template for:each={callToolStandardRows} for:item="tool">
+                                            <div key={tool.value}
+                                                 class={tool.rowClass}
+                                                 data-option={tool.value}
+                                                 onclick={handleCallToolStandardSelect}>
+                                                <span class={tool.checkClass}></span>
+                                                <div class="tool-text">
+                                                    <div class="tool-name">{tool.label}</div>
+                                                    <template lwc:if={tool.description}>
+                                                        <div class="tool-desc">{tool.description}</div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Custom Apex action / Flow -->
+                        <template lwc:if={isCallToolCustom}>
+                            <div class="prop-field">
+                                <label class="prop-label">Action</label>
+                                <template lwc:if={callToolCustomLoading}>
+                                    <div class="catalog-loading">
+                                        <lightning-spinner alternative-text="Loading actions" size="small"></lightning-spinner>
+                                        <p class="catalog-loading-text">Loading Apex actions and Flows…</p>
+                                    </div>
+                                </template>
+                                <template lwc:elseif={callToolCustomError}>
+                                    <div class="picker-blocked">{callToolCustomError}</div>
+                                </template>
+                                <template lwc:else>
+                                    <lightning-combobox
+                                        value={callToolCustomValue}
+                                        options={callToolCustomOptions}
+                                        variant="label-hidden"
+                                        placeholder="Pick an Apex action or Flow…"
+                                        onchange={handleCallToolCustomSelect}>
+                                    </lightning-combobox>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Schema-driven parameter fields -->
+                        <template lwc:if={callToolParamFields.length}>
+                            <div class="prop-field">
+                                <label class="prop-label">Parameters</label>
+                                <template for:each={callToolParamFields} for:item="p">
+                                    <div key={p.key} class="param-row">
+                                        <label class="prop-label param-row-label">{p.label}</label>
+                                        <template lwc:if={p.isMultiline}>
+                                            <div class="cond-side cond-side--top">
+                                                <lightning-textarea value={p.value} variant="label-hidden" rows="2" data-param={p.key} onchange={handleCallToolParamChange}></lightning-textarea>
+                                                <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={p.key} onselect={handleInsertParamToken} class="insert-btn">
+                                                    <template for:each={availableVariables} for:item="v">
+                                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                                    </template>
+                                                </lightning-button-menu>
+                                            </div>
+                                        </template>
+                                        <template lwc:else>
+                                            <div class="cond-side">
+                                                <lightning-input value={p.value} variant="label-hidden" data-param={p.key} onchange={handleCallToolParamChange}></lightning-input>
+                                                <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={p.key} onselect={handleInsertParamToken} class="insert-btn">
+                                                    <template for:each={availableVariables} for:item="v">
+                                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                                    </template>
+                                                </lightning-button-menu>
+                                            </div>
+                                        </template>
+                                        <template lwc:if={p.description}>
+                                            <div class="field-hint">{p.description}</div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template lwc:if={callToolNoParams}>
+                            <div class="field-hint">This tool takes no parameters.</div>
+                        </template>
+                    </template>
+                </template>
+
                 <!-- Remaining schema-driven fields -->
                 <template for:each={configFields} for:item="field">
                     <div key={field.key} class="prop-field">
                         <label class="prop-label">{field.label}</label>
 
                         <template lwc:if={field.isText}>
-                            <lightning-input value={field.value} variant="label-hidden" placeholder={field.placeholder} data-key={field.key} onchange={handleFieldChange}></lightning-input>
+                            <div class="cond-side">
+                                <lightning-input value={field.value} variant="label-hidden" placeholder={field.placeholder} data-key={field.key} onchange={handleFieldChange}></lightning-input>
+                                <template lwc:if={field.supportsVariables}>
+                                    <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={field.key} onselect={handleInsertFieldToken} class="insert-btn">
+                                        <template for:each={availableVariables} for:item="v">
+                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                        </template>
+                                    </lightning-button-menu>
+                                </template>
+                            </div>
                         </template>
                         <template lwc:if={field.isTextarea}>
-                            <lightning-textarea value={field.value} variant="label-hidden" placeholder={field.placeholder} max-length="10000" rows="4" data-key={field.key} onchange={handleFieldChange}></lightning-textarea>
+                            <div class="cond-side cond-side--top">
+                                <lightning-textarea value={field.value} variant="label-hidden" placeholder={field.placeholder} max-length="10000" rows="4" data-key={field.key} onchange={handleFieldChange}></lightning-textarea>
+                                <template lwc:if={field.supportsVariables}>
+                                    <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={field.key} onselect={handleInsertFieldToken} class="insert-btn">
+                                        <template for:each={availableVariables} for:item="v">
+                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                        </template>
+                                    </lightning-button-menu>
+                                </template>
+                            </div>
                         </template>
                         <template lwc:if={field.isNumber}>
                             <lightning-input type="number" value={field.value} variant="label-hidden" min={field.min} max={field.max} step={field.step} data-key={field.key} onchange={handleFieldChange}></lightning-input>
@@ -141,24 +343,14 @@
 
             <!-- ══ VARIABLES TAB ════════════════════════════ -->
             <template lwc:if={showVarsTab}>
-                <div class="vars-note">Available in instructions and field mappings</div>
+                <div class="vars-note">Reference — every field with a 🔤 icon on the Config tab can insert these directly.</div>
                 <div class="var-list">
-                    <div class="var-card">
-                        <code>&#123;!record.Field&#125;</code>
-                        <span>trigger record fields</span>
-                    </div>
-                    <div class="var-card">
-                        <code>&#123;!ai.score&#125;</code>
-                        <span>most recent AI score</span>
-                    </div>
-                    <div class="var-card">
-                        <code>&#123;!ai.priority&#125;</code>
-                        <span>most recent AI priority</span>
-                    </div>
-                    <div class="var-card">
-                        <code>&#123;!input.X&#125;</code>
-                        <span>values passed via inputPayload</span>
-                    </div>
+                    <template for:each={availableVariables} for:item="v">
+                        <div key={v.token} class="var-card">
+                            <code>{v.token}</code>
+                            <span>{v.hint}</span>
+                        </div>
+                    </template>
                 </div>
             </template>
 
@@ -180,27 +372,79 @@
                     </div>
                 </template>
 
-                <div class="tool-grid">
-                    <template for:each={toolRows} for:item="tool">
-                        <div key={tool.value}
-                             class={tool.rowClass}
-                             data-option={tool.value}
-                             onclick={handleToolRowToggle}>
-                            <span class={tool.checkClass}></span>
-                            <div class="tool-text">
-                                <div class="tool-name">{tool.label}</div>
-                                <template lwc:if={tool.description}>
-                                    <div class="tool-desc">{tool.description}</div>
+                <template lwc:if={catalogLoading}>
+                    <div class="catalog-loading">
+                        <lightning-spinner alternative-text="Loading tools" size="small"></lightning-spinner>
+                        <p class="catalog-loading-text">Loading tools from the MCP server…<br/>
+                        First load can take up to a minute while the server wakes up.</p>
+                    </div>
+                </template>
+                <template lwc:elseif={catalogError}>
+                    <div class="picker-blocked">
+                        <p>Could not load tools from the MCP server.</p>
+                        <p class="catalog-error-detail">{catalogError}</p>
+                        <lightning-button label="Retry" variant="brand" onclick={handleCatalogRetry}></lightning-button>
+                    </div>
+                </template>
+                <template lwc:else>
+                    <div class="tool-grid">
+                        <template for:each={toolRows} for:item="tool">
+                            <div key={tool.value}
+                                 class={tool.rowClass}
+                                 data-option={tool.value}
+                                 onclick={handleToolRowToggle}>
+                                <span class={tool.checkClass}></span>
+                                <div class="tool-text">
+                                    <div class="tool-name">{tool.label}</div>
+                                    <template lwc:if={tool.description}>
+                                        <div class="tool-desc">{tool.description}</div>
+                                    </template>
+                                </div>
+                                <template lwc:if={tool.showBadge}>
+                                    <span class={tool.badgeClass}>{tool.badgeLabel}</span>
                                 </template>
                             </div>
-                            <template lwc:if={tool.showBadge}>
-                                <span class={tool.badgeClass}>{tool.badgeLabel}</span>
-                            </template>
-                        </div>
+                        </template>
+                    </div>
+                    <template lwc:if={noTools}>
+                        <div class="picker-blocked">No tools available. Bind a connector on the Auth tab first.</div>
                     </template>
-                </div>
-                <template lwc:if={noTools}>
-                    <div class="picker-blocked">No tools available. Bind a connector on the Auth tab first.</div>
+                </template>
+
+                <!-- ── Custom tools (org's own Apex actions / Flows) ── -->
+                <template lwc:if={supportsCustomTools}>
+                    <div class="custom-tools-sec">
+                        <div class="custom-tools-head">
+                            <span class="custom-tools-title">Custom tools</span>
+                            <lightning-button label="+ Add custom tool" variant="base" onclick={handleOpenCustomToolPicker}></lightning-button>
+                        </div>
+                        <template lwc:if={hasCustomTools}>
+                            <div class="tool-grid">
+                                <template for:each={customToolRows} for:item="ct">
+                                    <div key={ct.key} class="tool-row tool-row--on">
+                                        <span class="tool-check tool-check--on"></span>
+                                        <div class="tool-text">
+                                            <div class="tool-name">{ct.label}</div>
+                                            <div class="tool-desc">{ct.name}</div>
+                                        </div>
+                                        <span class="tool-badge tool-badge--write">{ct.typeLabel}</span>
+                                        <lightning-button-icon icon-name="utility:delete" variant="bare" size="small"
+                                            alternative-text="Remove" data-key={ct.key} onclick={handleRemoveCustomTool}></lightning-button-icon>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template lwc:else>
+                            <div class="custom-tools-empty">Expose your org's own Apex actions and Flows to this agent — schemas load live from the org.</div>
+                        </template>
+                    </div>
+                </template>
+                <template lwc:if={showCustomToolPicker}>
+                    <c-agent-custom-tool-picker
+                        selected={selectedCustomTools}
+                        onaddtool={handleAddCustomTool}
+                        onclose={handleCloseCustomToolPicker}>
+                    </c-agent-custom-tool-picker>
                 </template>
             </template>
 
@@ -226,6 +470,14 @@
                         </div>
                     </template>
                     <lightning-button
+                        variant="brand"
+                        label="Re-authenticate"
+                        icon-name="utility:refresh"
+                        onclick={handleConnectProviderClick}
+                        title="Run the OAuth flow again — refreshes expired tokens or switches the connected account"
+                        class="full-width-btn connect-btn-space">
+                    </lightning-button>
+                    <lightning-button
                         label="Change connector"
                         icon-name="utility:switch"
                         onclick={handleChangeConnector}
@@ -237,6 +489,11 @@
                         <lightning-icon icon-name="utility:warning" size="xx-small"></lightning-icon>
                         <span>No account connected — authenticate {providerDisplayName} to activate this node.</span>
                     </div>
+                    <template lwc:if={isSalesforceMcpAuth}>
+                        <div class="field-hint">
+                            This isn't a different Salesforce org — it's a separate one-time login so the Salesforce tool server (a standalone process, not this Archon server) can call back into THIS org on the agent's behalf. Archon Setup authorizes the Archon server itself; this authorizes the tool server. Click Connect and log in as normal — it takes a few seconds.
+                        </div>
+                    </template>
                     <lightning-button
                         variant="brand"
                         label={connectButtonLabel}

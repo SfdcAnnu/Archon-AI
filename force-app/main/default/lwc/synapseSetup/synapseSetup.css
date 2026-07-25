@@ -87,3 +87,88 @@
     color: #706e6b;
     font-size: 12px;
 }
+
+/* ── Tabs ───────────────────────────────────────────────── */
+.setup-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e5e5e5;
+}
+.setup-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #706e6b;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+.setup-tab--on {
+    color: #032d60;
+    border-bottom-color: #0176d3;
+}
+
+/* ── AI Provider Setup ─────────────────────────────────────── */
+.card-sub {
+    font-size: 12px;
+    color: #706e6b;
+    max-width: 480px;
+}
+.ai-loading, .ai-empty {
+    padding: 24px 0;
+    text-align: center;
+    color: #706e6b;
+    font-size: 13px;
+}
+.ai-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+.ai-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 14px;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    background: #fafafa;
+}
+.ai-row-main { flex: 1; min-width: 0; }
+.ai-row-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.ai-row-label { font-size: 13px; font-weight: 600; color: #032d60; }
+.ai-row-sub { margin-top: 4px; font-size: 11px; color: #706e6b; }
+.ai-row-model { margin-left: 4px; }
+.ai-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.chip-engine {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    background: #eef1f6; color: #3e3e3c;
+}
+.chip-engine--claude { background: #f1ecff; color: #5a3fc0; }
+.chip-engine--openai { background: #e6f7f2; color: #0b6b52; }
+.chip-engine--gemini { background: #e8f0fe; color: #1a56c4; }
+.chip-engine--custom { background: #f0f0f0; color: #444; }
+
+.chip {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px;
+}
+.chip-pref     { background: #fff7e6; color: #8a5300; }
+.chip-shared   { background: #eaf3fc; color: #0b5a9e; }
+.chip-personal { background: #ecfdf5; color: #056636; }
+.chip-inactive { background: #f4f4f4; color: #706e6b; }
+
+.val-ok  { color: #056636; font-weight: 600; }
+.val-err { color: #a32d2d; font-weight: 600; }
+.val-unk { color: #8a5300; font-weight: 600; }

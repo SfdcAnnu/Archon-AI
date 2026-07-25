@@ -106,12 +106,16 @@ private class AgentBuilderControllerTest {
         );
 
         Test.startTest();
-        AgentBuilderController.ExecutionPage page1 = AgentBuilderController.getExecutionLogs(a.Id, 20, 0);
-        AgentBuilderController.ExecutionPage allLogs = AgentBuilderController.getExecutionLogs(null, 20, 0);
+        AgentBuilderController.ExecutionPage page1 = AgentBuilderController.getExecutionLogs(a.Id, 20, 0, null);
+        AgentBuilderController.ExecutionPage allLogs = AgentBuilderController.getExecutionLogs(null, 20, 0, null);
+        AgentBuilderController.ExecutionPage byStatus = AgentBuilderController.getExecutionLogs(null, 20, 0, 'SUCCESS');
+        AgentBuilderController.ExecutionPage noMatch = AgentBuilderController.getExecutionLogs(null, 20, 0, 'ERROR');
         Test.stopTest();
 
         System.assertEquals(1, page1.records.size());
         System.assert(allLogs.total >= 1);
+        System.assert(byStatus.total >= 1);
+        System.assertEquals(0, noMatch.total);
     }
 
     @IsTest
@@ -154,7 +158,11 @@ private class AgentBuilderControllerTest {
     @IsTest
     static void executeAgent_calls_engine_and_returns_result() {
         AgentDefinition__c a = createAgent('exec_agent', 'Active');
-        JwtSigner.overrideSecret = 'unit-test-secret';
+        insert new SynapseInstall__c(
+            SetupOwnerId    = UserInfo.getOrganizationId(),
+            SessionKey__c   = 'sk-test',
+            ConfiguredAt__c = System.now()
+        );
 
         Test.setMock(HttpCalloutMock.class, new MockEngine());
         Test.startTest();
@@ -165,5 +173,45 @@ private class AgentBuilderControllerTest {
         System.assertEquals(true, result.success);
         System.assertEquals('SUCCESS', result.agentStatus);
         System.assertEquals(85, result.agentScore);
+    }
+
+    @IsTest
+    static void executeAgent_allows_draft_agent_as_test_run() {
+        AgentDefinition__c a = createAgent('exec_draft_agent', 'Draft');
+        insert new SynapseInstall__c(
+            SetupOwnerId    = UserInfo.getOrganizationId(),
+            SessionKey__c   = 'sk-test',
+            ConfiguredAt__c = System.now()
+        );
+
+        Test.setMock(HttpCalloutMock.class, new MockEngine());
+        Test.startTest();
+        AgentBuilderController.ExecutionResult result =
+            AgentBuilderController.executeAgent('exec_draft_agent', a.Id, 'sync', '{}');
+        Test.stopTest();
+
+        System.assertEquals(true, result.success);
+    }
+
+    @IsTest
+    static void executeAgent_blocks_inactive_agent() {
+        AgentDefinition__c a = createAgent('exec_inactive_agent', 'Inactive');
+        insert new SynapseInstall__c(
+            SetupOwnerId    = UserInfo.getOrganizationId(),
+            SessionKey__c   = 'sk-test',
+            ConfiguredAt__c = System.now()
+        );
+
+        Test.setMock(HttpCalloutMock.class, new MockEngine());
+        Test.startTest();
+        Boolean threw = false;
+        try {
+            AgentBuilderController.executeAgent('exec_inactive_agent', a.Id, 'sync', '{}');
+        } catch (AuraHandledException e) {
+            threw = true;
+        }
+        Test.stopTest();
+
+        System.assertEquals(true, threw);
     }
 }

@@ -7,7 +7,13 @@
         <type>Text</type>
     </nameField>
     <deploymentStatus>Deployed</deploymentStatus>
-    <sharingModel>ReadWrite</sharingModel>
+    <!-- Private: chat users see ONLY agents explicitly shared with them
+         (via the builder's Share panel → ArchonAccess__c share rows). -->
+    <sharingModel>Private</sharingModel>
+    <sharingReasons>
+        <fullName>ArchonAccess__c</fullName>
+        <label>Archon Access</label>
+    </sharingReasons>
     <fields>
         <fullName>ApiName__c</fullName>
         <label>API Name</label>

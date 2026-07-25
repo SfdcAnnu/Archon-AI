@@ -54,6 +54,11 @@
                                 value={search}
                                 oninput={handleSearch}/>
                         </div>
+                        <lightning-button
+                            label="Add custom MCP server"
+                            icon-name="utility:add"
+                            onclick={handleOpenCustomForm}>
+                        </lightning-button>
                     </div>
 
                     <!-- Loading -->
@@ -91,26 +96,36 @@
                                     </template>
 
                                     <div class="conn-actions">
-                                        <template lwc:if={e.showConnectBtn}>
-                                            <button class="btn btn-primary"
-                                                    data-provider={e.providerKey}
-                                                    onclick={handleConnect}>
-                                                + Connect
-                                            </button>
-                                        </template>
-                                        <template lwc:if={e.showManageBtn}>
+                                        <template lwc:if={e.isCustom}>
+                                            <span class="btn-static">Custom · no connect step needed</span>
                                             <button class="btn btn-secondary"
                                                     data-id={e.connectorId}
-                                                    onclick={handleDisconnect}>
-                                                Disconnect
+                                                    onclick={handleDeleteCustom}>
+                                                Remove
                                             </button>
                                         </template>
-                                        <template lwc:if={e.showRetryBtn}>
-                                            <button class="btn btn-secondary"
-                                                    data-provider={e.providerKey}
-                                                    onclick={handleConnect}>
-                                                Retry
-                                            </button>
+                                        <template lwc:else>
+                                            <template lwc:if={e.showConnectBtn}>
+                                                <button class="btn btn-primary"
+                                                        data-provider={e.providerKey}
+                                                        onclick={handleConnect}>
+                                                    + Connect
+                                                </button>
+                                            </template>
+                                            <template lwc:if={e.showManageBtn}>
+                                                <button class="btn btn-secondary"
+                                                        data-id={e.connectorId}
+                                                        onclick={handleDisconnect}>
+                                                    Disconnect
+                                                </button>
+                                            </template>
+                                            <template lwc:if={e.showRetryBtn}>
+                                                <button class="btn btn-secondary"
+                                                        data-provider={e.providerKey}
+                                                        onclick={handleConnect}>
+                                                    Retry
+                                                </button>
+                                            </template>
                                         </template>
                                     </div>
                                 </article>
@@ -154,6 +169,28 @@
                 <footer class="api-modal-foot">
                     <lightning-button label="Cancel" onclick={handleApiKeyCancel}></lightning-button>
                     <lightning-button label="Save" variant="brand" onclick={handleApiKeySave} class="slds-m-left_small"></lightning-button>
+                </footer>
+            </section>
+        </template>
+
+        <!-- Add a custom MCP server — open extension point alongside the packaged catalog -->
+        <template lwc:if={showCustomForm}>
+            <div class="api-modal-backdrop" onclick={handleCloseCustomForm}></div>
+            <section role="dialog" aria-modal="true" class="api-modal" onclick={stopProp}>
+                <header class="api-modal-head">
+                    <h3>Add a custom MCP server</h3>
+                    <p class="dir-sub">Same idea as adding a custom MCP server in Claude's own connector settings — point at any MCP-compatible server URL. No Archon OAuth step; whatever auth the server itself needs happens on its side.</p>
+                </header>
+                <div class="api-modal-body">
+                    <lightning-input label="Server name" value={customForm.name} data-field="name" onchange={handleCustomFieldChange} required></lightning-input>
+                    <lightning-input label="MCP Server URL" type="url" placeholder="https://your-server.example.com" value={customForm.url} data-field="url" onchange={handleCustomFieldChange} required></lightning-input>
+                    <lightning-combobox label="Category" value={customForm.category} options={customCategoryOptions} data-field="category" onchange={handleCustomFieldChange}></lightning-combobox>
+                    <lightning-combobox label="Catalog type (which tool set the AI sees)" value={customForm.catalogType} options={customCatalogTypeOptions} data-field="catalogType" onchange={handleCustomFieldChange}></lightning-combobox>
+                    <lightning-textarea label="Description (optional)" value={customForm.description} data-field="description" onchange={handleCustomFieldChange}></lightning-textarea>
+                </div>
+                <footer class="api-modal-foot">
+                    <lightning-button label="Cancel" onclick={handleCloseCustomForm}></lightning-button>
+                    <lightning-button label="Save" variant="brand" onclick={handleSaveCustom} disabled={customSaving} class="slds-m-left_small"></lightning-button>
                 </footer>
             </section>
         </template>

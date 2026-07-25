@@ -29,16 +29,38 @@
             <div class="tb-actions">
                 <lightning-button label="Auto layout" variant="base"  icon-name="utility:rows"           onclick={handleAutoLayout}></lightning-button>
                 <lightning-button label="Connectors"  variant="base"  icon-name="utility:connected_apps" onclick={handleOpenConnectors}></lightning-button>
+                <lightning-button label="Share"       variant="base"  icon-name="utility:share"          onclick={handleOpenShare}></lightning-button>
                 <lightning-button label="Test run"                    icon-name="utility:apex"           onclick={handleTestRun}></lightning-button>
-                <lightning-button label="Save"                        icon-name="utility:save"           onclick={handleSave} disabled={isSaving}></lightning-button>
-                <lightning-button label="Deploy" variant="brand"      icon-name="utility:rocket"         onclick={handleDeploy}></lightning-button>
+                <lightning-button label="Save"                        icon-name="utility:save"           onclick={handleSave} disabled={isSaving}
+                    title="Saves everything as-is without changing Status. A Draft agent stays Draft — testable via Test Runner, but real triggers/automation still won't fire it.">
+                </lightning-button>
+                <lightning-button label="Deploy" variant="brand"      icon-name="utility:rocket"         onclick={handleDeploy}
+                    title="Saves AND sets Status to Active in one step — this is what makes the agent go live and start responding to real triggers/automation.">
+                </lightning-button>
             </div>
         </div>
+
+        <template lwc:if={showShareModal}>
+            <c-agent-share-modal
+                agent-id={agentDef.Id}
+                agent-name={agentDef.Name}
+                onclose={handleCloseShare}>
+            </c-agent-share-modal>
+        </template>
 
         <!-- ── CANVAS TOOLBAR ─────────────────────────────────── -->
         <div class="canvas-toolbar">
             <span class="node-count">{nodeCount} nodes · {connectionCount} connections</span>
             <div class="spacer"></div>
+            <template lwc:if={hasChecklist}>
+                <lightning-button
+                    label={checklistButtonLabel}
+                    icon-name="utility:checkin"
+                    variant="base"
+                    onclick={handleOpenChecklist}
+                    class="checklist-btn">
+                </lightning-button>
+            </template>
             <div class="zoom-group">
                 <lightning-button-icon icon-name="utility:zoomout"    variant="bare" alternative-text="Zoom out"  onclick={handleZoomOut}></lightning-button-icon>
                 <span class="zoom-label">{zoomLabel}</span>
@@ -274,6 +296,12 @@
                                 <div class="port port-no" data-nodeid={node.id} data-port="no" onmousedown={handlePortMouseDown} title="No branch"></div>
                                 <span class="port-lbl port-lbl-no">No</span>
                             </template>
+                            <template lwc:if={node.isLoop}>
+                                <div class="port port-yes" data-nodeid={node.id} data-port="each" onmousedown={handlePortMouseDown} title="Loop body — runs once per item"></div>
+                                <span class="port-lbl port-lbl-yes">Each</span>
+                                <div class="port port-no" data-nodeid={node.id} data-port="done" onmousedown={handlePortMouseDown} title="After the loop finishes"></div>
+                                <span class="port-lbl port-lbl-no">Done</span>
+                            </template>
                         </div>
                     </template>
 
@@ -283,6 +311,13 @@
                             <lightning-icon icon-name="utility:drag_and_drop" size="medium" alternative-text="Drop nodes here"></lightning-icon>
                             <p>Drag nodes from the left panel to start building</p>
                             <p class="canvas-hint-sub">Add a Trigger first, then chain AI, Connector, and Logic nodes</p>
+                            <div class="canvas-empty-or">or</div>
+                            <lightning-button
+                                variant="brand-outline"
+                                label="Describe what you need — AI builds it"
+                                icon-name="utility:einstein"
+                                onclick={handleOpenGenerate}>
+                            </lightning-button>
                         </div>
                     </template>
 
@@ -297,6 +332,8 @@
                 <template lwc:if={selectedNode}>
                     <c-agent-properties-panel
                         node={selectedNode}
+                        all-nodes={nodes}
+                        connections={connections}
                         onconfig={handleNodeConfigChange}
                         onlabelchange={handleNodeLabelChange}
                         onconnectprovider={handleConnectProviderEvent}>
@@ -335,6 +372,16 @@
                                     onchange={handleStatusChange}>
                                 </lightning-combobox>
                             </div>
+                            <div class="prop-field">
+                                <label class="prop-label">Salesforce tool-call identity</label>
+                                <lightning-combobox
+                                    value={accessModeValue}
+                                    options={accessModeOptions}
+                                    variant="label-hidden"
+                                    onchange={handleAccessModeChange}>
+                                </lightning-combobox>
+                                <div class="prop-hint">Not related to the Knowledge Base above. This controls WHO the Salesforce CRM tool (get/query/update records, etc.) acts as when this agent runs. Org connection: every user shares the Archon Setup connection's access. Each user's own: each chat user connects their own Salesforce login once — sharing rules and audit trail reflect the real person, not a shared identity.</div>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -349,39 +396,31 @@
             onclose={handleCloseConnectors}>
         </c-agent-connectors-directory>
 
-        <!-- Knowledge base modal -->
-        <template lwc:if={showKbModal}>
-            <div class="kb-modal-backdrop" onclick={handleCloseKb}></div>
-            <section
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="kb-modal-heading"
-                class="kb-modal">
-                <header class="kb-modal-head">
-                    <h2 id="kb-modal-heading">Knowledge base — {agentDef.Name}</h2>
-                    <lightning-button-icon
-                        icon-name="utility:close"
-                        size="small"
-                        variant="bare"
-                        alternative-text="Close"
-                        onclick={handleCloseKb}>
-                    </lightning-button-icon>
-                </header>
-                <div class="kb-modal-body">
-                    <lightning-textarea
-                        label="Business rules and knowledge"
-                        value={agentDef.KnowledgeBase__c}
-                        rows="14"
-                        placeholder="Write your agent's rules in plain English. Example: Hot leads (score > 80) must be assigned to the AE via Slack."
-                        onchange={handleKbChange}>
-                    </lightning-textarea>
-                </div>
-                <footer class="kb-modal-foot">
-                    <lightning-button label="Cancel" onclick={handleCloseKb}></lightning-button>
-                    <lightning-button variant="brand" label="Save" onclick={handleCloseKb} class="slds-m-left_small"></lightning-button>
-                </footer>
-            </section>
-        </template>
+        <!-- Knowledge base modal — Notes (plain text) + Documents (real RAG) -->
+        <c-agent-kb-modal
+            open={showKbModal}
+            agent-name={agentDef.Name}
+            agent-api-name={agentDef.ApiName__c}
+            agent-record-id={agentDef.Id}
+            notes-value={agentDef.KnowledgeBase__c}
+            onclose={handleCloseKb}
+            onnoteschange={handleKbChange}>
+        </c-agent-kb-modal>
+
+        <!-- AI agent generator — alternative to manual drag-and-drop -->
+        <c-agent-generate-modal
+            open={showGenerateModal}
+            onclose={handleCloseGenerate}
+            ongenerated={handleAgentGenerated}>
+        </c-agent-generate-modal>
+
+        <!-- Remaining manual setup steps for an AI-generated agent -->
+        <c-agent-setup-checklist
+            open={showChecklist}
+            items={checklistItems}
+            onclose={handleCloseChecklist}
+            ontoggleitem={handleToggleChecklistItem}>
+        </c-agent-setup-checklist>
 
     </div>
 </template>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>McpServerUrl__c</fullName>
+    <label>MCP Server URL</label>
+    <type>Url</type>
+    <required>true</required>
+    <description>The custom MCP server's base URL — same as adding a custom MCP server in Claude's own connector settings.</description>
+</CustomField>

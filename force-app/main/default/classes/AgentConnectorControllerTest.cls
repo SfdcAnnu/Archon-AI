@@ -14,9 +14,16 @@ private class AgentConnectorControllerTest {
         }
     }
 
+    // Every AgentConnectorController.callout() requires a configured
+    // SynapseInstall__c row (Bearer <SessionKey__c> pattern) — without it,
+    // the method throws before the HttpCalloutMock is ever reached.
     @TestSetup
-    static void seedJwt() {
-        JwtSigner.overrideSecret = 'test-jwt-secret-for-controller-tests';
+    static void seedInstall() {
+        insert new SynapseInstall__c(
+            SetupOwnerId    = UserInfo.getOrganizationId(),
+            SessionKey__c   = 'sk-test',
+            ConfiguredAt__c = System.now()
+        );
     }
 
     @IsTest
@@ -76,9 +83,9 @@ private class AgentConnectorControllerTest {
 
     @IsTest
     static void disconnect_calls_delete() {
-        Test.setMock(HttpCalloutMock.class, new StubMock(200, '{"id":"abc","status":"Disconnected"}'));
+        Test.setMock(HttpCalloutMock.class, new StubMock(200, '{"id":"a0000000000000A","status":"Disconnected"}'));
         Test.startTest();
-        AgentConnectorController.disconnect('abc');
+        AgentConnectorController.disconnect('a0000000000000A');
         Test.stopTest();
         // No exception = success
     }
@@ -88,10 +95,74 @@ private class AgentConnectorControllerTest {
         String body = '{"tools":[{"name":"soqlQuery","description":"Run SOQL","inputSchema":{"type":"object"}}]}';
         Test.setMock(HttpCalloutMock.class, new StubMock(200, body));
         Test.startTest();
-        List<AgentConnectorController.RemoteTool> tools = AgentConnectorController.getConnectorTools('abc');
+        List<AgentConnectorController.RemoteTool> tools = AgentConnectorController.getConnectorTools('a0000000000000A');
         Test.stopTest();
         System.assertEquals(1, tools.size());
         System.assertEquals('soqlQuery', tools[0].name);
         System.assert(tools[0].inputSchema.contains('object'), 'inputSchema should be JSON-encoded');
+    }
+
+    @IsTest
+    static void getMcpToolSchemas_parses_list_with_real_schema() {
+        String body = '{"tools":[{"name":"send_email","description":"Send an email","inputSchema":{"type":"object","properties":{"to":{"type":"string"}},"required":["to"]}}]}';
+        Test.setMock(HttpCalloutMock.class, new StubMock(200, body));
+        Test.startTest();
+        List<AgentConnectorController.RemoteTool> tools = AgentConnectorController.getMcpToolSchemas('outlook', 'conn-uuid-123');
+        Test.stopTest();
+        System.assertEquals(1, tools.size());
+        System.assertEquals('send_email', tools[0].name);
+        System.assert(tools[0].inputSchema.contains('required'), 'inputSchema should carry the real JSON schema through');
+    }
+
+    @IsTest
+    static void getMcpToolSchemas_blank_provider_returns_empty() {
+        Test.startTest();
+        List<AgentConnectorController.RemoteTool> tools = AgentConnectorController.getMcpToolSchemas(null, null);
+        Test.stopTest();
+        System.assertEquals(0, tools.size());
+    }
+
+    @IsTest
+    static void getConnectorsForCatalogType_blank_returns_empty() {
+        Test.startTest();
+        List<AgentConnectorController.ConnectorOption> opts = AgentConnectorController.getConnectorsForCatalogType(null);
+        Test.stopTest();
+        System.assertEquals(0, opts.size());
+    }
+
+    @IsTest
+    static void getConnectorsForCatalogType_filters_connected_rows() {
+        String body = '{"connectors":[{"id":"a0000000000000A","providerKey":"salesforce_mcp","displayName":"My SF","status":"Connected","accountEmail":"a@b.com"}]}';
+        Test.setMock(HttpCalloutMock.class, new StubMock(200, body));
+        Test.startTest();
+        List<AgentConnectorController.ConnectorOption> opts = AgentConnectorController.getConnectorsForCatalogType('salesforce_crm_tools');
+        Test.stopTest();
+        System.assert(opts != null, 'should return a list even with no matching metadata rows in this org');
+    }
+
+    @IsTest
+    static void getMcpToolCatalog_blank_provider_returns_empty() {
+        Test.startTest();
+        List<AgentConnectorController.McpToolSummary> tools = AgentConnectorController.getMcpToolCatalog(null);
+        Test.stopTest();
+        System.assertEquals(0, tools.size());
+    }
+
+    @IsTest
+    static void getCustomActionCatalog_returns_server_body() {
+        Test.setMock(HttpCalloutMock.class, new StubMock(200, '{"actions":[{"type":"apex","name":"X","label":"X"}]}'));
+        Test.startTest();
+        String body = AgentConnectorController.getCustomActionCatalog();
+        Test.stopTest();
+        System.assert(body.contains('actions'), 'should pass the server response straight through');
+    }
+
+    @IsTest
+    static void describeCustomAction_returns_server_body() {
+        Test.setMock(HttpCalloutMock.class, new StubMock(200, '{"label":"X","inputs":[]}'));
+        Test.startTest();
+        String body = AgentConnectorController.describeCustomAction('apex', 'MyClass');
+        Test.stopTest();
+        System.assert(body.contains('label'), 'should pass the server response straight through');
     }
 }

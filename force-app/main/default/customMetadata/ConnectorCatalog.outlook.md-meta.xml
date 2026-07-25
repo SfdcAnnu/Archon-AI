@@ -14,5 +14,5 @@
     <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">email_tools</value></values>
     <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">true</value></values>
     <values><field>SortOrder__c</field><value xsi:type="xsd:double">50</value></values>
-    <values><field>McpServerUrl__c</field><value xsi:type="xsd:string"></value></values>
+    <values><field>McpServerUrl__c</field><value xsi:type="xsd:string">https://outlook-mcp-server-y4wg.onrender.com</value></values>
 </CustomMetadata>

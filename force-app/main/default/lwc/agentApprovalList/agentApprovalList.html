@@ -1,0 +1,53 @@
+<template>
+    <div class="aal-wrap">
+        <div class="aal-head">
+            <h2>My Approvals</h2>
+            <lightning-button-icon icon-name="utility:refresh" variant="border-filled" alternative-text="Refresh" onclick={handleRefresh}></lightning-button-icon>
+        </div>
+
+        <template lwc:if={loading}>
+            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </template>
+        <template lwc:elseif={errorMessage}>
+            <div class="aal-error">{errorMessage}</div>
+        </template>
+        <template lwc:else>
+            <template lwc:if={noApprovals}>
+                <div class="aal-empty">Nothing waiting on you right now.</div>
+            </template>
+            <template for:each={rows} for:item="r">
+                <div key={r.id} class="aal-card">
+                    <div class="aal-card-head">
+                        <div class="aal-node">{r.nodeLabel}</div>
+                        <div class="aal-agent">{r.agentApiName}</div>
+                    </div>
+                    <div class="aal-meta">
+                        <span>Requested {r.createdLabel}</span>
+                        <template lwc:if={r.timeoutLabel}>
+                            <span class="aal-timeout">· Times out {r.timeoutLabel}</span>
+                        </template>
+                    </div>
+                    <template lwc:if={r.recordId}>
+                        <div class="aal-record">Record: {r.recordId}</div>
+                    </template>
+
+                    <template lwc:if={r.showComment}>
+                        <lightning-textarea
+                            label="Comment (optional)"
+                            value={_comment}
+                            rows="2"
+                            onchange={handleCommentChange}
+                            class="aal-comment">
+                        </lightning-textarea>
+                    </template>
+
+                    <div class="aal-actions">
+                        <lightning-button label="Add comment" variant="base" data-id={r.id} onclick={handleToggleComment}></lightning-button>
+                        <lightning-button label="Reject" variant="destructive-text" data-id={r.id} onclick={handleReject} disabled={_deciding}></lightning-button>
+                        <lightning-button label="Approve" variant="brand" data-id={r.id} onclick={handleApprove} disabled={_deciding}></lightning-button>
+                    </div>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

@@ -13,7 +13,7 @@
                 onchange={handleFilterStatus}
                 class="filter-combo">
             </lightning-combobox>
-            <lightning-button label="Export CSV" icon-name="utility:download"></lightning-button>
+            <lightning-button label="Export CSV" icon-name="utility:download" disabled={noLogs} onclick={handleExportCsv}></lightning-button>
         </div>
 
         <div class="logs-body">
@@ -108,6 +108,51 @@
                     <div class="detail-reason">{selectedLog.AgentReason__c}</div>
                     <div class="detail-section">Output payload</div>
                     <pre class="detail-json">{selectedLog.OutputPayload__c}</pre>
+
+                    <div class="detail-section-row">
+                        <div class="detail-section">Node-by-node trace</div>
+                        <template lwc:if={showLoadTraceButton}>
+                            <lightning-button label="Load trace" variant="brand" onclick={handleLoadTrace}></lightning-button>
+                        </template>
+                    </div>
+                    <template lwc:if={traceLoading}>
+                        <lightning-spinner size="small" alternative-text="Loading"></lightning-spinner>
+                    </template>
+                    <template lwc:elseif={traceError}>
+                        <div class="trace-empty">{traceError}</div>
+                    </template>
+                    <template lwc:elseif={traceNotLoaded}>
+                        <div class="trace-empty">Click "Load trace" to fetch this run's per-node input/output (a separate call to the Archon server — not loaded automatically to keep the log list fast).</div>
+                    </template>
+                    <template lwc:elseif={traceEmpty}>
+                        <div class="trace-empty">No per-node trace found for this run — it may predate this feature, or the run hasn't reached the server's durable-run store yet (very short sync runs still record steps, so this is unusual).</div>
+                    </template>
+                    <template lwc:else>
+                        <div class="trace-list">
+                            <template for:each={traceSteps} for:item="s">
+                                <div key={s.stepKey} class="trace-step">
+                                    <div class="trace-step-head">
+                                        <span class={s.statusDotClass}></span>
+                                        <span class="trace-step-label">{s.displayLabel}</span>
+                                        <span class="trace-step-sub">{s.nodeSubType}</span>
+                                    </div>
+                                    <template lwc:if={s.errorMsg}>
+                                        <div class="trace-step-error">{s.errorMsg}</div>
+                                    </template>
+                                    <div class="trace-io">
+                                        <div class="trace-io-col">
+                                            <div class="trace-io-label">Input (node config)</div>
+                                            <pre class="detail-json detail-json--sm">{s.inputJson}</pre>
+                                        </div>
+                                        <div class="trace-io-col">
+                                            <div class="trace-io-label">Output</div>
+                                            <pre class="detail-json detail-json--sm">{s.outputJson}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </div>
         </template>

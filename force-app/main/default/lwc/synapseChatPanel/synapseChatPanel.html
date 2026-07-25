@@ -94,7 +94,22 @@
                 </div>
             </template>
 
-            <div class="input-row">
+            <template lwc:if={needsConnection}>
+                <div class="connect-card">
+                    <lightning-icon icon-name="utility:lock" size="small" alternative-text="Connect"></lightning-icon>
+                    <div class="connect-text">
+                        <b>Connect your Salesforce account to start chatting.</b>
+                        <span>This agent runs with your own access — it only sees and changes what you can.</span>
+                    </div>
+                    <lightning-button
+                        variant="brand"
+                        label={connectButtonLabel}
+                        disabled={connectPolling}
+                        onclick={handleConnectMyAccount}>
+                    </lightning-button>
+                </div>
+            </template>
+            <div class="input-row" lwc:else>
                 <!-- File picker: hidden native input, custom button triggers it -->
                 <input type="file"
                        lwc:ref="fileInput"

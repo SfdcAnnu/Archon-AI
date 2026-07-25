@@ -111,6 +111,12 @@
                                 </li>
                             </template>
                         </ul>
+                        <template lwc:if={noAgents}>
+                            <div class="agent-empty">
+                                <p><b>No agents are available to you yet.</b></p>
+                                <p>Agents appear here once an Archon admin shares them with you. Ask your administrator to share an agent from the builder's <b>Share</b> panel.</p>
+                            </div>
+                        </template>
                     </template>
                 </div>
             </section>

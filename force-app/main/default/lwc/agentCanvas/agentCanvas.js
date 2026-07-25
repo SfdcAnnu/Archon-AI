@@ -36,10 +36,28 @@ const NODE_PALETTE = [
     {
         category: 'Logic',
         nodes: [
-            { type: 'logic', subType: 'if_else',  label: 'If / Else',     icon: 'utility:flow', color: '#5c6bc0', mcpServer: null, mcpTool: 'if_else' },
-            { type: 'logic', subType: 'loop',     label: 'Loop',           icon: 'utility:repeat', color: '#5c6bc0', mcpServer: null, mcpTool: 'loop' },
-            { type: 'logic', subType: 'wait',     label: 'Wait / Delay',   icon: 'utility:pause', color: '#5c6bc0', mcpServer: null, mcpTool: 'wait' },
-            { type: 'logic', subType: 'approval', label: 'Approval gate',  icon: 'utility:approval', color: '#5c6bc0', mcpServer: null, mcpTool: 'approval' },
+            { type: 'logic', subType: 'if_else',      label: 'If / Else',       icon: 'utility:flow',   color: '#5c6bc0', mcpServer: null, mcpTool: 'if_else' },
+            { type: 'logic', subType: 'set_variable', label: 'Set Variable',    icon: 'utility:text',   color: '#5c6bc0', mcpServer: null, mcpTool: 'set_variable' },
+            { type: 'logic', subType: 'loop',         label: 'Loop',            icon: 'utility:repeat', color: '#5c6bc0', mcpServer: null, mcpTool: 'loop' },
+            { type: 'logic', subType: 'wait',         label: 'Wait / Delay',    icon: 'utility:pause',  color: '#5c6bc0', mcpServer: null, mcpTool: 'wait' },
+            { type: 'logic', subType: 'approval',     label: 'Approval gate',   icon: 'utility:approval', color: '#5c6bc0', mcpServer: null, mcpTool: 'approval' },
+        ]
+    },
+    {
+        category: 'Actions',
+        nodes: [
+            // Simple, single-purpose Salesforce actions — no connector or
+            // tool picker needed, just fill in the fields. Prefer these for
+            // basic CRUD; reach for "Call a Tool" only when you need a
+            // connected provider (Slack, Gmail, a custom Apex/Flow tool, etc.)
+            // or a Salesforce action not listed here.
+            { type: 'action', subType: 'get_record',    label: 'Get Record',        icon: 'utility:preview',     color: '#0b7285', mcpServer: null, mcpTool: 'get_record' },
+            { type: 'action', subType: 'query_records',  label: 'Query Records',     icon: 'utility:search',      color: '#0b7285', mcpServer: null, mcpTool: 'query_records' },
+            { type: 'action', subType: 'create_record',  label: 'Create Record',     icon: 'utility:add',         color: '#0b7285', mcpServer: null, mcpTool: 'create_record' },
+            { type: 'action', subType: 'update_record',  label: 'Update Record',     icon: 'utility:edit',        color: '#0b7285', mcpServer: null, mcpTool: 'update_record' },
+            { type: 'action', subType: 'create_task',    label: 'Create Task',       icon: 'utility:task',        color: '#0b7285', mcpServer: null, mcpTool: 'create_task' },
+            { type: 'action', subType: 'post_chatter',   label: 'Post to Chatter',   icon: 'utility:comments',    color: '#0b7285', mcpServer: null, mcpTool: 'post_chatter' },
+            { type: 'action', subType: 'call_tool',      label: 'Call a Tool (Connector)', icon: 'utility:apex',  color: '#0b7285', mcpServer: null, mcpTool: 'call_tool' },
         ]
     },
     {
@@ -128,8 +146,10 @@ const DEFAULT_CONFIG = {
     slack:        { channel: '#general', message: '' },
     teams:        { webhook: '', message: '' },
     if_else:      { condition: '', truePort: 'yes', falsePort: 'no' },
-    loop:         { collectionVar: '', iteratorVar: 'item' },
-    wait:         { delayMs: 5000 },
+    set_variable: { variableName: '', template: '' },
+    call_tool:    { provider: '', connectorId: '', toolKind: 'standard', toolName: '', customToolType: '', paramValues: {} },
+    loop:         { collectionVar: '', iteratorVar: 'item', maxIterations: 25 },
+    wait:         { delayValue: 5, delayUnit: 'minutes' },
     approval:     { approverField: 'OwnerId', timeoutHours: 24 },
     sharepoint:   { siteUrl: '', filePath: '' },
     gdrive:       { folderId: '', fileName: '' },
@@ -150,6 +170,9 @@ export default class AgentCanvas extends LightningElement {
     @track scale          = 1;
     @track showKbModal    = false;
     @track showConnectorsModal = false;
+    @track showShareModal      = false;
+    @track showGenerateModal   = false;
+    @track showChecklist       = false;
     @track _connectorTiles = [];
     @track _directoryAll   = [];
     @track leftTab         = 'nodes';    // 'nodes' | 'connectors'
@@ -190,50 +213,100 @@ export default class AgentCanvas extends LightningElement {
     wiredAgent({ data, error }) {
         // New-agent case — agentId is null; skip silently
         if (!this.agentId) return;
-        if (data) {
-            this.agentDef = { ...data.agent };
-            const loadedNodes = data.nodes.map(n => ({
-                id:                    n.Id,
-                label:                 n.Name,
-                type:                  n.NodeType__c,
-                subType:               n.NodeSubType__c,
-                x:                     n.PositionX__c || 0,
-                y:                     n.PositionY__c || 0,
-                config:                n.ConfigJson__c ? JSON.parse(n.ConfigJson__c) : {},
-                mcpServer:             n.McpServer__c,
-                mcpTool:               n.McpTool__c,
-                isEnabled:             n.IsEnabled__c,
-                aiEngineConnectionId:  n.AiEngineConnection__c || null
-            }));
-            this.nodes = loadedNodes;
-
-            // Restore connections from CanvasJson__c — connections are stored
-            // as node-index references because node IDs change on each save
-            // (delete + reinsert). Map indices back to current node IDs.
-            if (data.agent.CanvasJson__c) {
-                try {
-                    const canvas = JSON.parse(data.agent.CanvasJson__c);
-                    const raw = canvas.connections || [];
-                    this.connections = raw.map((c, i) => {
-                        if (typeof c.fromIndex === 'number' && typeof c.toIndex === 'number') {
-                            const fromNode = loadedNodes[c.fromIndex];
-                            const toNode   = loadedNodes[c.toIndex];
-                            if (!fromNode || !toNode) return null;
-                            return {
-                                id:         c.id || `conn_${Date.now()}_${i}`,
-                                fromNodeId: fromNode.id,
-                                fromPort:   c.fromPort || 'out',
-                                toNodeId:   toNode.id,
-                                toPort:     c.toPort   || 'in'
-                            };
-                        }
-                        // Legacy id-based connection — drop, IDs are stale
-                        return null;
-                    }).filter(Boolean);
-                } catch(e) { /* ignore */ }
-            }
-        }
+        if (data) this.hydrateAgentPayload(data);
         if (error) this.showError(error);
+    }
+
+    /**
+     * Turns a {agent, nodes} payload — the exact shape getAgentWithNodes
+     * returns — into this.agentDef/this.nodes/this.connections. Extracted
+     * so the AI generator (agentGenerateModal) can populate the SAME
+     * client state through the SAME path a normal load uses; generation
+     * is "produce this payload shape," nothing downstream needs to know
+     * whether a human or the AI built the graph.
+     */
+    hydrateAgentPayload(data) {
+        this.agentDef = { ...data.agent };
+        const loadedNodes = data.nodes.map(n => ({
+            id:                    n.Id,
+            label:                 n.Name,
+            type:                  n.NodeType__c,
+            subType:               n.NodeSubType__c,
+            x:                     n.PositionX__c || 0,
+            y:                     n.PositionY__c || 0,
+            config:                n.ConfigJson__c ? JSON.parse(n.ConfigJson__c) : {},
+            mcpServer:             n.McpServer__c,
+            mcpTool:               n.McpTool__c,
+            isEnabled:             n.IsEnabled__c,
+            aiEngineConnectionId:  n.AiEngineConnection__c || null
+        }));
+        this.nodes = loadedNodes;
+
+        // Restore connections from CanvasJson__c — connections are stored
+        // as node-index references because node IDs change on each save
+        // (delete + reinsert). Map indices back to current node IDs.
+        if (data.agent.CanvasJson__c) {
+            try {
+                const canvas = JSON.parse(data.agent.CanvasJson__c);
+                const raw = canvas.connections || [];
+                this.connections = raw.map((c, i) => {
+                    if (typeof c.fromIndex === 'number' && typeof c.toIndex === 'number') {
+                        const fromNode = loadedNodes[c.fromIndex];
+                        const toNode   = loadedNodes[c.toIndex];
+                        if (!fromNode || !toNode) return null;
+                        return {
+                            id:         c.id || `conn_${Date.now()}_${i}`,
+                            fromNodeId: fromNode.id,
+                            fromPort:   c.fromPort || 'out',
+                            toNodeId:   toNode.id,
+                            toPort:     c.toPort   || 'in'
+                        };
+                    }
+                    // Legacy id-based connection — drop, IDs are stale
+                    return null;
+                }).filter(Boolean);
+            } catch(e) { /* ignore */ }
+        } else {
+            this.connections = [];
+        }
+    }
+
+    /**
+     * Adapts AgentGeneratorController's flat DTO shape into the SAME
+     * {agent, nodes} shape hydrateAgentPayload expects, then reuses it —
+     * one hydration path regardless of how the graph was produced.
+     */
+    hydrateFromGeneratedResult(result) {
+        const data = {
+            agent: {
+                Name:                  result.agentName,
+                ApiName__c:            this.slugify(result.agentName),
+                Department__c:         result.department,
+                Description__c:        result.description,
+                KnowledgeBase__c:      result.knowledgeBase,
+                Status__c:             'Draft',
+                AccessMode__c:         'Org',
+                CanvasJson__c:         JSON.stringify({ connections: result.connections || [] }),
+                SetupChecklistJson__c: JSON.stringify((result.setupChecklist || []).map(c => ({ ...c, done: false })))
+            },
+            nodes: (result.nodes || []).map((n, i) => ({
+                Id:                    `tmp_${Date.now()}_${i}`,
+                Name:                  n.label,
+                NodeType__c:           n.nodeType,
+                NodeSubType__c:        n.nodeSubType,
+                PositionX__c:          n.x,
+                PositionY__c:          n.y,
+                ConfigJson__c:         n.configJson,
+                McpServer__c:          null,
+                McpTool__c:            null,
+                IsEnabled__c:          true,
+                AiEngineConnection__c: null
+            }))
+        };
+        this.agentId = null; // stays a brand-new agent until the user clicks Save
+        this.hydrateAgentPayload(data);
+        this.showGenerateModal = false;
+        this.showChecklist = (result.setupChecklist || []).length > 0;
     }
 
     // ── Left panel tabs ──────────────────────────────────────────────
@@ -381,6 +454,7 @@ export default class AgentCanvas extends LightningElement {
                 : n.connectorIconUrl;
 
             const isIfElse = n.subType === 'if_else';
+            const isLoop = n.subType === 'loop';
             const isAiNode = n.type === 'ai';
             const isCatalog = n.type === 'catalog';
 
@@ -398,9 +472,23 @@ export default class AgentCanvas extends LightningElement {
             const toolChips = allowed.slice(0, 3).map(prettify);
             const moreCount = Math.max(0, allowed.length - 3);
 
-            // Status dot: AI → engine cred bound; catalog → connector bound
+            // Status dot: AI → engine cred bound; catalog → provider actually
+            // CONNECTED right now (live directory status, not just a stale
+            // connectorId string saved in config).
             const showStatusDot = isAiNode || isCatalog;
-            const isOk = isAiNode ? !!n.aiEngineConnectionId : !!n.config?.connectorId;
+            let isOk = false;
+            if (isAiNode) {
+                isOk = !!n.aiEngineConnectionId;
+            } else if (isCatalog) {
+                const LEGACY_PROVIDER_BY_SUBTYPE = { salesforce_crm_tools: 'salesforce_mcp' };
+                const provider = n.config?.provider || LEGACY_PROVIDER_BY_SUBTYPE[n.subType];
+                if (provider) {
+                    const entry = this._directoryAll.find(t => t.providerKey === provider);
+                    isOk = entry?.status === 'Connected';
+                } else {
+                    isOk = !!n.config?.connectorId;   // unknown provider — best effort
+                }
+            }
 
             return {
                 ...n,
@@ -411,8 +499,9 @@ export default class AgentCanvas extends LightningElement {
                 typeLabel:      TYPE_LABELS[n.type] || n.type.toUpperCase(),
                 subTitle,
                 hasInputPort:   n.type !== 'trigger',
-                hasOutputPort:  !isIfElse && n.type !== 'end',
+                hasOutputPort:  !isIfElse && !isLoop && n.type !== 'end',
                 isIfElse,
+                isLoop,
                 isConnectorBound: !!(isCatalog && n.config?.connectorId),
                 connectorIconUrl: iconUrl,
                 connectorAccount: connectorTile?.accountEmail || n.connectorAccount,
@@ -441,6 +530,21 @@ export default class AgentCanvas extends LightningElement {
         ];
     }
 
+    get accessModeOptions() {
+        return [
+            { label: 'Org connection (everyone shares)', value: 'Org' },
+            { label: "Each user's own access",           value: 'PerUser' }
+        ];
+    }
+
+    get accessModeValue() {
+        return this.agentDef.AccessMode__c || 'Org';
+    }
+
+    handleAccessModeChange(e) {
+        this.agentDef = { ...this.agentDef, AccessMode__c: e.detail.value };
+    }
+
     get previewConnection() {
         if (!this._connectingFrom) return null;
         const fromNode = this.nodes.find(n => n.id === this._connectingFrom.nodeId);
@@ -463,10 +567,10 @@ export default class AgentCanvas extends LightningElement {
             const to   = this.getPortPosition(toNode, 'in');
             const mx   = (from.x + to.x) / 2;
 
-            const color = c.fromPort === 'yes' ? '#2e844a'
-                        : c.fromPort === 'no'  ? '#c23934'
+            const color = (c.fromPort === 'yes' || c.fromPort === 'each') ? '#2e844a'
+                        : (c.fromPort === 'no'  || c.fromPort === 'done') ? '#c23934'
                         : '#378ADD';
-            const dash = c.fromPort === 'no' ? '5,3' : '4,3';
+            const dash = (c.fromPort === 'no' || c.fromPort === 'done') ? '5,3' : '4,3';
 
             return {
                 id:    c.id,
@@ -772,7 +876,9 @@ export default class AgentCanvas extends LightningElement {
                 description:   this.agentDef.Description__c,
                 knowledgeBase: this.agentDef.KnowledgeBase__c,
                 status:        this.agentDef.Status__c,
-                canvasJson:    JSON.stringify({ connections: indexedConnections })
+                accessMode:    this.agentDef.AccessMode__c || 'Org',
+                canvasJson:    JSON.stringify({ connections: indexedConnections }),
+                setupChecklistJson: this.agentDef.SetupChecklistJson__c || null
             };
 
             const nodeInput = this.nodes.map((n, i) => ({
@@ -793,7 +899,11 @@ export default class AgentCanvas extends LightningElement {
                 nodesJson: JSON.stringify(nodeInput)
             });
 
-            this.agentDef = { ...this.agentDef, Id: savedId };
+            // Also write back the (possibly slugify-derived) apiName so a
+            // freshly-created agent's local state matches what the server
+            // stored — needed for the KB modal's Documents tab to work
+            // immediately after the first save, without a full reload.
+            this.agentDef = { ...this.agentDef, Id: savedId, ApiName__c: agentInput.apiName };
             this.showToast('success', 'Agent saved successfully');
 
         } catch (err) {
@@ -831,9 +941,63 @@ export default class AgentCanvas extends LightningElement {
     handleAgentNameChange(e) { this.agentDef = { ...this.agentDef, Name: e.target.value }; }
     handleDeptChange(e)      { this.agentDef = { ...this.agentDef, Department__c: e.detail.value }; }
     handleStatusChange(e)    { this.agentDef = { ...this.agentDef, Status__c: e.detail.value }; }
-    handleKbChange(e)        { this.agentDef = { ...this.agentDef, KnowledgeBase__c: e.target.value }; }
-    handleOpenKb()           { this.showKbModal = true; }
+    handleKbChange(e)        { this.agentDef = { ...this.agentDef, KnowledgeBase__c: e.detail.value }; }
+
+    /**
+     * Documents (real RAG upload) need a real AgentDefinition__c Id to key
+     * chunks against — previously that meant "Save, close, reopen the KB
+     * modal" before you could upload anything, which nobody would guess on
+     * their own. Auto-save a Draft the moment the modal opens on an
+     * unsaved agent instead — Notes never needed this, only Documents did.
+     */
+    async handleOpenKb() {
+        if (!this.agentDef.Id) {
+            if (!this.agentDef.Name || !this.agentDef.Name.trim()) {
+                this.showToast('warning', 'Name the agent first — Documents need a saved agent to attach to.');
+                return;
+            }
+            this.showToast('info', 'Saving the agent so documents can be attached…');
+            await this.handleSave();
+            if (!this.agentDef.Id) return; // save failed — handleSave already toasted the error
+        }
+        this.showKbModal = true;
+    }
     handleCloseKb()          { this.showKbModal = false; }
+
+    // ── AI agent generator ─────────────────────────────────────────
+    handleOpenGenerate()  { this.showGenerateModal = true; }
+    handleCloseGenerate() { this.showGenerateModal = false; }
+    handleAgentGenerated(e) { this.hydrateFromGeneratedResult(e.detail); }
+
+    // ── Setup checklist (from AI generation) ────────────────────────
+    get checklistItems() {
+        try {
+            return JSON.parse(this.agentDef?.SetupChecklistJson__c || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+    get checklistOpenCount() {
+        return this.checklistItems.filter(c => !c.done).length;
+    }
+    get hasChecklist() { return this.checklistItems.length > 0; }
+    get checklistButtonLabel() { return `Setup checklist (${this.checklistOpenCount})`; }
+    handleOpenChecklist()  { this.showChecklist = true; }
+    handleCloseChecklist() { this.showChecklist = false; }
+    handleToggleChecklistItem(e) {
+        const idx = e.detail.index;
+        const items = this.checklistItems.map((c, i) => i === idx ? { ...c, done: !c.done } : c);
+        this.agentDef = { ...this.agentDef, SetupChecklistJson__c: JSON.stringify(items) };
+    }
+    handleOpenShare() {
+        if (!this.agentDef?.Id) {
+            this.showToast('warning', 'Save the agent first, then share it.');
+            return;
+        }
+        this.showShareModal = true;
+    }
+    handleCloseShare() { this.showShareModal = false; }
+
     handleOpenConnectors()   {
         this.connectorsStartProvider = null;
         this.showConnectorsModal = true;
@@ -861,13 +1025,12 @@ export default class AgentCanvas extends LightningElement {
             this.showToast('warning', `Unknown connector provider: ${providerKey}`);
             return;
         }
-        // Salesforce MCP is connected through Archon Setup, not the broker.
-        if (providerKey === 'salesforce_mcp' && entry.status !== 'Connected') {
-            this.showToast('info', 'Salesforce MCP connects through Archon Setup — run Setup first.');
-            return;
-        }
-        // Every other provider: the server decides what's supported/configured
-        // and returns a friendly error otherwise — no hardcoded gate here.
+        // Salesforce MCP supports HYBRID auth:
+        //   • Org-level connection — from Archon Setup (admin, shared).
+        //   • Personal connection — this button: the user authorizes with
+        //     THEIR Salesforce login, and their chats run with their own
+        //     record access. Runtime prefers personal over org.
+        // Both go through the server; it decides what's supported/configured.
         try {
             const url = new URL(window.location.href);
             url.searchParams.delete('synapse_connected');
@@ -898,8 +1061,8 @@ export default class AgentCanvas extends LightningElement {
         }
         if (port === 'in')  return { x: node.x,     y: node.y + H / 2 };
         if (port === 'out') return { x: node.x + W, y: node.y + H / 2 };
-        if (port === 'yes') return { x: node.x + W, y: node.y + H * 0.3 };
-        if (port === 'no')  return { x: node.x + W, y: node.y + H * 0.7 };
+        if (port === 'yes' || port === 'each') return { x: node.x + W, y: node.y + H * 0.3 };
+        if (port === 'no'  || port === 'done') return { x: node.x + W, y: node.y + H * 0.7 };
         return { x: node.x + W, y: node.y + H / 2 };
     }
 

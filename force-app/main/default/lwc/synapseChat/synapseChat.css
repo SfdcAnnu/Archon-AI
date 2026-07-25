@@ -297,3 +297,13 @@
     }
     .picker-modal { width: 96%; }
 }
+
+/* Empty state — no agents shared with this user */
+.agent-empty {
+    padding: 28px 18px;
+    text-align: center;
+    color: #83868F;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.agent-empty b { color: #444; }

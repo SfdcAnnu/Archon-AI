@@ -44,6 +44,8 @@
                 <value><fullName>SUCCESS</fullName><default>false</default></value>
                 <value><fullName>ERROR</fullName><default>false</default></value>
                 <value><fullName>TIMEOUT</fullName><default>false</default></value>
+                <value><fullName>WAITING</fullName><default>false</default></value>
+                <value><fullName>WAITING_APPROVAL</fullName><default>false</default></value>
             </valueSetDefinition>
         </valueSet>
     </fields>

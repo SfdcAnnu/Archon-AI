@@ -1,0 +1,83 @@
+<template>
+    <template lwc:if={open}>
+        <div class="agm-backdrop" onclick={handleClose}></div>
+        <section role="dialog" aria-modal="true" aria-labelledby="agm-heading" class="agm-modal" onclick={stop}>
+            <header class="agm-head">
+                <h2 id="agm-heading">Describe your agent</h2>
+                <lightning-button-icon icon-name="utility:close" size="small" variant="bare" alternative-text="Close" onclick={handleClose}></lightning-button-icon>
+            </header>
+
+            <div class="agm-body">
+                <template lwc:if={isInputStep}>
+                    <lightning-textarea
+                        label="What should this agent do?"
+                        value={requirementText}
+                        rows="8"
+                        placeholder="Example: When a new Lead comes in, score how likely it is to convert. If the score is above 70, notify the sales team on Slack and create a follow-up task for the owner. Otherwise just log it."
+                        onchange={handleTextChange}>
+                    </lightning-textarea>
+                    <div class="agm-hint">Plain English is fine — mention the object that triggers it, what should be decided, and what should happen. You can also attach a requirements document below.</div>
+
+                    <div class="agm-file-row">
+                        <template lwc:if={fileName}>
+                            <div class="agm-file-chip">
+                                <lightning-icon icon-name="utility:file" size="x-small"></lightning-icon>
+                                <span>{fileName}</span>
+                                <lightning-button-icon icon-name="utility:close" size="x-small" variant="bare" alternative-text="Remove file" onclick={handleRemoveFile}></lightning-button-icon>
+                            </div>
+                        </template>
+                        <template lwc:else>
+                            <label class="agm-file-label">
+                                <input type="file" accept=".txt,.md,.csv" onchange={handleFileChange} />
+                                <span>+ Attach a requirements document (.txt, .md, .csv)</span>
+                            </label>
+                        </template>
+                    </div>
+
+                    <template lwc:if={errorMessage}>
+                        <div class="agm-error">{errorMessage}</div>
+                    </template>
+                </template>
+
+                <template lwc:if={isQuestionsStep}>
+                    <div class="agm-hint agm-hint-top">A couple of things need to be pinned down before I can build this:</div>
+                    <template for:each={questionRows} for:item="q">
+                        <div key={q.index} class="agm-question">
+                            <lightning-input
+                                label={q.text}
+                                value={q.value}
+                                data-idx={q.index}
+                                onchange={handleAnswerChange}>
+                            </lightning-input>
+                        </div>
+                    </template>
+                    <template lwc:if={errorMessage}>
+                        <div class="agm-error">{errorMessage}</div>
+                    </template>
+                </template>
+
+                <template lwc:if={generating}>
+                    <div class="agm-loading">
+                        <lightning-spinner alternative-text="Generating" size="small"></lightning-spinner>
+                        <template lwc:if={waking}>
+                            <p>The Archon server is waking up from idle — this can take up to a minute the first time.</p>
+                        </template>
+                        <template lwc:else>
+                            <p>Reading your requirement and building the agent…</p>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <footer class="agm-foot">
+                <lightning-button label="Cancel" onclick={handleClose}></lightning-button>
+                <template lwc:if={isInputStep}>
+                    <lightning-button variant="brand" label="Generate" onclick={handleGenerate} disabled={generateDisabled} class="agm-primary-btn"></lightning-button>
+                </template>
+                <template lwc:if={isQuestionsStep}>
+                    <lightning-button variant="brand" label="Continue" onclick={handleSubmitAnswers} disabled={submitAnswersDisabled} class="agm-primary-btn"></lightning-button>
+                </template>
+            </footer>
+        </section>
+    </template>
+</template>

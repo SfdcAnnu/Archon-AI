@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CatalogType__c</fullName>
+    <label>Catalog Type</label>
+    <type>Text</type>
+    <length>40</length>
+    <required>true</required>
+    <description>Same values as ConnectorCatalog__mdt.MapsToCatalogType__c (salesforce_crm_tools/storage_tools/email_tools/channel_tools) — determines which tool schema set the AI sees for this server.</description>
+</CustomField>

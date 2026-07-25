@@ -8,6 +8,24 @@ import saveConnection from '@salesforce/apex/AiEngineConnectionController.saveCo
 export default class AiEngineConnectionForm extends LightningElement {
     @api engineType;               // read from parent (context)
     @api recordId;
+    /**
+     * Existing connection summary to pre-populate when editing — the API
+     * key itself is never sent back to the client, so that field stays
+     * blank (see apiKeyPlaceholder) and is left alone on save unless typed.
+     */
+    @api
+    set existing(v) {
+        if (!v) return;
+        this.label          = v.label ?? '';
+        this.endpoint        = v.endpoint ?? '';
+        this.defaultModel    = v.defaultModel ?? '';
+        this.isActive        = v.isActive !== false;
+        this.isPreferred     = v.isPreferred === true;
+        this.ownershipType   = v.ownershipType || 'Personal';
+        this.isPublicShared  = v.isPublicShared === true;
+        this.engineTypeOverride = v.engineType || null;
+    }
+    get existing() { return null; }
 
     @track engineTypeOverride = null;   // user's combobox pick, wins over @api
     @track label = '';

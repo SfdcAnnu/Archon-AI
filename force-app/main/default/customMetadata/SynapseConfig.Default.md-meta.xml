@@ -8,6 +8,6 @@
     </values>
     <values>
         <field>ServerUrl__c</field>
-        <value xsi:type="xsd:string">https://65f1-2401-4900-1c22-4709-f186-8f05-de00-f53a.ngrok-free.app</value>
+        <value xsi:type="xsd:string">https://archon-server-d31n.onrender.com</value>
     </values>
 </CustomMetadata>

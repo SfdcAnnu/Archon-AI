@@ -1,8 +1,10 @@
 import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import getDirectory  from '@salesforce/apex/AgentConnectorController.getDirectory';
-import startOAuth    from '@salesforce/apex/AgentConnectorController.startOAuth';
-import disconnect    from '@salesforce/apex/AgentConnectorController.disconnect';
+import getDirectory        from '@salesforce/apex/AgentConnectorController.getDirectory';
+import startOAuth          from '@salesforce/apex/AgentConnectorController.startOAuth';
+import disconnect          from '@salesforce/apex/AgentConnectorController.disconnect';
+import saveCustomMcpServer   from '@salesforce/apex/AgentConnectorController.saveCustomMcpServer';
+import deleteCustomMcpServer from '@salesforce/apex/AgentConnectorController.deleteCustomMcpServer';
 
 const CATEGORIES = [
     { key: 'All',          label: 'All' },
@@ -84,7 +86,8 @@ export default class AgentConnectorsDirectory extends LightningElement {
             showConnectBtn:   isDisconnected,
             showManageBtn:    isConnected || isError,
             showRetryBtn:     isPending,
-            connectedAsLine:  isConnected && e.accountEmail ? `Connected as ${e.accountEmail}` : null
+            connectedAsLine:  isConnected && e.accountEmail ? `Connected as ${e.accountEmail}` : null,
+            isCustom:         e.isCustom === true
         };
     }
 
@@ -184,6 +187,71 @@ export default class AgentConnectorsDirectory extends LightningElement {
 
     // API-key modal handlers were removed — Phase 1 only ships OAuth (Salesforce MCP).
     handleApiKeyCancel() { this.apiKeyModal = null; }
+
+    // ── Custom MCP servers — open extension point, no OAuth step ────
+    @track showCustomForm = false;
+    @track customForm = { name: '', url: '', category: 'Productivity', catalogType: 'salesforce_crm_tools', description: '' };
+    @track customSaving = false;
+
+    get customCategoryOptions() {
+        return CATEGORIES.filter(c => c.key !== 'All').map(c => ({ label: c.label, value: c.key }));
+    }
+    get customCatalogTypeOptions() {
+        return [
+            { label: 'Salesforce CRM tools', value: 'salesforce_crm_tools' },
+            { label: 'Storage tools',        value: 'storage_tools' },
+            { label: 'Email tools',          value: 'email_tools' },
+            { label: 'Channel tools',        value: 'channel_tools' }
+        ];
+    }
+
+    handleOpenCustomForm() {
+        this.customForm = { name: '', url: '', category: 'Productivity', catalogType: 'salesforce_crm_tools', description: '' };
+        this.showCustomForm = true;
+    }
+    handleCloseCustomForm() { this.showCustomForm = false; }
+    handleCustomFieldChange(e) {
+        const field = e.currentTarget.dataset.field;
+        this.customForm = { ...this.customForm, [field]: e.target.value };
+    }
+
+    async handleSaveCustom() {
+        if (!this.customForm.name?.trim() || !this.customForm.url?.trim()) {
+            this.toast('Missing info', 'Server name and URL are required.', 'warning');
+            return;
+        }
+        this.customSaving = true;
+        try {
+            await saveCustomMcpServer({
+                recordId:     null,
+                serverName:   this.customForm.name.trim(),
+                mcpServerUrl: this.customForm.url.trim(),
+                description:  this.customForm.description || null,
+                category:     this.customForm.category,
+                catalogType:  this.customForm.catalogType
+            });
+            this.toast('Added', 'Custom MCP server added — it now shows up as a connector option.', 'success');
+            this.showCustomForm = false;
+            await this.loadDirectory();
+        } catch (err) {
+            this.toastError('Could not save custom server', err);
+        } finally {
+            this.customSaving = false;
+        }
+    }
+
+    async handleDeleteCustom(e) {
+        const id = e.currentTarget.dataset.id;
+        // eslint-disable-next-line no-alert
+        if (!window.confirm('Remove this custom MCP server? Any agent nodes using it will need a new one.')) return;
+        try {
+            await deleteCustomMcpServer({ recordId: id });
+            this.toast('Removed', 'Custom MCP server removed.', 'success');
+            await this.loadDirectory();
+        } catch (err) {
+            this.toastError('Delete failed', err);
+        }
+    }
 
     // ── OAuth return handling ──────────────────────────────────────
     // The server's /api/oauth/callback finishes the dance and redirects the

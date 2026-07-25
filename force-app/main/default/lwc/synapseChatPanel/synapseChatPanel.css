@@ -545,3 +545,26 @@
         .bubble-asst { max-width: 78%; }
     }
 }
+
+/* PerUser access — inline connect card replaces the composer */
+.connect-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid #D8DDE6;
+    border-radius: 10px;
+    background: #F7F9FB;
+    margin: 4px 0;
+    flex-wrap: wrap;
+}
+.connect-text {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    color: #5A5F68;
+}
+.connect-text b { font-size: 13px; color: #16181D; }

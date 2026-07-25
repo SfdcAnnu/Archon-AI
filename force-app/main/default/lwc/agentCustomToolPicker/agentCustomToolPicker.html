@@ -1,0 +1,103 @@
+<template>
+    <section class="ctp-backdrop" onclick={handleClose}>
+        <div class="ctp-modal" onclick={stop} role="dialog" aria-label="Add custom tools">
+            <header class="ctp-head">
+                <div>
+                    <h2>Add custom tools</h2>
+                    <p class="ctp-sub">Your org's Apex actions and Flows, live with their schemas — pick what this agent may use.</p>
+                </div>
+                <lightning-button-icon icon-name="utility:close" variant="bare"
+                    alternative-text="Close" onclick={handleClose}></lightning-button-icon>
+            </header>
+
+            <div class="ctp-body">
+                <!-- LEFT: catalog list -->
+                <aside class="ctp-list-pane">
+                    <lightning-combobox
+                        variant="label-hidden"
+                        value={typeFilter}
+                        options={typeOptions}
+                        onchange={handleTypeChange}>
+                    </lightning-combobox>
+                    <lightning-input
+                        type="search"
+                        variant="label-hidden"
+                        placeholder="Search…"
+                        value={filter}
+                        onchange={handleFilterChange}>
+                    </lightning-input>
+                    <p class="ctp-count">{itemCountLabel}</p>
+
+                    <template lwc:if={loading}>
+                        <div class="ctp-center"><lightning-spinner size="small" alternative-text="Loading"></lightning-spinner></div>
+                    </template>
+                    <template lwc:else>
+                        <ul class="ctp-items">
+                            <template for:each={visibleItems} for:item="i">
+                                <li key={i.key} class={i.rowClass} data-key={i.key} onclick={handlePickItem}>
+                                    <lightning-icon icon-name={i.icon} size="x-small"></lightning-icon>
+                                    <div class="ctp-item-text">
+                                        <div class="ctp-item-label">{i.label}</div>
+                                        <div class="ctp-item-name">{i.name}</div>
+                                    </div>
+                                    <span class="ctp-item-type">{i.typeLabel}</span>
+                                </li>
+                            </template>
+                        </ul>
+                        <template lwc:if={noItems}>
+                            <p class="ctp-empty">Nothing found. Invocable Apex actions and active autolaunched Flows appear here.</p>
+                        </template>
+                    </template>
+                </aside>
+
+                <!-- RIGHT: schema preview -->
+                <section class="ctp-detail-pane">
+                    <template lwc:if={detail}>
+                        <div class="ctp-detail-head">
+                            <div>
+                                <h3>{detail.label}</h3>
+                                <p class="ctp-detail-name">{detail.name} · {detail.typeLabel}</p>
+                            </div>
+                            <lightning-button variant="brand" label="+ Add tool" onclick={handleAddTool} disabled={detailLoading}></lightning-button>
+                        </div>
+                        <template lwc:if={detail.description}>
+                            <p class="ctp-detail-desc">{detail.description}</p>
+                        </template>
+                        <template lwc:if={detailLoading}>
+                            <div class="ctp-center"><lightning-spinner size="small" alternative-text="Loading schema"></lightning-spinner></div>
+                        </template>
+                        <template lwc:elseif={detail.loadError}>
+                            <p class="ctp-error">{detail.loadError}</p>
+                        </template>
+                        <template lwc:else>
+                            <h4 class="ctp-schema-title">Input schema</h4>
+                            <div class="ctp-schema">
+                                <template for:each={detail.inputRows} for:item="row">
+                                    <div key={row.id} class="ctp-schema-row">
+                                        <code class="ctp-in-name">{row.name}</code>
+                                        <span class="ctp-in-type">{row.type}</span>
+                                        <span class="ctp-in-req">{row.required}</span>
+                                        <span class="ctp-in-desc">{row.description}</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </template>
+                    <template lwc:else>
+                        <div class="ctp-placeholder">
+                            <lightning-icon icon-name="utility:preview" size="medium" alternative-text="Preview"></lightning-icon>
+                            <p>Select an action from the list to preview its schema.</p>
+                        </div>
+                    </template>
+                </section>
+            </div>
+
+            <footer class="ctp-foot">
+                <template lwc:if={errorMessage}>
+                    <span class="ctp-error">{errorMessage}</span>
+                </template>
+                <lightning-button variant="brand" label="Done" onclick={handleClose}></lightning-button>
+            </footer>
+        </div>
+    </section>
+</template>

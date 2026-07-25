@@ -3,6 +3,15 @@ import getConnectorsForCatalogType from '@salesforce/apex/AgentConnectorControll
 import getConnectorTools from '@salesforce/apex/AgentConnectorController.getConnectorTools';
 import getDirectory      from '@salesforce/apex/AgentConnectorController.getDirectory';
 import getMcpToolCatalog from '@salesforce/apex/AgentConnectorController.getMcpToolCatalog';
+import getMcpToolSchemas from '@salesforce/apex/AgentConnectorController.getMcpToolSchemas';
+import getCustomActionCatalog from '@salesforce/apex/AgentConnectorController.getCustomActionCatalog';
+import describeCustomAction    from '@salesforce/apex/AgentConnectorController.describeCustomAction';
+
+// Text/textarea fields that hold an identifier/name rather than an
+// interpolated value — the {!...} insert button is hidden for these.
+const NO_INTERPOLATION_KEYS = new Set([
+    'className', 'methodName', 'variableName', 'iteratorVar', 'cronExpression'
+]);
 
 // Dynamic fields per node sub-type
 const FIELD_SCHEMAS = {
@@ -71,16 +80,28 @@ const FIELD_SCHEMAS = {
     ],
     einstein: [{ key: 'modelType', label: 'Model type', type: 'picklist', options: ['predict','classify','generate'] }],
     get_record:   [{ key: 'objectType', label: 'SF Object', type: 'text', placeholder: 'Lead' },
-                   { key: 'fields', label: 'Fields (comma separated)', type: 'text', placeholder: 'Id,Name,Email,Company' }],
+                   { key: 'fields', label: 'Fields (comma separated)', type: 'text', placeholder: 'Id,Name,Email,Company' },
+                   { key: 'outputVariable', label: 'Output variable name (optional)', type: 'text', placeholder: 'leadRecord',
+                     hint: 'Name this record so later nodes can reference its fields as {!leadRecord.Email}, {!leadRecord.Company}, etc.' }],
     update_record:[{ key: 'objectType', label: 'SF Object', type: 'text', placeholder: 'Lead' },
-                   { key: 'fieldMappings', label: 'Field mappings (JSON)', type: 'textarea', placeholder: '{"Status__c": "Hot", "Score__c": "{!ai.score}"}' }],
+                   { key: 'fieldMappings', label: 'Field mappings (JSON)', type: 'textarea', placeholder: '{"Status__c": "Hot", "Score__c": "{!ai.score}"}' },
+                   { key: 'outputVariable', label: 'Output variable name (optional)', type: 'text', placeholder: 'updateResult',
+                     hint: 'Reference downstream as {!updateResult.id} / {!updateResult.success}.' }],
     create_record:[{ key: 'objectType', label: 'SF Object', type: 'text', placeholder: 'Task' },
-                   { key: 'fieldMappings', label: 'Field values (JSON)', type: 'textarea', placeholder: '{"Subject": "Follow up", "Priority": "High"}' }],
-    query_records:[{ key: 'soql', label: 'SOQL query', type: 'textarea', placeholder: "SELECT Id, Name FROM Lead WHERE Id = '{!recordId}'" }],
+                   { key: 'fieldMappings', label: 'Field values (JSON)', type: 'textarea', placeholder: '{"Subject": "Follow up", "Priority": "High"}' },
+                   { key: 'outputVariable', label: 'Output variable name (optional)', type: 'text', placeholder: 'newRecord',
+                     hint: 'Reference downstream as {!newRecord.id} — the new record\'s Id.' }],
+    query_records:[{ key: 'soql', label: 'SOQL query', type: 'textarea', placeholder: "SELECT Id, Name FROM Lead WHERE Id = '{!recordId}'" },
+                   { key: 'outputVariable', label: 'Output variable name (optional)', type: 'text', placeholder: 'queryResults',
+                     hint: 'Reference downstream as {!queryResults.count}, or wire {!queryResults.records} into a Loop node\'s collection.' }],
     create_task:  [{ key: 'subject', label: 'Subject', type: 'text', placeholder: 'Follow up with lead' },
                    { key: 'dueDate', label: 'Due date', type: 'text', placeholder: 'TODAY+1' },
-                   { key: 'priority', label: 'Priority', type: 'picklist', options: ['High','Normal','Low'] }],
-    post_chatter: [{ key: 'message', label: 'Message', type: 'textarea', placeholder: 'Lead scored {!ai.score} — action required' }],
+                   { key: 'priority', label: 'Priority', type: 'picklist', options: ['High','Normal','Low'] },
+                   { key: 'outputVariable', label: 'Output variable name (optional)', type: 'text', placeholder: 'newTask',
+                     hint: 'Reference downstream as {!newTask.id}.' }],
+    post_chatter: [{ key: 'message', label: 'Message', type: 'textarea', placeholder: 'Lead scored {!ai.score} — action required' },
+                   { key: 'outputVariable', label: 'Output variable name (optional)', type: 'text', placeholder: 'chatterPost',
+                     hint: 'Reference downstream as {!chatterPost.id}.' }],
     apex_action:  [{ key: 'className', label: 'Apex class', type: 'text', placeholder: 'MyInvocableClass' },
                    { key: 'methodName', label: 'Method', type: 'text', placeholder: 'execute' }],
     outlook:      [{ key: 'to', label: 'To', type: 'text', placeholder: '{!record.Email}' },
@@ -100,9 +121,19 @@ const FIELD_SCHEMAS = {
     teams:        [{ key: 'webhookUrl', label: 'Webhook URL', type: 'text', placeholder: 'https://…' },
                    { key: 'message', label: 'Message', type: 'textarea', placeholder: '' }],
     if_else:      [{ key: 'condition', label: 'Condition', type: 'text', placeholder: '{!ai.score} > 80' }],
-    loop:         [{ key: 'collectionVar', label: 'Collection variable', type: 'text', placeholder: '{!records}' },
-                   { key: 'iteratorVar',   label: 'Iterator variable',   type: 'text', placeholder: 'item' }],
-    wait:         [{ key: 'delayMs', label: 'Delay (ms)', type: 'number', min: 0 }],
+    set_variable: [{ key: 'variableName', label: 'Variable name', type: 'text', placeholder: 'leadSummary',
+                     hint: 'Letters, numbers, no spaces. Reference it downstream as {!leadSummary.value}.' },
+                   { key: 'template', label: 'Value', type: 'textarea', placeholder: '{!ai.finalText}',
+                     hint: 'Plain text or {!variables} — see the Variables tab. Combine several with normal text.' }],
+    loop:         [{ key: 'collectionVar', label: 'Collection variable', type: 'text', placeholder: '{!records}',
+                     hint: 'Must resolve to a list — e.g. a query_records or Call-a-Tool node\'s array output.' },
+                   { key: 'iteratorVar',   label: 'Iterator variable',   type: 'text', placeholder: 'item',
+                     hint: 'Reference the current item downstream as {!item.FieldName} (or {!item.value} for a plain list).' },
+                   { key: 'maxIterations', label: 'Max iterations', type: 'number', min: 1, max: 100,
+                     hint: 'Hard-capped at 100 regardless of this value.' }],
+    wait:         [{ key: 'delayValue', label: 'Delay', type: 'number', min: 0 },
+                   { key: 'delayUnit', label: 'Unit', type: 'picklist', options: ['seconds','minutes','hours','days'],
+                     hint: '60 seconds or less runs inline. Longer than that pauses the run durably — it survives a server restart and resumes on its own.' }],
     approval:     [{ key: 'approverField', label: 'Approver field', type: 'text', placeholder: 'OwnerId' },
                    { key: 'timeoutHours',  label: 'Timeout (hours)', type: 'number', min: 1 }],
     sharepoint:   [{ key: 'siteUrl', label: 'Site URL', type: 'text' },
@@ -182,6 +213,11 @@ const MODEL_HINTS = {
 
 export default class AgentPropertiesPanel extends LightningElement {
     @api node;
+    /** Full canvas graph — passed down so this panel can figure out which
+     *  variables (trigger fields, AI score, Set Variable outputs) are
+     *  actually available upstream of the selected node. */
+    @api allNodes = [];
+    @api connections = [];
 
     @track _showConnectorPicker = false;
     @track _allTiles = [];
@@ -200,12 +236,61 @@ export default class AgentPropertiesPanel extends LightningElement {
     // Public /tools catalog (unauthenticated, provider-level). This is the
     // primary source for the Tools checklist — works before any account is
     // connected. Keyed by the provider the tile was dragged in with.
-    @wire(getMcpToolCatalog, { providerKey: '$providerKeyForCatalog' })
-    wiredMcpCatalog;
+    // The provider key is captured WITH the payload: when the user clicks
+    // from one connector node to another, the wire briefly still holds the
+    // previous provider's tools — without the stamp, the auto-default would
+    // write e.g. Salesforce tool names into a Gmail node's config.
+    // IMPERATIVE catalog loader — deliberately NOT a @wire. refreshApex on
+    // an errored wire does not reliably re-provision, which left the Tools
+    // tab spinning forever behind sleeping free-tier servers. Here every
+    // attempt, delay, and terminal state is explicit.
+    @track _mcpCatalog = { providerKey: null, data: undefined, error: undefined };
+    @track _catalogInFlight = false;
+    _catalogSeq = 0;
+
+    async loadCatalog(providerKey) {
+        const seq = ++this._catalogSeq;          // supersede older runs
+        this._catalogInFlight = true;
+        this._mcpCatalog = { providerKey, data: undefined, error: undefined };
+
+        const MAX_ATTEMPTS = 10;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const rows = await getMcpToolCatalog({ providerKey });
+                if (seq !== this._catalogSeq) return;     // node/provider changed
+                this._mcpCatalog = { providerKey, data: rows, error: undefined };
+                this._catalogInFlight = false;
+                return;
+            } catch (e) {
+                if (seq !== this._catalogSeq) return;
+                const msg = e?.body?.message || e?.message || '';
+                const retriable = /SERVER_WAKING|Application loading|upstream|unreachable|502|503|timed? ?out/i.test(msg);
+                if (!retriable || attempt === MAX_ATTEMPTS) {
+                    this._mcpCatalog = { providerKey, data: undefined, error: e };
+                    this._catalogInFlight = false;
+                    return;
+                }
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                await new Promise(resolve => setTimeout(resolve, 8000));
+            }
+        }
+    }
+
+    /** Catalog payload, but only when it belongs to the CURRENT provider. */
+    get wiredMcpCatalog() {
+        return this._mcpCatalog.providerKey === this.providerKeyForCatalog
+            ? this._mcpCatalog
+            : { data: undefined, error: undefined };
+    }
 
     get providerKeyForCatalog() {
         if (!CATALOG_SUBTYPES.includes(this.node?.subType)) return null;
-        return this.node?.config?.provider || null;
+        // Legacy nodes (saved before provider was stamped at drop time)
+        // fall back to an unambiguous subType mapping.
+        const LEGACY_PROVIDER_BY_SUBTYPE = { salesforce_crm_tools: 'salesforce_mcp' };
+        return this.node?.config?.provider
+            || LEGACY_PROVIDER_BY_SUBTYPE[this.node?.subType]
+            || null;
     }
 
     get boundConnectorId() {
@@ -282,9 +367,11 @@ export default class AgentPropertiesPanel extends LightningElement {
             const isExamples    = f.type === 'examples';
             const isConnector   = f.type === 'connector';
             const options = isConnector ? this.connectorOptions : (f.options || []).map(o => ({ label: o, value: o }));
-            // allowedTools on a catalog node: prefer the live remote list when present
-            const msOptions = (isMultiselect && f.key === 'allowedTools' && liveTools)
-                ? liveTools
+            // allowedTools must ALWAYS come from a live MCP source — never
+            // the static schema options (kept only as field metadata).
+            const liveNames = this.liveCatalog ? this.liveCatalog.map(t => t.name) : liveTools;
+            const msOptions = (isMultiselect && f.key === 'allowedTools')
+                ? (liveNames || [])
                 : (f.options || []);
             return {
                 ...f,
@@ -294,6 +381,7 @@ export default class AgentPropertiesPanel extends LightningElement {
                 isNumber:      f.type === 'number',
                 isPicklist:    f.type === 'picklist' || isConnector,
                 isToggle:      f.type === 'toggle',
+                supportsVariables: (f.type === 'text' || f.type === 'textarea') && !NO_INTERPOLATION_KEYS.has(f.key),
                 isMultiselect,
                 isExamples,
                 hint: f.hint || null,
@@ -325,7 +413,350 @@ export default class AgentPropertiesPanel extends LightningElement {
     get mcpTool()     { return this.node?.mcpTool || ''; }
     get hasMcp()      { return !!this.node?.mcpServer; }
 
-    get isCatalogNode() { return CATALOG_SUBTYPES.includes(this.node?.subType); }
+    get isCatalogNode()  { return CATALOG_SUBTYPES.includes(this.node?.subType); }
+    get isIfElseNode()   { return this.node?.subType === 'if_else'; }
+    get isCallToolNode() { return this.node?.subType === 'call_tool'; }
+
+    // ── Variables (scoped to nodes upstream of the selection) ────
+    // Walks the connection graph BACKWARD from the selected node so the
+    // Variables tab — and the click-to-insert pickers on If/Else and
+    // Call-a-Tool — only ever offer tokens that actually resolve at
+    // runtime, instead of a generic static list.
+    get upstreamNodeIds() {
+        const visited = new Set();
+        const selfId = this.node?.id;
+        if (!selfId || !Array.isArray(this.connections)) return visited;
+        const incoming = new Map();
+        this.connections.forEach(c => {
+            if (!incoming.has(c.toNodeId)) incoming.set(c.toNodeId, []);
+            incoming.get(c.toNodeId).push(c.fromNodeId);
+        });
+        const queue = [selfId];
+        while (queue.length > 0) {
+            const cur = queue.shift();
+            for (const pred of (incoming.get(cur) || [])) {
+                if (!visited.has(pred)) { visited.add(pred); queue.push(pred); }
+            }
+        }
+        return visited;
+    }
+
+    get availableVariables() {
+        const ids = this.upstreamNodeIds;
+        const nodesById = new Map((this.allNodes || []).map(n => [n.id, n]));
+        let hasTrigger = false;
+        let hasAi = false;
+        const customVars = [];
+        const ACTION_OUTPUT_EXAMPLE = {
+            get_record:    'FieldApiName',
+            update_record: 'id',
+            create_record: 'id',
+            query_records: 'count',
+            create_task:   'id',
+            post_chatter:  'id'
+        };
+        ids.forEach(id => {
+            const n = nodesById.get(id);
+            if (!n) return;
+            if (n.type === 'trigger') hasTrigger = true;
+            if (n.type === 'ai') hasAi = true;
+            if (n.subType === 'set_variable' && n.config?.variableName) {
+                customVars.push({ token: `{!${n.config.variableName}.value}`, hint: `Set by "${n.label || 'Set Variable'}"` });
+            }
+            const example = ACTION_OUTPUT_EXAMPLE[n.subType];
+            if (example && n.config?.outputVariable) {
+                customVars.push({ token: `{!${n.config.outputVariable}.${example}}`, hint: `Output of "${n.label || n.subType}"` });
+            }
+        });
+        const out = [];
+        if (hasTrigger) out.push({ token: '{!record.Field}', hint: "Trigger record field — replace Field with the API name, e.g. {!record.Email}" });
+        out.push({ token: '{!recordId}', hint: "The triggering record's Id" });
+        if (hasAi) {
+            out.push(
+                { token: '{!ai.score}',     hint: 'Most recent AI score' },
+                { token: '{!ai.priority}',  hint: 'Most recent AI priority' },
+                { token: '{!ai.finalText}', hint: "Most recent AI response text" }
+            );
+        }
+        out.push(...customVars);
+        out.push({ token: '{!input.X}', hint: 'A value passed in via inputPayload — replace X with the key' });
+        // Always-available context — not scoped to upstream nodes since these
+        // don't depend on the graph, only on who/where the agent is running.
+        out.push(
+            { token: '{!user.Id}',       hint: 'Running user — Id' },
+            { token: '{!user.Name}',     hint: 'Running user — full name' },
+            { token: '{!user.Email}',    hint: 'Running user — email' },
+            { token: '{!user.Username}', hint: 'Running user — username' },
+            { token: '{!org.Id}',        hint: 'Organization Id' },
+            { token: '{!org.Name}',      hint: 'Organization name' }
+        );
+        return out;
+    }
+
+    /**
+     * Deterministic per-field "insert a field/variable" menus — each button
+     * carries its own data-key/data-part, so selecting a token always lands
+     * in the exact field the button sits next to. Replaces an earlier
+     * design (a shared Variables tab + "insert into whatever was last
+     * clicked") that was unreliable across tab switches.
+     */
+    handleInsertFieldToken(e) {
+        const key = e.currentTarget.dataset.key;
+        const token = e.detail.value;
+        if (!key || !token) return;
+        const current = String(this.node?.config?.[key] ?? '');
+        const value = current ? `${current} ${token}` : token;
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: key, value } }));
+    }
+
+    handleInsertConditionToken(e) {
+        const part = e.currentTarget.dataset.part;
+        const token = e.detail.value;
+        if (!part || !token) return;
+        const parts = this.conditionParts;
+        const existing = parts[part] || '';
+        this.applyConditionParts({ ...parts, [part]: existing ? `${existing} ${token}` : token });
+    }
+
+    handleInsertParamToken(e) {
+        const key = e.currentTarget.dataset.key;
+        const token = e.detail.value;
+        if (!key || !token) return;
+        const current = { ...(this.node?.config?.paramValues || {}) };
+        current[key] = current[key] ? `${current[key]} ${token}` : token;
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: current } }));
+    }
+
+    // ── If/Else condition builder ─────────────────────────
+    // Compiles down to the SAME "{!x} op y" string the engine's
+    // evalCondition() already parses — no engine change needed here.
+    get conditionOperatorOptions() {
+        return [
+            { label: '=  equals',            value: '==' },
+            { label: '≠  not equals',        value: '!=' },
+            { label: '>  greater than',      value: '>' },
+            { label: '<  less than',         value: '<' },
+            { label: '≥  greater or equal',  value: '>=' },
+            { label: '≤  less or equal',     value: '<=' }
+        ];
+    }
+    get conditionParts() {
+        const raw = String(this.node?.config?.condition ?? '').trim();
+        const match = raw.match(/^(.+?)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
+        if (!match) return { lhs: raw, op: '>', rhs: '' };
+        const [, lhs, op, rhs] = match;
+        return { lhs: lhs.trim(), op, rhs: rhs.trim() };
+    }
+    applyConditionParts(parts) {
+        const composed = `${parts.lhs || ''} ${parts.op || '>'} ${parts.rhs || ''}`.trim();
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'condition', value: composed } }));
+    }
+    get ifElseScoreHint() {
+        return 'Using {!ai.score} or {!ai.priority}? The upstream AI node asks the model for these automatically, but a busy tool-calling reply can occasionally omit them. Run "Test this node" after building the flow — the Execution Log will call out an unresolved value by name instead of failing silently.';
+    }
+    handleConditionLhsChange(e) { this.applyConditionParts({ ...this.conditionParts, lhs: e.target.value }); }
+    handleConditionOpChange(e)  { this.applyConditionParts({ ...this.conditionParts, op: e.detail.value }); }
+    handleConditionRhsChange(e) { this.applyConditionParts({ ...this.conditionParts, rhs: e.target.value }); }
+
+    // ── Call a Tool (generic action node) ─────────────────
+    // Same connector directory the catalog nodes use for the provider
+    // picklist; tool schemas + custom-action catalog are fetched live,
+    // exactly like the AI's own tool discovery — never hardcoded.
+    get callToolProvider()    { return this.node?.config?.provider || ''; }
+    get callToolConnectorId() { return this.node?.config?.connectorId || ''; }
+    get callToolKind()        { return this.node?.config?.toolKind || 'standard'; }
+    get callToolName()        { return this.node?.config?.toolName || ''; }
+    get callToolSupportsCustom() { return this.callToolProvider === 'salesforce_mcp'; }
+    get isCallToolStandard() { return this.callToolKind !== 'custom'; }
+    get isCallToolCustom()   { return this.callToolKind === 'custom' && this.callToolSupportsCustom; }
+
+    get callToolProviderOptions() {
+        if (!this._allTiles || this._allTiles.length === 0) {
+            return [{ label: '— No connected providers — open Connectors to add one —', value: '' }];
+        }
+        return this._allTiles.map(t => ({
+            label: t.displayName + (t.accountEmail ? `  ·  ${t.accountEmail}` : ''),
+            value: t.providerKey
+        }));
+    }
+    get callToolKindOptions() {
+        const opts = [{ label: 'Standard tool (from the connector)', value: 'standard' }];
+        if (this.callToolSupportsCustom) opts.push({ label: "Custom — my org's Apex action / Flow", value: 'custom' });
+        return opts;
+    }
+
+    handleCallToolProviderChange(e) {
+        const value = e.detail.value;
+        const tile = (this._allTiles || []).find(t => t.providerKey === value);
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'provider', value } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'connectorId', value: tile ? tile.connectorId : '' } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolKind', value: 'standard' } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolName', value: '' } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'customToolType', value: '' } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: {} } }));
+    }
+    handleCallToolKindChange(e) {
+        const value = e.detail.value;
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolKind', value } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolName', value: '' } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'customToolType', value: '' } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: {} } }));
+    }
+
+    // Standard tools — live tools/list WITH schemas from the MCP server.
+    @track _callToolTools = { providerKey: null, data: undefined, error: undefined };
+    @track _callToolLoading = false;
+    _callToolSeq = 0;
+
+    async loadCallToolSchemas(providerKey) {
+        const seq = ++this._callToolSeq;
+        this._callToolLoading = true;
+        this._callToolTools = { providerKey, data: undefined, error: undefined };
+        const connectorId = this.callToolConnectorId || null;
+        const MAX_ATTEMPTS = 8;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const rows = await getMcpToolSchemas({ providerKey, connectorId });
+                if (seq !== this._callToolSeq) return;
+                this._callToolTools = { providerKey, data: rows, error: undefined };
+                this._callToolLoading = false;
+                return;
+            } catch (e) {
+                if (seq !== this._callToolSeq) return;
+                const msg = e?.body?.message || e?.message || '';
+                const retriable = /SERVER_WAKING|Application loading|upstream|unreachable|502|503|timed? ?out/i.test(msg);
+                if (!retriable || attempt === MAX_ATTEMPTS) {
+                    this._callToolTools = { providerKey, data: undefined, error: e };
+                    this._callToolLoading = false;
+                    return;
+                }
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                await new Promise(resolve => setTimeout(resolve, 8000));
+            }
+        }
+    }
+
+    get callToolStandardRows() {
+        const tools = (this._callToolTools.providerKey === this.callToolProvider) ? this._callToolTools.data : undefined;
+        if (!Array.isArray(tools)) return [];
+        const prettify = t => String(t).replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, c => c.toUpperCase());
+        const selected = this.callToolName;
+        return tools.map(t => ({
+            value: t.name,
+            label: prettify(t.name),
+            description: t.description,
+            rowClass: t.name === selected ? 'tool-row tool-row--on' : 'tool-row',
+            checkClass: t.name === selected ? 'tool-check tool-check--on' : 'tool-check'
+        }));
+    }
+    get callToolStandardLoading() {
+        return this.callToolKind === 'standard' && !!this.callToolProvider
+            && this._callToolTools.providerKey !== this.callToolProvider && this._callToolLoading;
+    }
+    get callToolStandardError() {
+        if (this.callToolKind !== 'standard' || this._callToolTools.providerKey !== this.callToolProvider) return null;
+        const err = this._callToolTools.error;
+        return err ? (err?.body?.message || err?.message || 'Could not load tools.') : null;
+    }
+    handleCallToolStandardSelect(e) {
+        const toolName = e.currentTarget.dataset.option;
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolName', value: toolName } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: {} } }));
+    }
+    get callToolSelectedSchema() {
+        const tools = this._callToolTools.data;
+        if (!Array.isArray(tools)) return null;
+        const tool = tools.find(t => t.name === this.callToolName);
+        if (!tool || !tool.inputSchema) return null;
+        try { return JSON.parse(tool.inputSchema); } catch { return null; }
+    }
+
+    // Custom tools — org's own Apex actions / Flows (Salesforce provider only).
+    @track _customCatalog = { data: undefined, error: undefined, loading: false };
+    async loadCustomCatalog() {
+        this._customCatalog = { data: undefined, error: undefined, loading: true };
+        try {
+            const raw = await getCustomActionCatalog();
+            const parsed = JSON.parse(raw);
+            this._customCatalog = { data: parsed.actions || [], error: undefined, loading: false };
+        } catch (e) {
+            this._customCatalog = { data: undefined, error: e?.body?.message || e?.message || 'Could not load custom actions.', loading: false };
+        }
+    }
+    get callToolCustomOptions() {
+        return (this._customCatalog.data || []).map(i => ({
+            label: `${i.label || i.name}  ·  ${i.type === 'apex' ? 'Apex' : 'Flow'}`,
+            value: `${i.type}:${i.name}`
+        }));
+    }
+    get callToolCustomValue() {
+        const type = this.node?.config?.customToolType;
+        return type && this.callToolName ? `${type}:${this.callToolName}` : '';
+    }
+    get callToolCustomLoading() { return this._customCatalog.loading; }
+    get callToolCustomError()   { return this._customCatalog.error || null; }
+
+    @track _customToolSchema = { key: null, data: undefined, loading: false, error: undefined };
+    async loadCustomToolSchema(type, name) {
+        const key = `${type}:${name}`;
+        this._customToolSchema = { key, data: undefined, loading: true, error: undefined };
+        try {
+            const raw = await describeCustomAction({ actionType: type, name });
+            const d = JSON.parse(raw);
+            this._customToolSchema = { key, data: d, loading: false, error: undefined };
+        } catch (e) {
+            this._customToolSchema = { key, data: undefined, loading: false, error: e?.body?.message || e?.message || 'Could not load the schema.' };
+        }
+    }
+    handleCallToolCustomSelect(e) {
+        const raw = e.detail.value;
+        const idx = raw.indexOf(':');
+        if (idx < 0) return;
+        const type = raw.slice(0, idx);
+        const name = raw.slice(idx + 1);
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'customToolType', value: type } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolName', value: name } }));
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: {} } }));
+        this.loadCustomToolSchema(type, name);
+    }
+
+    // Param fields — schema-driven for either kind, rendered identically.
+    get callToolParamFields() {
+        const current = this.node?.config?.paramValues || {};
+        if (this.callToolKind === 'custom') {
+            const key = this.callToolCustomValue;
+            if (!key || this._customToolSchema.key !== key || !this._customToolSchema.data) return [];
+            return (this._customToolSchema.data.inputs || []).map(inp => ({
+                key: inp.name,
+                label: inp.name + (inp.required ? ' (required)' : ''),
+                description: inp.description || inp.label || '',
+                value: current[inp.name] ?? '',
+                isMultiline: inp.type === 'textarea' || inp.type === 'object'
+            }));
+        }
+        const schema = this.callToolSelectedSchema;
+        if (!schema || !schema.properties) return [];
+        const required = new Set(schema.required || []);
+        return Object.keys(schema.properties).map(key => {
+            const p = schema.properties[key] || {};
+            return {
+                key,
+                label: key + (required.has(key) ? ' (required)' : ''),
+                description: p.description || '',
+                value: current[key] ?? '',
+                isMultiline: p.type === 'object' || p.type === 'array'
+            };
+        });
+    }
+    get callToolNoParams() {
+        return !!this.callToolName && this.callToolParamFields.length === 0;
+    }
+    handleCallToolParamChange(e) {
+        const key = e.currentTarget.dataset.param;
+        const current = { ...(this.node?.config?.paramValues || {}) };
+        current[key] = e.target.value;
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: current } }));
+    }
 
     // ── Header ────────────────────────────────────────────
     get headIcon() {
@@ -344,6 +775,7 @@ export default class AgentPropertiesPanel extends LightningElement {
         let tint = 'ic-gray';
         if (t === 'ai')           tint = st === 'gpt4' ? 'ic-teal' : st === 'gemini' ? 'ic-blue' : 'ic-purple';
         else if (t === 'catalog') tint = 'ic-blue';
+        else if (t === 'action')  tint = 'ic-teal';
         else if (t === 'logic')   tint = 'ic-amber';
         else if (t === 'email')   tint = 'ic-coral';
         else if (t === 'sms')     tint = 'ic-teal';
@@ -416,7 +848,10 @@ export default class AgentPropertiesPanel extends LightningElement {
     // ── Config tab fields (schema minus specially-rendered keys) ──
     get configFields() {
         if (this.isCatalogNode) return [];
-        return this.fields.filter(f => !(this.isAiNode && f.key === 'model'));
+        return this.fields
+            .filter(f => !(this.isAiNode && f.key === 'model'))
+            // If/Else renders its own lhs/op/rhs builder instead of the raw condition text box.
+            .filter(f => !(this.isIfElseNode && f.key === 'condition'));
     }
 
     // ── Tools tab (catalog nodes) ─────────────────────────
@@ -428,14 +863,42 @@ export default class AgentPropertiesPanel extends LightningElement {
         return { ...f, value: this.node?.config?.description ?? '' };
     }
     /**
-     * Tool catalog resolution order:
+     * Tool catalog resolution order — LIVE sources only, never hardcoded:
      *   1. Public /tools catalog (name+description+readOnly) — provider-level
      *   2. Authenticated MCP tools/list (names) — connector-level
-     *   3. Hardcoded schema fallback (names)
+     * If neither is available the template shows a loading or error state;
+     * a static tool list must never appear (tools belong to the MCP server).
      */
     get liveCatalog() {
         const rows = this.wiredMcpCatalog?.data;
         return Array.isArray(rows) && rows.length > 0 ? rows : null;
+    }
+
+    /** True while the provider-level /tools fetch is still in flight. */
+    get catalogLoading() {
+        if (!this.isCatalogNode || !this.providerKeyForCatalog) return false;
+        if (this.liveCatalog || this.effectiveToolOptions) return false;
+        return this._catalogInFlight;
+    }
+
+    /** Error message when the /tools fetch failed and no live source is left. */
+    get catalogError() {
+        if (this._catalogInFlight) return null;
+        if (!this.isCatalogNode || this.liveCatalog || this.effectiveToolOptions) return null;
+        const err = this.wiredMcpCatalog?.error;
+        if (err) {
+            return err?.body?.message || err?.statusText || 'Could not reach the MCP server.';
+        }
+        // Wire resolved but came back empty — catalog record or server issue.
+        const rows = this.wiredMcpCatalog?.data;
+        if (Array.isArray(rows) && rows.length === 0) {
+            return 'The MCP server returned no tools. Check the connector catalog McpServerUrl and that the server is running.';
+        }
+        return null;
+    }
+
+    handleCatalogRetry() {
+        if (this.providerKeyForCatalog) this.loadCatalog(this.providerKeyForCatalog);
     }
 
     get toolRows() {
@@ -450,11 +913,12 @@ export default class AgentPropertiesPanel extends LightningElement {
             catalog = this.liveCatalog.map(t => ({
                 value: t.name, description: t.description, readOnly: t.readOnly === true
             }));
+        } else if (this.effectiveToolOptions) {
+            // Authenticated MCP tools/list — still live, just names only.
+            catalog = this.effectiveToolOptions.map(v => ({ value: v, description: null, readOnly: null }));
         } else {
-            const schema = FIELD_SCHEMAS[this.node?.subType] || [];
-            const f = schema.find(x => x.key === 'allowedTools');
-            const options = this.effectiveToolOptions || f?.options || [];
-            catalog = options.map(v => ({ value: v, description: null, readOnly: null }));
+            // No live source — template shows loading/error, never static tools.
+            return [];
         }
 
         // Reads first, then writes
@@ -474,7 +938,64 @@ export default class AgentPropertiesPanel extends LightningElement {
             };
         });
     }
-    get noTools() { return this.isCatalogNode && this.toolRows.length === 0; }
+    get noTools() {
+        return this.isCatalogNode && this.toolRows.length === 0
+            && !this.catalogLoading && !this.catalogError;
+    }
+
+    _defaultedForNodeId = null;
+    _catalogProvider = null;
+    _callToolProviderLoaded = null;
+    _customCatalogRequested = false;
+    _focusTrackedNodeId = null;
+
+    renderedCallback() {
+        // Reset transient per-node UI state (click-to-insert target) when
+        // the selected node changes, so a stale field key from a
+        // previously-selected node never gets written to the new one.
+        if (this._focusTrackedNodeId !== this.node?.id) {
+            this._focusTrackedNodeId = this.node?.id;
+            this._lastFocusTarget = null;
+        }
+
+        // Tools-tab catalog (connector/catalog nodes) — kick the imperative
+        // load when the selected node's provider changes.
+        if (this.providerKeyForCatalog !== this._catalogProvider) {
+            this._catalogProvider = this.providerKeyForCatalog;
+            if (this._catalogProvider) this.loadCatalog(this._catalogProvider);
+        }
+        if (this.isCatalogNode && this.liveCatalog && this._defaultedForNodeId !== this.node?.id) {
+            this.applyCatalogAutoDefault();
+        }
+
+        // Call-a-Tool node — standard tool schemas + custom action catalog.
+        if (this.isCallToolNode) {
+            if (this.callToolKind === 'standard' && this.callToolProvider) {
+                if (this._callToolProviderLoaded !== this.callToolProvider) {
+                    this._callToolProviderLoaded = this.callToolProvider;
+                    this.loadCallToolSchemas(this.callToolProvider);
+                }
+            } else if (this._callToolProviderLoaded) {
+                this._callToolProviderLoaded = null;
+            }
+            if (this.callToolKind === 'custom' && !this._customCatalogRequested) {
+                this._customCatalogRequested = true;
+                this.loadCustomCatalog();
+            } else if (this.callToolKind !== 'custom' && this._customCatalogRequested) {
+                this._customCatalogRequested = false;
+            }
+            // Re-opening an already-configured custom-tool node: fetch its
+            // param schema without waiting for the user to re-pick the tool
+            // (re-picking would also reset their saved paramValues).
+            const customType = this.node?.config?.customToolType;
+            if (this.callToolKind === 'custom' && customType && this.callToolName) {
+                const key = `${customType}:${this.callToolName}`;
+                if (this._customToolSchema.key !== key) {
+                    this.loadCustomToolSchema(customType, this.callToolName);
+                }
+            }
+        }
+    }
 
     /**
      * Auto-default: when the live catalog arrives and this node has never
@@ -482,11 +1003,7 @@ export default class AgentPropertiesPanel extends LightningElement {
      * null), pre-select the read-only tools. Never overrides a user's
      * choice, including an intentional empty selection ([]).
      */
-    _defaultedForNodeId = null;
-    renderedCallback() {
-        if (!this.isCatalogNode || !this.liveCatalog) return;
-        if (this._defaultedForNodeId === this.node?.id) return;
-
+    applyCatalogAutoDefault() {
         const current = this.node?.config?.allowedTools;
         const liveNames = new Set(this.liveCatalog.map(t => t.name));
 
@@ -504,6 +1021,48 @@ export default class AgentPropertiesPanel extends LightningElement {
         const readTools = this.liveCatalog.filter(t => t.readOnly === true).map(t => t.name);
         this.dispatchEvent(new CustomEvent('config', {
             detail: { field: 'allowedTools', value: readTools }
+        }));
+    }
+
+    // ── Custom tools (org's own Apex actions / Flows) ─────
+    // Only the Salesforce MCP connector supports them — they execute via
+    // the org's invocable-actions API with the session's own token.
+    @track showCustomToolPicker = false;
+
+    get supportsCustomTools() {
+        return this.isCatalogNode && this.providerKeyForCatalog === 'salesforce_mcp';
+    }
+    get selectedCustomTools() {
+        const list = this.node?.config?.customTools;
+        return Array.isArray(list) ? list : [];
+    }
+    get hasCustomTools() { return this.selectedCustomTools.length > 0; }
+    get customToolRows() {
+        return this.selectedCustomTools.map(t => ({
+            ...t,
+            key: `${t.type}:${t.name}`,
+            label: t.label || t.name,
+            typeLabel: t.type === 'apex' ? 'apex' : 'flow'
+        }));
+    }
+
+    handleOpenCustomToolPicker()  { this.showCustomToolPicker = true; }
+    handleCloseCustomToolPicker() { this.showCustomToolPicker = false; }
+
+    handleAddCustomTool(e) {
+        const { type, name, label } = e.detail;
+        const current = this.selectedCustomTools;
+        if (current.some(t => t.type === type && t.name === name)) return;
+        this.dispatchEvent(new CustomEvent('config', {
+            detail: { field: 'customTools', value: [...current, { type, name, label }] }
+        }));
+    }
+
+    handleRemoveCustomTool(e) {
+        const key = e.currentTarget.dataset.key;
+        const next = this.selectedCustomTools.filter(t => `${t.type}:${t.name}` !== key);
+        this.dispatchEvent(new CustomEvent('config', {
+            detail: { field: 'customTools', value: next }
         }));
     }
 
@@ -525,6 +1084,9 @@ export default class AgentPropertiesPanel extends LightningElement {
     }
     get boundConnectorIdValue() {
         return this.node?.config?.connectorId || '';
+    }
+    get isSalesforceMcpAuth() {
+        return this.providerKeyForCatalog === 'salesforce_mcp';
     }
     get providerDisplayName() {
         const p = this.node?.config?.provider;

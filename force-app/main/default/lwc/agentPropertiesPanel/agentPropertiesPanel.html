@@ -104,19 +104,12 @@
                                         data-part="lhs"
                                         onchange={handleConditionLhsChange}>
                                     </lightning-input>
-                                    <lightning-button-menu
-                                        icon-name="utility:merge_field"
-                                        icon-size="x-small"
-                                        variant="border-filled"
-                                        alternative-text="Insert a field or variable"
-                                        menu-alignment="right"
+                                    <c-agent-variable-picker
+                                        variables={availableVariables}
                                         data-part="lhs"
                                         onselect={handleInsertConditionToken}
                                         class="insert-btn">
-                                        <template for:each={availableVariables} for:item="v">
-                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                        </template>
-                                    </lightning-button-menu>
+                                    </c-agent-variable-picker>
                                 </div>
                             </div>
                             <div class="cond-row">
@@ -139,19 +132,12 @@
                                         data-part="rhs"
                                         onchange={handleConditionRhsChange}>
                                     </lightning-input>
-                                    <lightning-button-menu
-                                        icon-name="utility:merge_field"
-                                        icon-size="x-small"
-                                        variant="border-filled"
-                                        alternative-text="Insert a field or variable"
-                                        menu-alignment="right"
+                                    <c-agent-variable-picker
+                                        variables={availableVariables}
                                         data-part="rhs"
                                         onselect={handleInsertConditionToken}
                                         class="insert-btn">
-                                        <template for:each={availableVariables} for:item="v">
-                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                        </template>
-                                    </lightning-button-menu>
+                                    </c-agent-variable-picker>
                                 </div>
                             </div>
                         </div>
@@ -252,21 +238,13 @@
                                         <template lwc:if={p.isMultiline}>
                                             <div class="cond-side cond-side--top">
                                                 <lightning-textarea value={p.value} variant="label-hidden" rows="2" data-param={p.key} onchange={handleCallToolParamChange}></lightning-textarea>
-                                                <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={p.key} onselect={handleInsertParamToken} class="insert-btn">
-                                                    <template for:each={availableVariables} for:item="v">
-                                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                                    </template>
-                                                </lightning-button-menu>
+                                                <c-agent-variable-picker variables={availableVariables} data-key={p.key} onselect={handleInsertParamToken} class="insert-btn"></c-agent-variable-picker>
                                             </div>
                                         </template>
                                         <template lwc:else>
                                             <div class="cond-side">
                                                 <lightning-input value={p.value} variant="label-hidden" data-param={p.key} onchange={handleCallToolParamChange}></lightning-input>
-                                                <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={p.key} onselect={handleInsertParamToken} class="insert-btn">
-                                                    <template for:each={availableVariables} for:item="v">
-                                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                                    </template>
-                                                </lightning-button-menu>
+                                                <c-agent-variable-picker variables={availableVariables} data-key={p.key} onselect={handleInsertParamToken} class="insert-btn"></c-agent-variable-picker>
                                             </div>
                                         </template>
                                         <template lwc:if={p.description}>
@@ -291,11 +269,7 @@
                             <div class="cond-side">
                                 <lightning-input value={field.value} variant="label-hidden" placeholder={field.placeholder} data-key={field.key} onchange={handleFieldChange}></lightning-input>
                                 <template lwc:if={field.supportsVariables}>
-                                    <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={field.key} onselect={handleInsertFieldToken} class="insert-btn">
-                                        <template for:each={availableVariables} for:item="v">
-                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                        </template>
-                                    </lightning-button-menu>
+                                    <c-agent-variable-picker variables={availableVariables} data-key={field.key} onselect={handleInsertFieldToken} class="insert-btn"></c-agent-variable-picker>
                                 </template>
                             </div>
                         </template>
@@ -303,11 +277,7 @@
                             <div class="cond-side cond-side--top">
                                 <lightning-textarea value={field.value} variant="label-hidden" placeholder={field.placeholder} max-length="10000" rows="4" data-key={field.key} onchange={handleFieldChange}></lightning-textarea>
                                 <template lwc:if={field.supportsVariables}>
-                                    <lightning-button-menu icon-name="utility:merge_field" icon-size="x-small" variant="border-filled" alternative-text="Insert a field or variable" menu-alignment="right" data-key={field.key} onselect={handleInsertFieldToken} class="insert-btn">
-                                        <template for:each={availableVariables} for:item="v">
-                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                        </template>
-                                    </lightning-button-menu>
+                                    <c-agent-variable-picker variables={availableVariables} data-key={field.key} onselect={handleInsertFieldToken} class="insert-btn"></c-agent-variable-picker>
                                 </template>
                             </div>
                         </template>

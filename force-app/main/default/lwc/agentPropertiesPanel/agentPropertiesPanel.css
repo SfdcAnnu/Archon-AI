@@ -273,16 +273,22 @@
     font-size: 10.5px;
     color: var(--a-text-3);
 }
-/* -- If/Else condition builder -- */
+/* -- If/Else condition builder -- stacked rows, each field gets full
+   panel width instead of 5 controls squeezed into one narrow line -- */
 .cond-builder {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 12px;
 }
-.cond-op {
-    flex-shrink: 0;
-    width: 130px;
+.cond-row { display: flex; flex-direction: column; gap: 4px; }
+.cond-row-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--a-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
+.cond-op { width: 100%; }
 
 /* -- Field + "insert variable" button, reused by condition
    sides, generic text/textarea fields, and Call-a-Tool params -- */

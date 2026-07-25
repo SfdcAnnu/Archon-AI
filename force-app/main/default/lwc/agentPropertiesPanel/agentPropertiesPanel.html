@@ -86,64 +86,76 @@
                     </div>
                 </template>
 
-                <!-- ── If/Else condition builder ── -->
+                <!-- ── If/Else condition builder — stacked rows, not a
+                     cramped single line; the sidebar isn't wide enough to
+                     hold left value + operator + right value legibly
+                     side by side. ── -->
                 <template lwc:if={isIfElseNode}>
                     <div class="prop-field">
                         <label class="prop-label">Condition</label>
                         <div class="cond-builder">
-                            <div class="cond-side">
-                                <lightning-input
-                                    value={conditionParts.lhs}
-                                    variant="label-hidden"
-                                    placeholder="\{!ai.score}"
-                                    data-part="lhs"
-                                    onchange={handleConditionLhsChange}>
-                                </lightning-input>
-                                <lightning-button-menu
-                                    icon-name="utility:merge_field"
-                                    icon-size="x-small"
-                                    variant="border-filled"
-                                    alternative-text="Insert a field or variable"
-                                    menu-alignment="right"
-                                    data-part="lhs"
-                                    onselect={handleInsertConditionToken}
-                                    class="insert-btn">
-                                    <template for:each={availableVariables} for:item="v">
-                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                    </template>
-                                </lightning-button-menu>
+                            <div class="cond-row">
+                                <span class="cond-row-label">Left side</span>
+                                <div class="cond-side">
+                                    <lightning-input
+                                        value={conditionParts.lhs}
+                                        variant="label-hidden"
+                                        placeholder="\{!ai.score}"
+                                        data-part="lhs"
+                                        onchange={handleConditionLhsChange}>
+                                    </lightning-input>
+                                    <lightning-button-menu
+                                        icon-name="utility:merge_field"
+                                        icon-size="x-small"
+                                        variant="border-filled"
+                                        alternative-text="Insert a field or variable"
+                                        menu-alignment="right"
+                                        data-part="lhs"
+                                        onselect={handleInsertConditionToken}
+                                        class="insert-btn">
+                                        <template for:each={availableVariables} for:item="v">
+                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                        </template>
+                                    </lightning-button-menu>
+                                </div>
                             </div>
-                            <lightning-combobox
-                                value={conditionParts.op}
-                                options={conditionOperatorOptions}
-                                variant="label-hidden"
-                                class="cond-op"
-                                onchange={handleConditionOpChange}>
-                            </lightning-combobox>
-                            <div class="cond-side">
-                                <lightning-input
-                                    value={conditionParts.rhs}
+                            <div class="cond-row">
+                                <span class="cond-row-label">Operator</span>
+                                <lightning-combobox
+                                    value={conditionParts.op}
+                                    options={conditionOperatorOptions}
                                     variant="label-hidden"
-                                    placeholder="80"
-                                    data-part="rhs"
-                                    onchange={handleConditionRhsChange}>
-                                </lightning-input>
-                                <lightning-button-menu
-                                    icon-name="utility:merge_field"
-                                    icon-size="x-small"
-                                    variant="border-filled"
-                                    alternative-text="Insert a field or variable"
-                                    menu-alignment="right"
-                                    data-part="rhs"
-                                    onselect={handleInsertConditionToken}
-                                    class="insert-btn">
-                                    <template for:each={availableVariables} for:item="v">
-                                        <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
-                                    </template>
-                                </lightning-button-menu>
+                                    class="cond-op"
+                                    onchange={handleConditionOpChange}>
+                                </lightning-combobox>
+                            </div>
+                            <div class="cond-row">
+                                <span class="cond-row-label">Right side</span>
+                                <div class="cond-side">
+                                    <lightning-input
+                                        value={conditionParts.rhs}
+                                        variant="label-hidden"
+                                        placeholder="80"
+                                        data-part="rhs"
+                                        onchange={handleConditionRhsChange}>
+                                    </lightning-input>
+                                    <lightning-button-menu
+                                        icon-name="utility:merge_field"
+                                        icon-size="x-small"
+                                        variant="border-filled"
+                                        alternative-text="Insert a field or variable"
+                                        menu-alignment="right"
+                                        data-part="rhs"
+                                        onselect={handleInsertConditionToken}
+                                        class="insert-btn">
+                                        <template for:each={availableVariables} for:item="v">
+                                            <lightning-menu-item key={v.token} value={v.token} label={v.token} title={v.hint}></lightning-menu-item>
+                                        </template>
+                                    </lightning-button-menu>
+                                </div>
                             </div>
                         </div>
-                        <div class="field-hint">Either side can be a plain value or a variable — click the 🔤 icon to insert a record field, AI output, current user, or org value. Text values don't need quotes.</div>
+                        <div class="field-hint">Either side can be a plain value or a variable — click the merge-field icon to insert a record field, AI output, current user, or org value. Text values don't need quotes.</div>
                         <div class="field-hint">{ifElseScoreHint}</div>
                     </div>
                 </template>
@@ -330,7 +342,7 @@
                                         <lightning-textarea label="Output" value={ex.output} rows="2" max-length="2000" data-key={field.key} data-idx={ex.idx} data-which="output" onchange={handleExampleChange}></lightning-textarea>
                                     </div>
                                 </template>
-                                <lightning-button label="+ Add example" variant="base" data-key={field.key} onclick={handleAddExample}></lightning-button>
+                                <lightning-button label="+ Add example" data-key={field.key} onclick={handleAddExample}></lightning-button>
                             </div>
                         </template>
 
@@ -416,7 +428,7 @@
                     <div class="custom-tools-sec">
                         <div class="custom-tools-head">
                             <span class="custom-tools-title">Custom tools</span>
-                            <lightning-button label="+ Add custom tool" variant="base" onclick={handleOpenCustomToolPicker}></lightning-button>
+                            <lightning-button label="+ Add custom tool" onclick={handleOpenCustomToolPicker}></lightning-button>
                         </div>
                         <template lwc:if={hasCustomTools}>
                             <div class="tool-grid">

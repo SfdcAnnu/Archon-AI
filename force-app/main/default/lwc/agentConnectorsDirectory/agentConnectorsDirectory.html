@@ -98,33 +98,35 @@
                                     <div class="conn-actions">
                                         <template lwc:if={e.isCustom}>
                                             <span class="btn-static">Custom · no connect step needed</span>
-                                            <button class="btn btn-secondary"
-                                                    data-id={e.connectorId}
-                                                    onclick={handleDeleteCustom}>
-                                                Remove
-                                            </button>
+                                            <lightning-button
+                                                label="Remove"
+                                                data-id={e.connectorId}
+                                                onclick={handleDeleteCustom}>
+                                            </lightning-button>
                                         </template>
                                         <template lwc:else>
                                             <template lwc:if={e.showConnectBtn}>
-                                                <button class="btn btn-primary"
-                                                        data-provider={e.providerKey}
-                                                        onclick={handleConnect}>
-                                                    + Connect
-                                                </button>
+                                                <lightning-button
+                                                    label="Connect"
+                                                    variant="brand"
+                                                    icon-name="utility:add"
+                                                    data-provider={e.providerKey}
+                                                    onclick={handleConnect}>
+                                                </lightning-button>
                                             </template>
                                             <template lwc:if={e.showManageBtn}>
-                                                <button class="btn btn-secondary"
-                                                        data-id={e.connectorId}
-                                                        onclick={handleDisconnect}>
-                                                    Disconnect
-                                                </button>
+                                                <lightning-button
+                                                    label="Disconnect"
+                                                    data-id={e.connectorId}
+                                                    onclick={handleDisconnect}>
+                                                </lightning-button>
                                             </template>
                                             <template lwc:if={e.showRetryBtn}>
-                                                <button class="btn btn-secondary"
-                                                        data-provider={e.providerKey}
-                                                        onclick={handleConnect}>
-                                                    Retry
-                                                </button>
+                                                <lightning-button
+                                                    label="Retry"
+                                                    data-provider={e.providerKey}
+                                                    onclick={handleConnect}>
+                                                </lightning-button>
                                             </template>
                                         </template>
                                     </div>

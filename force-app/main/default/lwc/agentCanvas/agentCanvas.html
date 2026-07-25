@@ -27,9 +27,9 @@
                 <span class={statusPillClass}>{agentDef.Status__c}</span>
             </div>
             <div class="tb-actions">
-                <lightning-button label="Auto layout" variant="base"  icon-name="utility:rows"           onclick={handleAutoLayout}></lightning-button>
-                <lightning-button label="Connectors"  variant="base"  icon-name="utility:connected_apps" onclick={handleOpenConnectors}></lightning-button>
-                <lightning-button label="Share"       variant="base"  icon-name="utility:share"          onclick={handleOpenShare}></lightning-button>
+                <lightning-button label="Auto layout"                 icon-name="utility:rows"           onclick={handleAutoLayout}></lightning-button>
+                <lightning-button label="Connectors"                  icon-name="utility:connected_apps" onclick={handleOpenConnectors}></lightning-button>
+                <lightning-button label="Share"                       icon-name="utility:share"          onclick={handleOpenShare}></lightning-button>
                 <lightning-button label="Test run"                    icon-name="utility:apex"           onclick={handleTestRun}></lightning-button>
                 <lightning-button label="Save"                        icon-name="utility:save"           onclick={handleSave} disabled={isSaving}
                     title="Saves everything as-is without changing Status. A Draft agent stays Draft — testable via Test Runner, but real triggers/automation still won't fire it.">

@@ -42,7 +42,7 @@
                     </template>
 
                     <div class="aal-actions">
-                        <lightning-button label="Add comment" variant="base" data-id={r.id} onclick={handleToggleComment}></lightning-button>
+                        <lightning-button label="Add comment" data-id={r.id} onclick={handleToggleComment}></lightning-button>
                         <lightning-button label="Reject" variant="destructive-text" data-id={r.id} onclick={handleReject} disabled={_deciding}></lightning-button>
                         <lightning-button label="Approve" variant="brand" data-id={r.id} onclick={handleApprove} disabled={_deciding}></lightning-button>
                     </div>

@@ -453,7 +453,8 @@ export default class AgentPropertiesPanel extends LightningElement {
             create_record: 'id',
             query_records: 'count',
             create_task:   'id',
-            post_chatter:  'id'
+            post_chatter:  'id',
+            call_tool:     'result'
         };
         ids.forEach(id => {
             const n = nodesById.get(id);
@@ -566,6 +567,7 @@ export default class AgentPropertiesPanel extends LightningElement {
     get callToolConnectorId() { return this.node?.config?.connectorId || ''; }
     get callToolKind()        { return this.node?.config?.toolKind || 'standard'; }
     get callToolName()        { return this.node?.config?.toolName || ''; }
+    get callToolOutputVariable() { return this.node?.config?.outputVariable || ''; }
     get callToolSupportsCustom() { return this.callToolProvider === 'salesforce_mcp'; }
     get isCallToolStandard() { return this.callToolKind !== 'custom'; }
     get isCallToolCustom()   { return this.callToolKind === 'custom' && this.callToolSupportsCustom; }
@@ -594,6 +596,9 @@ export default class AgentPropertiesPanel extends LightningElement {
         this.dispatchEvent(new CustomEvent('config', { detail: { field: 'toolName', value: '' } }));
         this.dispatchEvent(new CustomEvent('config', { detail: { field: 'customToolType', value: '' } }));
         this.dispatchEvent(new CustomEvent('config', { detail: { field: 'paramValues', value: {} } }));
+    }
+    handleCallToolOutputVariableChange(e) {
+        this.dispatchEvent(new CustomEvent('config', { detail: { field: 'outputVariable', value: e.target.value } }));
     }
     handleCallToolKindChange(e) {
         const value = e.detail.value;

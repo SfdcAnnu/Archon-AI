@@ -457,12 +457,21 @@ export default class AgentCanvas extends LightningElement {
             const isLoop = n.subType === 'loop';
             const isAiNode = n.type === 'ai';
             const isCatalog = n.type === 'catalog';
+            // Call a Tool nodes ARE action-type but represent a connector/MCP
+            // call, not a built-in Salesforce action — they need to read as
+            // visually distinct, or an agent mixing both looks like every
+            // action node is the same thing on the canvas.
+            const isCallTool = n.subType === 'call_tool';
 
             // Second line under the type label
             let subTitle;
             if (isAiNode)        subTitle = n.config?.model || n.subType;
             else if (isCatalog)  subTitle = connectorTile?.accountEmail || n.mcpServer || n.subType;
-            else {
+            else if (isCallTool) {
+                const provider = n.config?.provider || '(no connector picked)';
+                const tool = n.config?.toolName || '(no tool picked)';
+                subTitle = `${provider} → ${tool}`;
+            } else {
                 const cfgVals = Object.values(n.config || {}).filter(v => v && typeof v === 'string');
                 subTitle = cfgVals[0] ? String(cfgVals[0]).substring(0, 30) : prettify(n.subType);
             }
@@ -475,11 +484,11 @@ export default class AgentCanvas extends LightningElement {
             // Status dot: AI → engine cred bound; catalog → provider actually
             // CONNECTED right now (live directory status, not just a stale
             // connectorId string saved in config).
-            const showStatusDot = isAiNode || isCatalog;
+            const showStatusDot = isAiNode || isCatalog || isCallTool;
             let isOk = false;
             if (isAiNode) {
                 isOk = !!n.aiEngineConnectionId;
-            } else if (isCatalog) {
+            } else if (isCatalog || isCallTool) {
                 const LEGACY_PROVIDER_BY_SUBTYPE = { salesforce_crm_tools: 'salesforce_mcp' };
                 const provider = n.config?.provider || LEGACY_PROVIDER_BY_SUBTYPE[n.subType];
                 if (provider) {
@@ -492,11 +501,11 @@ export default class AgentCanvas extends LightningElement {
 
             return {
                 ...n,
-                icon:           NODE_ICONS[n.type] || 'utility:settings',
-                iconChipClass:  `cnicon ${this.iconChipClassFor(n.type, n.subType)}`,
+                icon:           isCallTool ? 'utility:apex' : (NODE_ICONS[n.type] || 'utility:settings'),
+                iconChipClass:  `cnicon ${isCallTool ? 'ic-mcp' : this.iconChipClassFor(n.type, n.subType)}`,
                 positionStyle:  `left: ${n.x}px; top: ${n.y}px`,
                 cardClass:      `cnode${this.selectedNodeId === n.id ? ' cnode--sel' : ''}`,
-                typeLabel:      TYPE_LABELS[n.type] || n.type.toUpperCase(),
+                typeLabel:      isCallTool ? 'MCP TOOL' : (TYPE_LABELS[n.type] || n.type.toUpperCase()),
                 subTitle,
                 hasInputPort:   n.type !== 'trigger',
                 hasOutputPort:  !isIfElse && !isLoop && n.type !== 'end',
@@ -506,6 +515,7 @@ export default class AgentCanvas extends LightningElement {
                 connectorIconUrl: iconUrl,
                 connectorAccount: connectorTile?.accountEmail || n.connectorAccount,
                 isAiNode,
+                isCallTool,
                 toolChips,
                 hasToolChips:   toolChips.length > 0,
                 moreToolsLabel: moreCount > 0 ? `+${moreCount}` : null,
@@ -513,7 +523,9 @@ export default class AgentCanvas extends LightningElement {
                 statusDotClass: isOk ? 'cndot cndot--ok' : 'cndot',
                 statusDotTitle: isAiNode
                     ? (isOk ? 'Engine credential bound' : 'API key required')
-                    : (isOk ? 'Connector bound' : 'No connector selected')
+                    : isCallTool
+                        ? (isOk ? 'Connector connected' : 'Connector not connected — this call will fail')
+                        : (isOk ? 'Connector bound' : 'No connector selected')
             };
         });
     }

@@ -257,6 +257,7 @@
 .ic-gray   { background: #EDEEF1; --sds-c-icon-color-foreground-default: #4C4F58; }
 .ic-pink   { background: #FBEAF0; --sds-c-icon-color-foreground-default: #993556; }
 .ic-green  { background: #EAF3DE; --sds-c-icon-color-foreground-default: #3B6D11; }
+.ic-mcp    { background: #DDF3F2; --sds-c-icon-color-foreground-default: #0B7285; }
 
 /* Connector tiles (Connectors tab) */
 .citem {

@@ -1,38 +1,64 @@
 :host {
+    /* Shared Archon design tokens -- identical block in every component so
+       the whole app reads as one product. Source of truth: agentHome.css. */
+    --a-surface-0: #F4F5F7;
+    --a-surface-1: #FAFAFB;
+    --a-surface-2: #FFFFFF;
+    --a-border:        #E4E5E9;
+    --a-border-strong: #CDCFD6;
+    --a-text-1: #17181C;
+    --a-text-2: #4C4F58;
+    --a-text-3: #83868F;
+    --a-accent:        #0B7BD1;
+    --a-accent-soft:   #EAF3FC;
+    --a-accent-border: #B9D9F3;
+    --a-success:      #2F7D3E;
+    --a-success-soft: #E8F4EA;
+    --a-danger:       #C0392B;
+    --a-danger-soft:  #FBEAE7;
+    --a-warning-soft: #FBF3DF;
+    --a-warning-text: #7A5A10;
+    --a-radius: 8px;
+    --a-radius-lg: 12px;
+
+    display: block;
+    background: var(--a-surface-0);
+    min-height: 100%;
     font-family: 'Salesforce Sans', -apple-system, Arial, sans-serif;
     font-size: 13px;
-    color: #17181C;
+    color: var(--a-text-1);
 }
-.aal-wrap { padding: 16px; max-width: 720px; margin: 0 auto; }
+.aal-wrap { padding: 20px; max-width: 720px; margin: 0 auto; }
 .aal-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
-.aal-head h2 { font-size: 18px; font-weight: 700; margin: 0; }
+.aal-head h2 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
 
 .aal-error {
     font-size: 12px;
-    color: #B3261E;
-    background: #FBEAE9;
+    color: var(--a-danger);
+    background: var(--a-danger-soft);
     border: 1px solid #F3C6C2;
-    border-radius: 8px;
+    border-radius: var(--a-radius);
     padding: 10px 12px;
 }
 .aal-empty {
     font-size: 13px;
-    color: #83868F;
+    color: var(--a-text-3);
     text-align: center;
     padding: 40px 16px;
 }
 
 .aal-card {
-    border: 1px solid #E4E5E9;
-    border-radius: 10px;
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-radius-lg);
     padding: 14px 16px;
     margin-bottom: 10px;
-    background: #fff;
+    background: var(--a-surface-2);
+    box-shadow: 0 1px 3px rgba(20, 24, 33, 0.05);
 }
 .aal-card-head {
     display: flex;
@@ -40,11 +66,11 @@
     justify-content: space-between;
     gap: 10px;
 }
-.aal-node { font-size: 14px; font-weight: 700; }
-.aal-agent { font-size: 11px; color: #83868F; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.aal-meta { font-size: 11px; color: #83868F; margin-top: 4px; }
-.aal-timeout { color: #B4741A; }
-.aal-record { font-size: 11px; color: #6B7280; margin-top: 2px; }
+.aal-node { font-size: 14px; font-weight: 700; color: var(--a-text-1); }
+.aal-agent { font-size: 11px; color: var(--a-text-3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.aal-meta { font-size: 11px; color: var(--a-text-3); margin-top: 4px; }
+.aal-timeout { color: var(--a-warning-text); }
+.aal-record { font-size: 11px; color: var(--a-text-2); margin-top: 2px; }
 
 .aal-comment { margin-top: 10px; }
 .aal-actions {

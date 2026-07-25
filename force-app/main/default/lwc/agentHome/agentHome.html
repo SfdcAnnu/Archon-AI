@@ -1,20 +1,22 @@
 <template>
     <div class="agent-app">
 
-        <!-- TOP NAV -->
-        <div class="top-nav">
-            <div class="nav-logo">
-                <lightning-icon icon-name="utility:connected_apps" size="small" alternative-text="Agent Builder"></lightning-icon>
-                <span class="nav-title">Agent Builder</span>
+        <!-- PAGE HEADER — no duplicate app branding, Lightning's own nav bar
+             already shows "Archon AI" and its tabs; this is content-only. -->
+        <template lwc:if={showHome}>
+            <div class="page-header">
+                <div class="page-title-wrap">
+                    <h1 class="page-title">Agents</h1>
+                    <div class="page-subtitle">Build, test, and manage your AI agents</div>
+                </div>
+                <div class="page-actions">
+                    <lightning-button-group>
+                        <lightning-button label="Execution Logs" icon-name="utility:list" onclick={handleViewLogs}></lightning-button>
+                        <lightning-button variant="brand" label="New Agent" icon-name="utility:add" onclick={handleNewAgent}></lightning-button>
+                    </lightning-button-group>
+                </div>
             </div>
-            <div class="nav-spacer"></div>
-            <template lwc:if={showHome}>
-                <lightning-button-group>
-                    <lightning-button label="Logs" icon-name="utility:list" onclick={handleViewLogs}></lightning-button>
-                    <lightning-button variant="brand" label="+ New Agent" onclick={handleNewAgent}></lightning-button>
-                </lightning-button-group>
-            </template>
-        </div>
+        </template>
 
         <!-- SUB NAV TABS -->
         <div class="sub-nav">
@@ -105,7 +107,7 @@
                         <!-- NEW AGENT CARD -->
                         <div class="agent-card agent-card--new" onclick={handleNewAgent}>
                             <lightning-icon icon-name="utility:add" size="small" alternative-text="New agent"></lightning-icon>
-                            <div class="ac-name" style="color: #0176d3;">New agent</div>
+                            <div class="ac-name ac-name--accent">New agent</div>
                             <div class="ac-desc">Build a new AI agent for your department</div>
                         </div>
                     </div>

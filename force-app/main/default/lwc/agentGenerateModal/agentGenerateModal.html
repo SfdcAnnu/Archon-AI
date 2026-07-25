@@ -51,6 +51,13 @@
                             </lightning-input>
                         </div>
                     </template>
+                    <lightning-textarea
+                        label="Anything else to add? (optional)"
+                        placeholder="Extra context, constraints, or things you already know it should do that weren't asked above — this goes to the AI along with your answers."
+                        value={extraNotes}
+                        rows="3"
+                        onchange={handleExtraNotesChange}>
+                    </lightning-textarea>
                     <template lwc:if={errorMessage}>
                         <div class="agm-error">{errorMessage}</div>
                     </template>

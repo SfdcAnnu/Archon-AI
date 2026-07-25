@@ -989,6 +989,11 @@ export default class AgentCanvas extends LightningElement {
         const items = this.checklistItems.map((c, i) => i === idx ? { ...c, done: !c.done } : c);
         this.agentDef = { ...this.agentDef, SetupChecklistJson__c: JSON.stringify(items) };
     }
+    handleChecklistNoteChange(e) {
+        const { index, value } = e.detail;
+        const items = this.checklistItems.map((c, i) => i === index ? { ...c, notes: value } : c);
+        this.agentDef = { ...this.agentDef, SetupChecklistJson__c: JSON.stringify(items) };
+    }
     handleOpenShare() {
         if (!this.agentDef?.Id) {
             this.showToast('warning', 'Save the agent first, then share it.');

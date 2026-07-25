@@ -36,6 +36,10 @@ export default class AgentSetupChecklist extends LightningElement {
         const index = Number(e.currentTarget.dataset.idx);
         this.dispatchEvent(new CustomEvent('toggleitem', { detail: { index } }));
     }
+    handleNoteChange(e) {
+        const index = Number(e.currentTarget.dataset.idx);
+        this.dispatchEvent(new CustomEvent('notechange', { detail: { index, value: e.target.value } }));
+    }
     handleClose() { this.dispatchEvent(new CustomEvent('close')); }
     stop(e) { e.stopPropagation(); }
 }

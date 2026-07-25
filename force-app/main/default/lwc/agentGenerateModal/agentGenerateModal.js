@@ -24,6 +24,7 @@ export default class AgentGenerateModal extends LightningElement {
 
     @track questions = [];
     @track answers = [];
+    @track extraNotes = '';
     _qaHistory = [];
 
     get isInputStep()     { return this.step === STEP_INPUT; }
@@ -76,9 +77,18 @@ export default class AgentGenerateModal extends LightningElement {
         next[idx] = e.target.value;
         this.answers = next;
     }
+    handleExtraNotesChange(e) { this.extraNotes = e.target.value; }
 
     async handleSubmitAnswers() {
         this._qaHistory = this.questions.map((q, i) => ({ question: q, answer: this.answers[i] || '' }));
+        // A free-form note isn't tied to any specific asked question, but the
+        // server only understands qaHistory as {question, answer} pairs — a
+        // clearly-labeled pseudo-entry reads naturally in the prompt (see
+        // buildUserMessage in agent-generator/generate.ts) without needing a
+        // separate field end-to-end.
+        if (this.extraNotes && this.extraNotes.trim()) {
+            this._qaHistory.push({ question: 'Anything else the user wants to add', answer: this.extraNotes.trim() });
+        }
         await this.runGenerate({
             requirementText: this.requirementText,
             fileBase64: this._fileBase64,
@@ -144,6 +154,7 @@ export default class AgentGenerateModal extends LightningElement {
         this._fileBase64 = null;
         this.questions = [];
         this.answers = [];
+        this.extraNotes = '';
         this._qaHistory = [];
         this.errorMessage = null;
     }

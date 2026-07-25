@@ -33,19 +33,24 @@
 .asc-all-done { font-size: 12.5px; color: #2F7D3E; text-align: center; padding: 20px; }
 
 .asc-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
     padding: 10px 11px;
     border: 1px solid #E4E5E9;
     border-radius: 8px;
     margin-bottom: 6px;
-    cursor: pointer;
     background: #FAFAFB;
 }
+.asc-row-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
 .asc-row:hover { border-color: #B9D9F3; }
-.asc-row--done { opacity: 0.55; }
 .asc-row--done .asc-title { text-decoration: line-through; }
+.asc-row--done .asc-row-main { opacity: 0.55; }
+
+.asc-note-wrap { margin: 8px 0 0 26px; }
+.asc-note-wrap .slds-form-element__control { margin: 0; }
 
 .asc-check {
     width: 16px;

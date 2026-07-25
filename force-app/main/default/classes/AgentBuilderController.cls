@@ -365,6 +365,15 @@ public with sharing class AgentBuilderController {
         if (body.get('agentScore') != null) {
             result.agentScore = Integer.valueOf(body.get('agentScore'));
         }
+        if (result.success != true) {
+            result.errorMessage = (String) body.get('message');
+            if (String.isBlank(result.errorMessage)) {
+                result.errorMessage = (String) body.get('error');
+            }
+            if (String.isBlank(result.errorMessage)) {
+                result.errorMessage = 'Run failed (HTTP ' + statusCode + ') — no further detail returned.';
+            }
+        }
         return result;
     }
 
@@ -413,6 +422,10 @@ public with sharing class AgentBuilderController {
         @AuraEnabled public String  agentStatus;
         @AuraEnabled public String  agentOutputPayload;
         @AuraEnabled public Integer httpStatus;
+        // Populated whenever success is false — the server's own explanation
+        // (HTTP-layer rejection or a caught exception), independent of
+        // agentReason (which only ever holds the AI's score-tail reasoning).
+        @AuraEnabled public String  errorMessage;
     }
 
     public class ExecutionPage {

@@ -573,13 +573,22 @@ export default class AgentPropertiesPanel extends LightningElement {
     get isCallToolCustom()   { return this.callToolKind === 'custom' && this.callToolSupportsCustom; }
 
     get callToolProviderOptions() {
-        if (!this._allTiles || this._allTiles.length === 0) {
-            return [{ label: '— No connected providers — open Connectors to add one —', value: '' }];
+        // The org's own Apex/Flow actions never need an OAuth "connector" —
+        // this Salesforce connection is inherent (the app runs inside the
+        // org), same as Flow's own Apex Action element needs nothing extra.
+        // Always offer it, whether or not any external provider is connected.
+        const options = [];
+        const hasSalesforceTile = (this._allTiles || []).some(t => t.providerKey === 'salesforce_mcp');
+        if (!hasSalesforceTile) {
+            options.push({ label: 'This Salesforce org — Apex action / Flow (no connector needed)', value: 'salesforce_mcp' });
         }
-        return this._allTiles.map(t => ({
-            label: t.displayName + (t.accountEmail ? `  ·  ${t.accountEmail}` : ''),
-            value: t.providerKey
-        }));
+        for (const t of (this._allTiles || [])) {
+            options.push({
+                label: t.displayName + (t.accountEmail ? `  ·  ${t.accountEmail}` : ''),
+                value: t.providerKey
+            });
+        }
+        return options;
     }
     get callToolKindOptions() {
         const opts = [{ label: 'Standard tool (from the connector)', value: 'standard' }];
@@ -680,12 +689,23 @@ export default class AgentPropertiesPanel extends LightningElement {
     @track _customCatalog = { data: undefined, error: undefined, loading: false };
     async loadCustomCatalog() {
         this._customCatalog = { data: undefined, error: undefined, loading: true };
-        try {
-            const raw = await getCustomActionCatalog();
-            const parsed = JSON.parse(raw);
-            this._customCatalog = { data: parsed.actions || [], error: undefined, loading: false };
-        } catch (e) {
-            this._customCatalog = { data: undefined, error: e?.body?.message || e?.message || 'Could not load custom actions.', loading: false };
+        const MAX_ATTEMPTS = 8;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const raw = await getCustomActionCatalog();
+                const parsed = JSON.parse(raw);
+                this._customCatalog = { data: parsed.actions || [], error: undefined, loading: false };
+                return;
+            } catch (e) {
+                const msg = e?.body?.message || e?.message || '';
+                const retriable = /SERVER_WAKING|Application loading|upstream|unreachable|502|503|timed? ?out/i.test(msg);
+                if (!retriable || attempt === MAX_ATTEMPTS) {
+                    this._customCatalog = { data: undefined, error: msg || 'Could not load custom actions.', loading: false };
+                    return;
+                }
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                await new Promise(resolve => setTimeout(resolve, 8000));
+            }
         }
     }
     get callToolCustomOptions() {
@@ -705,12 +725,23 @@ export default class AgentPropertiesPanel extends LightningElement {
     async loadCustomToolSchema(type, name) {
         const key = `${type}:${name}`;
         this._customToolSchema = { key, data: undefined, loading: true, error: undefined };
-        try {
-            const raw = await describeCustomAction({ actionType: type, name });
-            const d = JSON.parse(raw);
-            this._customToolSchema = { key, data: d, loading: false, error: undefined };
-        } catch (e) {
-            this._customToolSchema = { key, data: undefined, loading: false, error: e?.body?.message || e?.message || 'Could not load the schema.' };
+        const MAX_ATTEMPTS = 8;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const raw = await describeCustomAction({ actionType: type, name });
+                const d = JSON.parse(raw);
+                this._customToolSchema = { key, data: d, loading: false, error: undefined };
+                return;
+            } catch (e) {
+                const msg = e?.body?.message || e?.message || '';
+                const retriable = /SERVER_WAKING|Application loading|upstream|unreachable|502|503|timed? ?out/i.test(msg);
+                if (!retriable || attempt === MAX_ATTEMPTS) {
+                    this._customToolSchema = { key, data: undefined, loading: false, error: msg || 'Could not load the schema.' };
+                    return;
+                }
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                await new Promise(resolve => setTimeout(resolve, 8000));
+            }
         }
     }
     handleCallToolCustomSelect(e) {

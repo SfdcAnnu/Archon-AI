@@ -75,7 +75,7 @@ export default class AgentTestRunner extends LightningElement {
             }
 
             this.addLog(res.success ? 'success' : 'error',
-                res.success ? `✓ Complete in ${elapsed}s` : `✗ Error: ${res.agentReason}`);
+                res.success ? `✓ Complete in ${elapsed}s` : `✗ Error: ${res.errorMessage || res.agentReason || 'Unknown error'}`);
 
             this.result = { ...res, elapsed };
 

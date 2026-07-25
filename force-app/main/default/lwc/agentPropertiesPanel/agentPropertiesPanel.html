@@ -149,13 +149,15 @@
                 <!-- ── Call a Tool (generic action node) ── -->
                 <template lwc:if={isCallToolNode}>
                     <div class="prop-field">
-                        <label class="prop-label">Connector</label>
+                        <label class="prop-label">Tool source</label>
                         <lightning-combobox
                             value={callToolProvider}
                             options={callToolProviderOptions}
                             variant="label-hidden"
+                            placeholder="Pick a source…"
                             onchange={handleCallToolProviderChange}>
                         </lightning-combobox>
+                        <div class="field-hint">Your own Salesforce org's Apex actions and Flows need no connection. Gmail, Outlook, and other apps need to be connected first — see the Connectors directory.</div>
                     </div>
 
                     <template lwc:if={callToolProvider}>

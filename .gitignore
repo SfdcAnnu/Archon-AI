@@ -70,3 +70,6 @@ tools-out.json
 
 # ── Archon Server — lives in its own repo (Archon-Server) ──
 server/
+
+# ── Simulated client-org test fixtures — NOT part of the package ──
+client-test-fixtures/

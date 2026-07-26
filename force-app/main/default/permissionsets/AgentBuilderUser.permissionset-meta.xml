@@ -276,6 +276,10 @@
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
+        <tab>Agent_Approvals</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
         <tab>AgentDefinition__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>

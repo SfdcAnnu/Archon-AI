@@ -172,4 +172,8 @@
         <tab>Synapse_Chat</tab>
         <visibility>Visible</visibility>
     </tabSettings>
+    <tabSettings>
+        <tab>Agent_Approvals</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
 </PermissionSet>

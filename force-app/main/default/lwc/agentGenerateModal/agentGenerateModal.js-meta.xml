@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>62.0</apiVersion>
-    <isExposed>false</isExposed>
-    <description>Describe-your-agent modal — paste/upload a requirement, answer any clarifying questions the AI asks, and get a complete draft agent back.</description>
-</LightningComponentBundle>

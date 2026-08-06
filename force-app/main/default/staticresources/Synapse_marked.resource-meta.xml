@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<StaticResource xmlns="http://soap.sforce.com/2006/04/metadata">
-    <cacheControl>Public</cacheControl>
-    <contentType>application/javascript</contentType>
-    <description>marked v14.1.3 — MIT-licensed markdown parser (marked.min.js). Loaded by synapseChatPanel LWC to render assistant messages as HTML. Output is passed through DOMPurify before injection.</description>
-</StaticResource>

@@ -9,6 +9,62 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
+        <apexClass>AgentBuilderRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentWebSocketController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentConnectorRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentGuardrailsRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentListRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentAccessRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentConversationsRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentExecutionsRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentApprovalRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentKbRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentEngineConnectionsRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentConnectorAdminRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentSetupRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentChatRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>AiEngineConnectionController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -41,10 +97,6 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>AgentGeneratorController</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
         <apexClass>SynapseSetupController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -57,11 +109,11 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>AgentSharingController</apexClass>
+        <apexClass>AgentUserConnectionController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>AgentUserConnectionController</apexClass>
+        <apexClass>AgentGuardrailsController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
 
@@ -171,8 +223,10 @@
     <fieldPermissions><field>AgentDefinition__c.TotalExecutions__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.SuccessRate__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExecuteType__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.PostTurnAutomationAgent__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.AccessMode__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.SetupChecklistJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.DebugMode__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ── AgentNode__c field permissions (NodeType__c and master-detail AgentDefinition__c are required — implicit) ── -->
     <fieldPermissions><field>AgentNode__c.NodeSubType__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
@@ -231,6 +285,7 @@
     <fieldPermissions><field>ChatSession__c.TokensIn__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TokensOut__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.PendingApprovalToken__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.ActiveTopic__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Content__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ToolCallsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ToolResultsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
@@ -242,6 +297,8 @@
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.AttachedContentDocumentIds__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.RequestPayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ResponsePayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ── AiEngineConnection__c field permissions (merged from ArchonAiEngineAdmin) ── -->
@@ -264,22 +321,6 @@
     <!-- they're auto-granted when the user has object access. -->
 
     <tabSettings>
-        <tab>Synapse_AI</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>Synapse_Setup</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>Synapse_Chat</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>Agent_Approvals</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
         <tab>AgentDefinition__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
@@ -293,7 +334,7 @@
     </tabSettings>
 
     <applicationVisibilities>
-        <application>Synapse_AI</application>
+        <application>Agent_Builder</application>
         <visible>true</visible>
     </applicationVisibilities>
 </PermissionSet>

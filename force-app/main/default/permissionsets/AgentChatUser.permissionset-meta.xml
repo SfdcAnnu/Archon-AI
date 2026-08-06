@@ -111,6 +111,7 @@
     <fieldPermissions><field>ChatSession__c.TokensIn__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TokensOut__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.PendingApprovalToken__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.ActiveTopic__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ChatMessage__c FLS (Name + master-detail ChatSession__c + Role__c required → implicit) -->
     <fieldPermissions><field>ChatMessage__c.Content__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
@@ -124,6 +125,8 @@
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.AttachedContentDocumentIds__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.RequestPayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.ResponsePayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- AgentDefinition__c FLS — read only what the chat runtime needs -->
     <fieldPermissions><field>AgentDefinition__c.Description__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
@@ -133,7 +136,9 @@
     <fieldPermissions><field>AgentDefinition__c.Version__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExternalServerUrl__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExecuteType__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.PostTurnAutomationAgent__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.AccessMode__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.DebugMode__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
 
     <!-- AgentNode__c FLS — read only (chat runtime resolves the flow + tools) -->
     <fieldPermissions><field>AgentNode__c.NodeSubType__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
@@ -167,13 +172,4 @@
     <fieldPermissions><field>AiEngineConnection__c.Notes__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentNode__c.AiEngineConnection__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
-
-    <tabSettings>
-        <tab>Synapse_Chat</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>Agent_Approvals</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
 </PermissionSet>

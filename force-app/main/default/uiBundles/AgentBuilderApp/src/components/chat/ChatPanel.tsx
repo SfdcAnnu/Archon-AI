@@ -293,8 +293,19 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
       // Preserve the user's optimistic/pending message in the UI by
       // unsetting its `isPending` flag instead of removing it entirely.
       // This keeps the user's turn visible while we append the assistant's reply.
-      setMessages(list => list.map(m => (m.isPending ? { ...m, isPending: false } : m)));
-      console.log('[ChatPanel] messages after clearing pending flag', { messagesPreview: undefined });
+      setMessages(list => {
+        const next = list.map(m => (m.isPending ? { ...m, isPending: false } : m));
+        try {
+          console.log('[ChatPanel] cleared pending flag', {
+            beforeLen: list.length,
+            afterLen: next.length,
+            lastMessages: next.slice(-6),
+          });
+        } catch (err) {
+          console.log('[ChatPanel] cleared pending flag (log failed)', err);
+        }
+        return next;
+      });
       if (result.status === 'complete' && result.assistantText != null) {
         historyRef.current = [
           ...historyRef.current,

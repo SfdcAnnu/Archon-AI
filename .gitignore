@@ -73,3 +73,12 @@ server/
 
 # ── Simulated client-org test fixtures — NOT part of the package ──
 client-test-fixtures/
+
+# ── Stray local artifacts — never part of the package ──
+SF-Assistant*
+SF-Assistant*.zip
+force-app.zip
+/src/
+/prisma/
+.graphqlrc.yml
+.tmp-retrieve/

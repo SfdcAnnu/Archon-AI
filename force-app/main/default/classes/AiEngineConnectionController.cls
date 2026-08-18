@@ -226,13 +226,21 @@ public with sharing class AiEngineConnectionController {
      */
     public static AiEngineConnection__c resolveForRuntime(String engineType, Id nodeBoundId) {
         Id userId = UserInfo.getUserId();
+        // Every caller passes the AI node's NodeSubType__c verbatim ('claude'/
+        // 'gpt4'/'gemini'), but AiEngineConnection__c.EngineType__c is saved
+        // using the connection admin UI's own vocabulary ('claude'/'openai'/
+        // 'gemini') — 'gpt4' never matched 'openai', so every OpenAI node
+        // silently found zero personal/shared connections no matter how many
+        // times a key was saved. Normalize once, here, so every caller is
+        // fixed without hunting down each call site.
+        String normalizedEngineType = normalizeEngineType(engineType);
 
         // 1 & 2 — Personal, prefer IsPreferred
         List<AiEngineConnection__c> personal = [
             SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, IsPreferred__c, User__c
             FROM AiEngineConnection__c
             WHERE User__c = :userId
-              AND EngineType__c = :engineType
+              AND EngineType__c = :normalizedEngineType
               AND OwnershipType__c = 'Personal'
               AND IsActive__c = true
             WITH USER_MODE
@@ -258,7 +266,7 @@ public with sharing class AiEngineConnectionController {
             SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, User__c
             FROM AiEngineConnection__c
             WHERE OwnershipType__c = 'Shared'
-              AND EngineType__c = :engineType
+              AND EngineType__c = :normalizedEngineType
               AND IsActive__c = true
             WITH USER_MODE
             ORDER BY LastUsedAt__c DESC NULLS LAST
@@ -267,6 +275,16 @@ public with sharing class AiEngineConnectionController {
         if (!shared.isEmpty()) return shared[0];
 
         return null;
+    }
+
+    /** Maps an AgentNode__c.NodeSubType__c value to the vocabulary
+     *  AiEngineConnection__c.EngineType__c is actually stored in. Every other
+     *  subtype already matches its engine type 1:1 — only OpenAI's node
+     *  subtype ('gpt4', named after the canvas's model picker) diverges from
+     *  its connection engine type ('openai', named after the provider). */
+    private static String normalizeEngineType(String nodeSubType) {
+        if (nodeSubType == 'gpt4') return 'openai';
+        return nodeSubType;
     }
 
     /** Called by AgentChatController after a successful turn. */

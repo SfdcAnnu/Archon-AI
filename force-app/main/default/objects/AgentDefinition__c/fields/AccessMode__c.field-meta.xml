@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>AccessMode__c</fullName>
-    <label>Data Access Mode</label>
     <description>How Salesforce tool calls authenticate for chat users. Org = everyone uses the Archon Setup org connection. PerUser = each user must connect their own Salesforce account once; tool calls run with their access and audit identity.</description>
+    <label>Data Access Mode</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
     <type>Picklist</type>
     <valueSet>
         <valueSetDefinition>
             <sorted>false</sorted>
-            <value><fullName>Org</fullName><label>Org connection (everyone shares)</label><default>true</default></value>
-            <value><fullName>PerUser</fullName><label>Each user&apos;s own access</label><default>false</default></value>
+            <value>
+                <fullName>Org</fullName>
+                <default>true</default>
+                <label>Org connection (everyone shares)</label>
+            </value>
+            <value>
+                <fullName>PerUser</fullName>
+                <default>false</default>
+                <label>Each user&apos;s own access</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

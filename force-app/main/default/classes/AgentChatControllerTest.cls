@@ -74,6 +74,35 @@ private class AgentChatControllerTest {
     }
 
     @IsTest
+    static void findOrCreateAutomatedSession_creates_session_anchored_to_given_user() {
+        Id fakeOwnerId = UserInfo.getUserId();
+        Test.startTest();
+        ChatSession__c s = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', '006000000000001AAA', 'Opportunity', fakeOwnerId);
+        Test.stopTest();
+        System.assertNotEquals(null, s.Id);
+        System.assertEquals('Active', s.Status__c);
+        System.assertEquals(fakeOwnerId, s.User__c);
+        System.assertEquals('006000000000001AAA', s.RecordContextId__c);
+    }
+
+    @IsTest
+    static void findOrCreateAutomatedSession_reuses_existing_session_regardless_of_anchor_user() {
+        // Started under the running test user...
+        ChatSession__c first = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', '006000000000002AAA', 'Opportunity', UserInfo.getUserId());
+
+        Test.startTest();
+        // ...a second call passing a DIFFERENT (fake, non-matching) anchor
+        // user must still find and reuse it — this is the whole point of
+        // this method over startSession()'s User__c-scoped reuse, since the
+        // two flows that call it (WhatsAppRevivalInitiator's proactive send,
+        // WhatsAppAgentBridge's inbound reply) can run under different users.
+        ChatSession__c second = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', '006000000000002AAA', 'Opportunity', null);
+        Test.stopTest();
+
+        System.assertEquals(first.Id, second.Id, 'Must reuse the same session regardless of which anchor user is passed');
+    }
+
+    @IsTest
     static void sendTurn_complete_inserts_user_and_assistant_messages() {
         AgentChatController.SessionWithMessages sess = AgentChatController.startSession('TestChatAgent', null, null);
 

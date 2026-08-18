@@ -25,7 +25,7 @@ public with sharing class AgentBuilderController {
         return [
             SELECT Id, Name, ApiName__c, Department__c, Description__c,
                    Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
-                   CreatedDate, LastModifiedDate
+                   ExecuteType__c, CreatedDate, LastModifiedDate
             FROM AgentDefinition__c
             WHERE Department__c = :department
             WITH USER_MODE
@@ -34,7 +34,49 @@ public with sharing class AgentBuilderController {
         ];
     }
 
-    // GET: Single agent with all nodes (returns null wrapper when id is blank — new-agent case)
+    // GET: agents eligible to be named as a "post-turn automation agent" (Trigger or Both),
+    // for the linked-automation-agent picker on a chat-capable agent. Excludes the agent
+    // being edited so it can't point at itself.
+    @AuraEnabled(cacheable=true)
+    public static List<AutomationAgentOption> listAutomationAgents(String excludeAgentId) {
+        // Bind-null comparisons on `!=` aren't reliable in SOQL — branch instead
+        // (new, unsaved agent has no Id yet, so there's nothing to exclude).
+        List<AgentDefinition__c> rows;
+        if (String.isBlank(excludeAgentId)) {
+            rows = [
+                SELECT Id, Name, ApiName__c
+                FROM AgentDefinition__c
+                WHERE ExecuteType__c IN ('Trigger', 'Both')
+                WITH USER_MODE
+                ORDER BY Name ASC
+                LIMIT 200
+            ];
+        } else {
+            Id excludeId = (Id) excludeAgentId;
+            rows = [
+                SELECT Id, Name, ApiName__c
+                FROM AgentDefinition__c
+                WHERE ExecuteType__c IN ('Trigger', 'Both')
+                  AND Id != :excludeId
+                WITH USER_MODE
+                ORDER BY Name ASC
+                LIMIT 200
+            ];
+        }
+        List<AutomationAgentOption> out = new List<AutomationAgentOption>();
+        for (AgentDefinition__c a : rows) {
+            AutomationAgentOption o = new AutomationAgentOption();
+            o.id      = a.Id;
+            o.label   = a.Name;
+            o.apiName = a.ApiName__c;
+            out.add(o);
+        }
+        return out;
+    }
+
+    // GET: Single agent with all nodes — one read for the whole agentEditor
+    // page, mirroring the canvas's existing one-wire pattern. Returns null
+    // wrapper when id is blank — new-agent case.
     @AuraEnabled(cacheable=true)
     public static AgentWithNodes getAgentWithNodes(String agentId) {
         if (String.isBlank(agentId)) return null;
@@ -42,7 +84,7 @@ public with sharing class AgentBuilderController {
             SELECT Id, Name, ApiName__c, Department__c, Description__c,
                    KnowledgeBase__c, Status__c, Version__c, CanvasJson__c,
                    ExternalServerUrl__c, TotalExecutions__c, SuccessRate__c, AccessMode__c,
-                   SetupChecklistJson__c,
+                   SetupChecklistJson__c, ExecuteType__c, PostTurnAutomationAgent__c, DebugMode__c,
                    (SELECT Id, Name, NodeType__c, NodeSubType__c, ConfigJson__c,
                            PositionX__c, PositionY__c, SortOrder__c,
                            IsEnabled__c, McpServer__c, McpTool__c,
@@ -295,6 +337,19 @@ public with sharing class AgentBuilderController {
         update agents;
     }
 
+    @AuraEnabled
+    public static void updateDebugMode(String agentId, Boolean enabled) {
+        List<AgentDefinition__c> agents = [
+            SELECT Id, DebugMode__c FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) throw new AuraHandledException('Agent not found');
+        agents[0].DebugMode__c = enabled == true;
+        update agents;
+    }
+
     // PRIVATE HELPERS
 
     private static AgentDefinition__c buildAgentRecord(AgentDefinitionInput inp) {
@@ -307,7 +362,9 @@ public with sharing class AgentBuilderController {
             Status__c         = inp.status != null ? inp.status : 'Draft',
             AccessMode__c     = inp.accessMode != null ? inp.accessMode : 'Org',
             CanvasJson__c     = inp.canvasJson,
-            SetupChecklistJson__c = inp.setupChecklistJson
+            SetupChecklistJson__c = inp.setupChecklistJson,
+            ExecuteType__c    = inp.executeType != null ? inp.executeType : 'Trigger',
+            PostTurnAutomationAgent__c = inp.postTurnAutomationAgent
         );
     }
 
@@ -383,8 +440,8 @@ public with sharing class AgentBuilderController {
         @AuraEnabled public AgentDefinition__c agent;
         @AuraEnabled public List<AgentNode__c>  nodes;
         public AgentWithNodes(AgentDefinition__c a) {
-            this.agent = a;
-            this.nodes = a.Nodes__r != null ? a.Nodes__r : new List<AgentNode__c>();
+            this.agent   = a;
+            this.nodes   = a.Nodes__r  != null ? a.Nodes__r  : new List<AgentNode__c>();
         }
     }
 
@@ -398,6 +455,14 @@ public with sharing class AgentBuilderController {
         @AuraEnabled public String accessMode;
         @AuraEnabled public String canvasJson;
         @AuraEnabled public String setupChecklistJson;
+        @AuraEnabled public String executeType;
+        @AuraEnabled public String postTurnAutomationAgent;
+    }
+
+    public class AutomationAgentOption {
+        @AuraEnabled public String id;
+        @AuraEnabled public String label;
+        @AuraEnabled public String apiName;
     }
 
     public class AgentNodeInput {

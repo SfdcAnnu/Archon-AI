@@ -79,7 +79,9 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'error'>('connecting');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceSupported] = useState(
+    () => typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
+  );
 
   const [gate, setGate] = useState<ConnectionGate>({ accessMode: 'Org', connected: true, accountEmail: null });
   const [connectPolling, setConnectPolling] = useState(false);
@@ -91,11 +93,42 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
   const recognitionRef = useRef<InstanceType<NonNullable<Window['SpeechRecognition']>> | null>(null);
   const gatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Guards against the bootstrap effect re-running just because
+  // `initialSessionId` changed as a *side effect* of our own
+  // onSessionChange callback firing after every turn. Without this,
+  // completing a turn -> parent updates initialSessionId -> effect
+  // re-fires -> startChatSession() re-runs -> setMessages(display)
+  // wipes out the in-progress conversation (this was the bug: only
+  // the first user message survived because every subsequent turn
+  // triggered a silent remount-style reset).
+  const bootstrappedForRef = useRef<string | null>(null);
+  // Tracks the last session id we told the parent about, so we only
+  // call onSessionChange when it actually changes rather than on
+  // every completed turn.
+  const lastReportedSessionIdRef = useRef<string | null>(null);
+
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
     });
   }, []);
+
+  const reportSessionChange = useCallback(
+    (info: { sessionId: string | null; ended: boolean }) => {
+      if (!info.ended && info.sessionId === lastReportedSessionIdRef.current) {
+        console.log('[ChatPanel] reportSessionChange skipped (unchanged)', info);
+        return;
+      }
+      console.log('[ChatPanel] reportSessionChange firing', {
+        from: lastReportedSessionIdRef.current,
+        to: info.sessionId,
+        ended: info.ended,
+      });
+      lastReportedSessionIdRef.current = info.sessionId;
+      onSessionChange?.(info);
+    },
+    [onSessionChange]
+  );
 
   // ── Access gate (PerUser agents) ────────────────────────────────
   const refreshGate = useCallback(() => {
@@ -132,16 +165,90 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
       });
   }, [agentApiName]);
 
+  // ── Send / receive ───────────────────────────────────────────────
+  // Declared before the bootstrap effect below because that effect's
+  // ws.onmessage handler references it — defining it after caused an
+  // eslint(react-hooks/immutability) "accessed before it is declared"
+  // error, since the effect closes over `handleTurnResult` before the
+  // function statement is reached in source order.
+  const handleTurnResult = useCallback(
+    (result: ChatTurnResult) => {
+      console.log('[ChatPanel] handleTurnResult received', result);
+      // Preserve the user's optimistic/pending message in the UI by
+      // unsetting its `isPending` flag instead of removing it entirely.
+      // This keeps the user's turn visible while we append the assistant's reply.
+      setMessages(list => {
+        const next = list.map(m => (m.isPending ? { ...m, isPending: false } : m));
+        console.log('[ChatPanel] cleared pending flag', { beforeLen: list.length, afterLen: next.length, next });
+        return next;
+      });
+
+      if (result.status === 'complete' && result.assistantText != null) {
+        historyRef.current = [
+          ...historyRef.current,
+          { role: 'assistant', content: result.assistantText },
+        ];
+        setMessages(list => [
+          ...list,
+          {
+            id: `assistant_${Date.now()}`,
+            role: 'Assistant',
+            content: result.assistantText ?? '',
+            toolLabel: null,
+            createdDate: new Date().toISOString(),
+          },
+        ]);
+      } else {
+        const errText = result.message ?? result.error ?? 'Unknown error';
+        setMessages(list => [
+          ...list,
+          {
+            id: `error_${Date.now()}`,
+            role: 'Assistant',
+            content: '⚠ ' + errText,
+            toolLabel: null,
+            createdDate: new Date().toISOString(),
+            isError: true,
+          },
+        ]);
+      }
+      setSending(false);
+      scrollToBottom();
+      if (session) reportSessionChange({ sessionId: session.Id, ended: false });
+      console.log('[ChatPanel] handleTurnResult done', { sessionId: session?.Id });
+    },
+    [session, reportSessionChange, scrollToBottom]
+  );
+
   // ── Bootstrap: load/start session, open WS ──────────────────────
   useEffect(() => {
+    // Only (re)bootstrap when we're switching to a genuinely different
+    // agent/session than the one we already loaded. This intentionally
+    // does NOT re-run just because initialSessionId flips from null to
+    // a real id after our own onSessionChange call — see refs above.
+    const bootstrapKey = `${agentApiName}::${initialSessionId ?? ''}`;
+    console.log('[ChatPanel] bootstrap effect ran', {
+      bootstrapKey,
+      previousKey: bootstrappedForRef.current,
+      willSkip: bootstrappedForRef.current === bootstrapKey,
+    });
+    if (bootstrappedForRef.current === bootstrapKey) return;
+    bootstrappedForRef.current = bootstrapKey;
+
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
 
-    startChatSession(agentApiName, null, null)
+    console.log('[ChatPanel] calling startChatSession', { agentApiName, initialSessionId });
+    startChatSession(agentApiName, initialSessionId ?? null, null)
       .then(result => {
         if (cancelled) return;
+        console.log('[ChatPanel] startChatSession resolved', {
+          sessionId: result.session.Id,
+          messageCount: result.messages.length,
+        });
         setSession(result.session);
+        lastReportedSessionIdRef.current = result.session.Id;
         const display = result.messages.map(toDisplay).filter((m): m is DisplayMessage => m != null);
         setMessages(display);
         historyRef.current = result.messages
@@ -157,10 +264,22 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
             return;
           }
           socketRef.current = ws;
-          ws.onopen = () => setWsStatus('open');
-          ws.onerror = () => setWsStatus('error');
-          ws.onclose = () => setWsStatus(prev => (prev === 'open' ? 'error' : prev));
-          ws.onmessage = ev => handleTurnResult(JSON.parse(ev.data) as ChatTurnResult);
+          ws.onopen = () => {
+            console.log('[ChatPanel] websocket open');
+            setWsStatus('open');
+          };
+          ws.onerror = e => {
+            console.log('[ChatPanel] websocket error', e);
+            setWsStatus('error');
+          };
+          ws.onclose = () => {
+            console.log('[ChatPanel] websocket closed');
+            setWsStatus(prev => (prev === 'open' ? 'error' : prev));
+          };
+          ws.onmessage = ev => {
+            console.log('[ChatPanel] websocket message received', ev.data);
+            handleTurnResult(JSON.parse(ev.data) as ChatTurnResult);
+          };
         });
       })
       .catch(err => {
@@ -182,7 +301,6 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
   useEffect(() => {
     const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!SR) return;
-    setVoiceSupported(true);
     const recognition = new SR();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -286,65 +404,6 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
     });
   }, []);
 
-  // ── Send / receive ───────────────────────────────────────────────
-  const handleTurnResult = useCallback(
-    (result: ChatTurnResult) => {
-      console.log('[ChatPanel] handleTurnResult start', { result });
-      // Preserve the user's optimistic/pending message in the UI by
-      // unsetting its `isPending` flag instead of removing it entirely.
-      // This keeps the user's turn visible while we append the assistant's reply.
-      setMessages(list => {
-        const next = list.map(m => (m.isPending ? { ...m, isPending: false } : m));
-        try {
-          console.log('[ChatPanel] cleared pending flag', {
-            beforeLen: list.length,
-            afterLen: next.length,
-            lastMessages: next.slice(-6),
-          });
-        } catch (err) {
-          console.log('[ChatPanel] cleared pending flag (log failed)', err);
-        }
-        return next;
-      });
-      if (result.status === 'complete' && result.assistantText != null) {
-        historyRef.current = [
-          ...historyRef.current,
-          { role: 'assistant', content: result.assistantText },
-        ];
-        setMessages(list => [
-          ...list,
-          {
-            id: `assistant_${Date.now()}`,
-            role: 'Assistant',
-            content: result.assistantText ?? '',
-            toolLabel: null,
-            createdDate: new Date().toISOString(),
-          },
-        ]);
-        console.log('[ChatPanel] appended assistant message', { assistantText: result.assistantText });
-      } else {
-        const errText = result.message ?? result.error ?? 'Unknown error';
-        setMessages(list => [
-          ...list,
-          {
-            id: `error_${Date.now()}`,
-            role: 'Assistant',
-            content: '⚠ ' + errText,
-            toolLabel: null,
-            createdDate: new Date().toISOString(),
-            isError: true,
-          },
-        ]);
-        console.log('[ChatPanel] appended error message', { errText });
-      }
-      setSending(false);
-      scrollToBottom();
-      if (session) onSessionChange?.({ sessionId: session.Id, ended: false });
-      console.log('[ChatPanel] handleTurnResult end');
-    },
-    [session, onSessionChange, scrollToBottom]
-  );
-
   const sendDisabled =
     sending ||
     wsStatus !== 'open' ||
@@ -353,8 +412,12 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
     (!input.trim() && pendingAttachments.length === 0);
 
   const handleSend = useCallback(() => {
-    if (sendDisabled || !socketRef.current) return;
+    if (sendDisabled || !socketRef.current) {
+      console.log('[ChatPanel] handleSend blocked', { sendDisabled, hasSocket: !!socketRef.current });
+      return;
+    }
     const text = input.trim();
+    console.log('[ChatPanel] handleSend called', { text, attachmentCount: pendingAttachments.length });
     const attachments: ChatAttachmentRef[] = pendingAttachments
       .filter(a => a.contentDocumentId && a.contentVersionId)
       .map(a => ({
@@ -375,19 +438,28 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
         ...list,
         {
           id: `pending_${Date.now()}`,
-          role: 'User',
+          role: 'User' as const,
           content: text || `[${attachedThisTurn.length} attachment${attachedThisTurn.length > 1 ? 's' : ''}]`,
           toolLabel: null,
           createdDate: new Date().toISOString(),
           isPending: true,
         },
       ];
-      console.log('[ChatPanel] handleSend added pending message', { pendingMessage: next[next.length - 1], prevLen: list.length, nextLen: next.length });
+      console.log('[ChatPanel] handleSend added pending user message', {
+        prevLen: list.length,
+        nextLen: next.length,
+        added: next[next.length - 1],
+      });
       return next;
     });
     scrollToBottom();
 
     historyRef.current = [...historyRef.current, { role: 'user', content: text }];
+    console.log('[ChatPanel] sending over websocket', {
+      text,
+      historyLen: historyRef.current.length,
+      attachments,
+    });
     socketRef.current.send(
       JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments })
     );
@@ -395,7 +467,6 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
     for (const a of attachedThisTurn) {
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
     }
-    console.log('[ChatPanel] handleSend finished send', { text, attachmentsCount: attachments.length });
   }, [sendDisabled, input, pendingAttachments, scrollToBottom]);
 
   const handleKeyDown = useCallback(
@@ -413,11 +484,11 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
     if (!window.confirm('End this chat? You will start fresh next time.')) return;
     endChatSession(session.Id)
       .then(() => {
-        onSessionChange?.({ sessionId: null, ended: true });
+        reportSessionChange({ sessionId: null, ended: true });
         onClose();
       })
       .catch(err => console.error('Could not end session:', err));
-  }, [session, onSessionChange, onClose]);
+  }, [session, reportSessionChange, onClose]);
 
   const needsConnection = gate.accessMode === 'PerUser' && !gate.connected;
 

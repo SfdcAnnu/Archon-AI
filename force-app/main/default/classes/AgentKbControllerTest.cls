@@ -83,7 +83,7 @@ private class AgentKbControllerTest {
         String body = '{"document":{"id":"d2","title":"Notes","sourceType":"upload","status":"Ready","chunkCount":1,"errorMessage":null}}';
         Test.setMock(HttpCalloutMock.class, new StubMock(200, body));
         Test.startTest();
-        AgentKbController.KbDocumentDto doc = AgentKbController.uploadDocument('lead_scoring_agent', 'Notes', 'Some plain text.', null);
+        AgentKbController.KbDocumentDto doc = AgentKbController.uploadDocument('lead_scoring_agent', 'Notes', 'Some plain text.', null, null);
         Test.stopTest();
         System.assertEquals('d2', doc.id);
         System.assertEquals('Ready', doc.status);

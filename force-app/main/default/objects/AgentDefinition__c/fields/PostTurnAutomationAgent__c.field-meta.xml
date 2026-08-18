@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>PostTurnAutomationAgent__c</fullName>
+    <label>Post-Turn Automation Agent</label>
+    <description>Optional. A Trigger/Both agent to automatically invoke (via AgentRunner.run, with the turn's transcript) after every chat turn on this agent. Lets a chat agent hand off to a paired automation agent without any agent-specific Apex — leave blank to opt out.</description>
+    <type>Lookup</type>
+    <referenceTo>AgentDefinition__c</referenceTo>
+    <relationshipLabel>Chat Agents Using This For Automation</relationshipLabel>
+    <relationshipName>LinkedChatAgents</relationshipName>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

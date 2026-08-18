@@ -1,0 +1,234 @@
+@import 'tailwindcss';
+
+@layer base {
+  /* Salesforce sometimes injects its own <sf-session-banner> chrome above
+   * our mount point (e.g. a "Logged in as..." preview banner on
+   * non-verified my.salesforce.app domains) — a position:fixed element
+   * that shoves body down via a dynamically-set margin-top equal to its
+   * own height (confirmed live: margin-top: 35.5px, banner height: 35.5px).
+   * A plain height:100%/100vh on body or #root doesn't subtract that
+   * margin, so the document ends up taller than the viewport and the
+   * bottom of the page (this app's own content) either scrolls out of
+   * reach or gets clipped. Only flexbox correctly subtracts a flex item's
+   * own margin when handing out space — so html itself must be the flex
+   * container, not just body, for body's margin-top to actually shrink
+   * body's box instead of overflowing it. This self-adjusts to whatever
+   * that margin is (including zero, e.g. in a verified production org)
+   * without hardcoding its value anywhere. */
+  html {
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    @apply antialiased bg-white;
+  }
+
+  #root {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* Attempted, not guaranteed: Salesforce's own <sf-session-banner> ("Logged
+   * in as..." on non-verified my.salesforce.app domains) is platform-
+   * injected, not our markup — this rule may not hold if the platform
+   * reasserts a competing inline style or renders inside a closed shadow
+   * root. Harmless either way: display:none contributes zero height, so
+   * the flex-column math above degrades gracefully back to today's
+   * behavior if this doesn't stick. */
+  sf-session-banner {
+    display: none !important;
+  }
+
+  /* Hiding the banner element above doesn't undo THIS: Salesforce also sets
+   * body.style.marginTop inline, separately, sized to the banner's own
+   * height (confirmed live: 35.5px) — a second, independent mechanism that
+   * doesn't care whether the banner itself is visible. Left alone, the
+   * whole app still renders shifted down by that amount for no visible
+   * reason. !important is required here because an inline style otherwise
+   * beats a plain stylesheet rule regardless of selector specificity. */
+  body {
+    margin-top: 0 !important;
+  }
+}
+
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+ * Archon AI brand tokens — mapped onto shadcn's semantic slots so every
+ * shadcn primitive (Button, Card, Dialog, Tabs, ...) picks these up for
+ * free. Values match the approved canvas mockup exactly (same source as
+ * the LWC agentEditor.css tokens) so the UI Bundle and the rest of Archon
+ * read as one visual system, not two apps stitched together.
+ */
+:root {
+  --radius: 0.625rem;
+  --background: #F6F7FA;
+  --foreground: #12141C;
+  --card: #FFFFFF;
+  --card-foreground: #12141C;
+  --popover: #FFFFFF;
+  --popover-foreground: #12141C;
+  --primary: #3854E0;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0F2F6;
+  --secondary-foreground: #12141C;
+  --muted: #F0F2F6;
+  --muted-foreground: #7C8199;
+  --accent: #EEF1FD;
+  --accent-foreground: #3854E0;
+  --destructive: #C22222;
+  --border: #E3E6EC;
+  --input: #E3E6EC;
+  --ring: #3854E0;
+  --chart-1: #3854E0;
+  --chart-2: #10A37F;
+  --chart-3: #4285F4;
+  --chart-4: #A9670A;
+  --chart-5: #7C4DFF;
+  /* The app-shell sidebar is a fixed dark treatment regardless of the
+     main workspace's own light/dark mode — same pattern as Linear/Vercel/
+     Notion's nav rail. Not swapped in .dark below on purpose. */
+  --sidebar: #0E1015;
+  --sidebar-foreground: #F4F5F9;
+  --sidebar-primary: #6B85F5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1B1E28;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #22252F;
+  --sidebar-muted: #8A8F9E;
+  --sidebar-ring: #6B85F5;
+
+  /* Archon-specific tokens not covered by the shadcn slot set above —
+     reused verbatim by agent-builder components (node cards, edges,
+     legend) rather than inventing a second palette. */
+  --archon-success: #0F7A56;
+  --archon-success-tint: #E5F5EE;
+  --archon-warning: #A9670A;
+  --archon-warning-tint: #FCF1DC;
+  --archon-apex-tint: #FCEFE1;
+  --archon-apex-text: #8A4B00;
+  --archon-flow-tint: #E5F5EE;
+  --archon-accent-rgb: 56, 84, 224;
+  --archon-dot: rgba(56, 84, 224, .16);
+
+  /* Node icon-chip colors — small colored squares as functional accents
+     (trigger/logic/action/message/wait), matching the reference's muted
+     enterprise palette rather than the earlier saturated "colorful" pass. */
+  --node-blue: #2563EB;    --node-blue-tint: #EAF1FE;
+  --node-purple: #7C3AED;  --node-purple-tint: #F1EBFC;
+  --node-amber: #D97706;   --node-amber-tint: #FDF1E2;
+  --node-green: #16A34A;   --node-green-tint: #E7F7ED;
+  --node-gray: #6B7280;    --node-gray-tint: #F1F2F5;
+}
+
+.dark {
+  --background: #0E0F14;
+  --foreground: #EBEDF5;
+  --card: #171922;
+  --card-foreground: #EBEDF5;
+  --popover: #171922;
+  --popover-foreground: #EBEDF5;
+  --primary: #6B85F5;
+  --primary-foreground: #0E0F14;
+  --secondary: #1D202B;
+  --secondary-foreground: #EBEDF5;
+  --muted: #1D202B;
+  --muted-foreground: #B0B4C7;
+  --accent: #1B2140;
+  --accent-foreground: #6B85F5;
+  --destructive: #F0716B;
+  --border: #2A2D3A;
+  --input: #2A2D3A;
+  --ring: #6B85F5;
+  --chart-1: #6B85F5;
+  --chart-2: #4ED9A4;
+  --chart-3: #7ba7f7;
+  --chart-4: #E3AC4C;
+  --chart-5: #a996ff;
+  /* Same fixed dark sidebar as :root — this rail doesn't change with the
+     workspace's own theme toggle. */
+  --sidebar: #0E1015;
+  --sidebar-foreground: #F4F5F9;
+  --sidebar-primary: #6B85F5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1B1E28;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #22252F;
+  --sidebar-muted: #8A8F9E;
+  --sidebar-ring: #6B85F5;
+
+  --archon-success: #4ED9A4;
+  --archon-success-tint: #123528;
+  --archon-warning: #E3AC4C;
+  --archon-warning-tint: #3A2C11;
+  --archon-apex-tint: #3A2A14;
+  --archon-apex-text: #E3AC4C;
+  --archon-flow-tint: #123528;
+  --archon-accent-rgb: 107, 133, 245;
+  --archon-dot: rgba(107, 133, 245, .22);
+
+  --node-blue: #5B8DEF;    --node-blue-tint: #16233D;
+  --node-purple: #A78BFA;  --node-purple-tint: #241F3D;
+  --node-amber: #E3AC4C;   --node-amber-tint: #3A2C11;
+  --node-green: #4ED9A4;   --node-green-tint: #123528;
+  --node-gray: #9AA0B0;    --node-gray-tint: #1D202B;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <actionCalls>
+        <name>Handle_Incoming_WhatsApp_Message</name>
+        <label>Handle Incoming WhatsApp Message</label>
+        <locationX>176</locationX>
+        <locationY>440</locationY>
+        <actionName>WhatsAppAgentBridge</actionName>
+        <actionType>apex</actionType>
+        <inputParameters>
+            <name>messageId</name>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>agentApiName</name>
+            <value>
+                <stringValue>whatsapp_lost_opportunity_revival</stringValue>
+            </value>
+        </inputParameters>
+    </actionCalls>
+    <decisions>
+        <name>Is_Incoming_Message</name>
+        <label>Is Incoming Message</label>
+        <locationX>176</locationX>
+        <locationY>240</locationY>
+        <defaultConnectorLabel>Not incoming</defaultConnectorLabel>
+        <rules>
+            <name>Incoming</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.RecordType.DeveloperName</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Incoming</stringValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Handle_Incoming_WhatsApp_Message</targetReference>
+            </connector>
+            <label>Incoming</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <interviewLabel>WhatsApp Incoming Message Handler {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>WhatsApp Incoming Message Handler</label>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Is_Incoming_Message</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>tdc_tsw__ToNumber__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>917969297221</stringValue>
+            </value>
+        </filters>
+        <object>tdc_tsw__Message__c</object>
+        <recordTriggerType>Create</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>

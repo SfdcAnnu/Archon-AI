@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Latest_closed_opp__c</fullName>
+    <label>Latest Closed Lost Opportunity</label>
+    <description>Name of the most recently Closed Lost Opportunity on this account. Populated by the Opportunity Closed Lost Revival flow; referenced by the WhatsApp revival outreach template.</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+</CustomField>

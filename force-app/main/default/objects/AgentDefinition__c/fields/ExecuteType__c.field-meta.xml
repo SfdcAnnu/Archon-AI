@@ -1,15 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>ExecuteType__c</fullName>
+    <description>How this agent can be invoked. Trigger = only from Apex callouts (today&apos;s behavior). Chat = listed in the Archon Chat picker. Both = available in both modes.</description>
     <label>Execute Type</label>
-    <description>How this agent can be invoked. Trigger = only from Apex callouts (today's behavior). Chat = listed in the Archon Chat picker. Both = available in both modes.</description>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
     <type>Picklist</type>
     <valueSet>
         <valueSetDefinition>
             <sorted>false</sorted>
-            <value><fullName>Trigger</fullName><default>true</default></value>
-            <value><fullName>Chat</fullName><default>false</default></value>
-            <value><fullName>Both</fullName><default>false</default></value>
+            <value>
+                <fullName>Trigger</fullName>
+                <default>true</default>
+                <label>Trigger</label>
+            </value>
+            <value>
+                <fullName>Chat</fullName>
+                <default>false</default>
+                <label>Chat</label>
+            </value>
+            <value>
+                <fullName>Both</fullName>
+                <default>false</default>
+                <label>Both</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

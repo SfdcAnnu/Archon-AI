@@ -87,6 +87,49 @@ public with sharing class AgentConnectorController {
         return out;
     }
 
+    /**
+     * Admin roster for the Salesforce access page — every user who has (or
+     * attempted) their own "Connect my Salesforce" for PerUser-mode agents.
+     * Distinct from getDirectory(), which is the org-level Setup connection.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<UserConnection> listSalesforceUserConnections() {
+        HttpResponse res = callout('GET', '/api/connectors/users?providerKey=salesforce_mcp', null);
+        List<UserConnection> out = new List<UserConnection>();
+        if (res.getStatusCode() >= 400) return out;
+        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        Object usersRaw = body.get('users');
+        if (!(usersRaw instanceof List<Object>)) return out;
+
+        Set<Id> userIds = new Set<Id>();
+        List<Map<String, Object>> rows = new List<Map<String, Object>>();
+        for (Object item : (List<Object>) usersRaw) {
+            Map<String, Object> u = (Map<String, Object>) item;
+            rows.add(u);
+            String configuredBy = (String) u.get('configuredBy');
+            if (String.isNotBlank(configuredBy)) {
+                try { userIds.add((Id) configuredBy); } catch (Exception e) { /* not a valid Id — skip */ }
+            }
+        }
+        Map<Id, User> usersById = new Map<Id, User>(
+            userIds.isEmpty() ? new List<User>() : [SELECT Id, Name, Email FROM User WHERE Id IN :userIds WITH USER_MODE]
+        );
+
+        for (Map<String, Object> u : rows) {
+            UserConnection uc = new UserConnection();
+            String configuredBy = (String) u.get('configuredBy');
+            User matchedUser = String.isNotBlank(configuredBy) ? usersById.get((Id) configuredBy) : null;
+            uc.userName         = matchedUser != null ? matchedUser.Name : configuredBy;
+            uc.userEmail         = matchedUser != null ? matchedUser.Email : null;
+            uc.status            = (String) u.get('status');
+            uc.accountEmail      = (String) u.get('accountEmail');
+            uc.lastConnectedAt   = parseIso((String) u.get('lastConnectedAt'));
+            uc.lastErrorMessage  = (String) u.get('lastErrorMessage');
+            out.add(uc);
+        }
+        return out;
+    }
+
     // ── CUSTOM MCP SERVERS ───────────────────────────────────────────
     // User/client-added servers — see DirectoryEntry.isCustom above for how
     // they surface in the same directory as the packaged catalog.
@@ -277,6 +320,52 @@ public with sharing class AgentConnectorController {
         return res.getBody();
     }
 
+    // ── APPROVAL PROCESSES (native — org's own, already configured) ────
+
+    public class ApprovalProcessOption {
+        // "id" here is deliberately the process's unique DeveloperName, not
+        // ProcessDefinition.Id — confirmed against a real org that the
+        // Submit REST API's processDefinitionNameOrId only accepts the
+        // unique name (or a different Id than ProcessDefinition.Id exposes);
+        // passing ProcessDefinition.Id fails with NO_APPLICABLE_PROCESS even
+        // though the same process is found fine when omitted entirely.
+        @AuraEnabled public String id;
+        @AuraEnabled public String name;
+        @AuraEnabled public String label;
+    }
+
+    /**
+     * Active native Approval Processes, for the Approval node's picker.
+     * Pure Apex SOQL — no Node server round trip, since this metadata lives
+     * in Salesforce itself. Filtered to one object when the agent has a
+     * trigger object (flow-mode); unfiltered for chat-mode agents (no
+     * single implied object), matching the ask to show everything active.
+     *
+     * TableEnumOrId is the object's own API name for standard objects
+     * (confirmed against a real org — e.g. "Opportunity") but is reported
+     * to be the object's own (CustomObject) Id for custom objects rather
+     * than "MyObject__c" — not yet verified against a real custom-object
+     * approval process, so custom-object filtering may need adjustment
+     * once one is tested.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<ApprovalProcessOption> getApprovalProcesses(String objectType) {
+        List<SObject> defs = Database.query(
+            'SELECT Id, Name, DeveloperName, TableEnumOrId FROM ProcessDefinition ' +
+            'WHERE Type = \'Approval\' AND State = \'Active\' ORDER BY Name'
+        );
+        List<ApprovalProcessOption> out = new List<ApprovalProcessOption>();
+        for (SObject s : defs) {
+            if (String.isNotBlank(objectType) && (String) s.get('TableEnumOrId') != objectType) continue;
+            ApprovalProcessOption opt = new ApprovalProcessOption();
+            opt.id = (String) s.get('DeveloperName');
+            opt.name = (String) s.get('Name');
+            opt.label = (String) s.get('Name');
+            out.add(opt);
+        }
+        return out;
+    }
+
     /**
      * Free-tier Render sleeps idle services; while one wakes (~30-60s) its
      * edge answers requests with an HTML "Application loading" page. Turn
@@ -355,10 +444,27 @@ public with sharing class AgentConnectorController {
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }
 
+    /**
+     * Set true whenever listServerConnectors couldn't actually reach the
+     * Archon server (idle Render service waking, etc.). Callers that show
+     * connection STATUS to a user should check this after getDirectory():
+     * an empty connector map from an unreachable server is NOT the same as
+     * "nothing is connected", but the silent-empty fallback below renders
+     * exactly like it. Static (per-transaction) rather than a changed
+     * return shape so no existing caller needs touching.
+     */
+    public static Boolean directoryServerUnreachable = false;
+
     private static Map<String, ServerConnector> listServerConnectors() {
+        directoryServerUnreachable = false;
         HttpResponse res = callout('GET', '/api/connectors', null);
         Map<String, ServerConnector> result = new Map<String, ServerConnector>();
-        if (res.getStatusCode() >= 400) return result;
+        String rawBody = res.getBody();
+        Boolean htmlBody = rawBody != null && rawBody.trim().startsWith('<');
+        if (res.getStatusCode() >= 400 || htmlBody) {
+            directoryServerUnreachable = true;
+            return result;
+        }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
         Object connectorsRaw = body.get('connectors');
         if (!(connectorsRaw instanceof List<Object>)) return result;
@@ -425,6 +531,15 @@ public with sharing class AgentConnectorController {
         @AuraEnabled public String  name;
         @AuraEnabled public String  description;
         @AuraEnabled public Boolean readOnly;
+    }
+
+    public class UserConnection {
+        @AuraEnabled public String   userName;
+        @AuraEnabled public String   userEmail;
+        @AuraEnabled public String   status;
+        @AuraEnabled public String   accountEmail;
+        @AuraEnabled public DateTime lastConnectedAt;
+        @AuraEnabled public String   lastErrorMessage;
     }
 
     private class ServerConnector {

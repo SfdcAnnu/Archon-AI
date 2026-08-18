@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>AiEngineConnection__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Optional. The credential this AI node uses at runtime. Serves as the DEFAULT — the resolver still prefers the running user&apos;s own Preferred connection over this if present.</description>
     <label>AI Engine Connection</label>
-    <description>Optional. The credential this AI node uses at runtime. Serves as the DEFAULT — the resolver still prefers the running user's own Preferred connection over this if present.</description>
     <referenceTo>AiEngineConnection__c</referenceTo>
     <relationshipLabel>Agent Nodes</relationshipLabel>
     <relationshipName>AgentNodes</relationshipName>
     <required>false</required>
+    <trackTrending>false</trackTrending>
     <type>Lookup</type>
-    <deleteConstraint>SetNull</deleteConstraint>
 </CustomField>

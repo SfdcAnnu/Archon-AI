@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Loss_Reason__c</fullName>
+    <label>Loss Reason</label>
+    <description>Why this deal was lost. Required when Stage is Closed Lost (see the Opportunity_Requires_Loss_Reason validation rule) — referenced by the WhatsApp lost-opportunity revival agent.</description>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Price</fullName><default>false</default></value>
+            <value><fullName>Competitor</fullName><default>false</default></value>
+            <value><fullName>No Budget</fullName><default>false</default></value>
+            <value><fullName>Timing / No Decision</fullName><default>false</default></value>
+            <value><fullName>Product Fit</fullName><default>false</default></value>
+            <value><fullName>No Response</fullName><default>false</default></value>
+            <value><fullName>Other</fullName><default>false</default></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

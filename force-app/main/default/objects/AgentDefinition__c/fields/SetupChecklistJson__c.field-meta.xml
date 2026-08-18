@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>SetupChecklistJson__c</fullName>
+    <description>Populated when this agent was AI-generated — items the admin still needs to do by hand (connect a provider, bind an AI key, review a default). Rendered by the builder&apos;s setup-checklist panel.</description>
     <label>Setup Checklist (JSON)</label>
-    <type>LongTextArea</type>
     <length>32768</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
     <visibleLines>5</visibleLines>
-    <description>Populated when this agent was AI-generated — items the admin still needs to do by hand (connect a provider, bind an AI key, review a default). Rendered by the builder's setup-checklist panel.</description>
 </CustomField>

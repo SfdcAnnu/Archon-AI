@@ -13,7 +13,7 @@
 public with sharing class AgentChatController {
 
     private static final Integer CALLOUT_TIMEOUT_MS = 120000;   // 2-min — chat tool sequences can be slow
-    private static final Integer EXPIRY_HOURS = 24;
+    public  static final Integer EXPIRY_HOURS = 24;              // also used by WhatsAppRevivalInitiator
 
     // ── PICKER ───────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ public with sharing class AgentChatController {
                 SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                        User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                        LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                       TokensIn__c, TokensOut__c, PendingApprovalToken__c
+                       TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
                 FROM ChatSession__c WHERE Id = :existing[0].Id WITH USER_MODE LIMIT 1
             ];
         } else {
@@ -109,7 +109,7 @@ public with sharing class AgentChatController {
                 SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                        User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                        LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                       TokensIn__c, TokensOut__c, PendingApprovalToken__c
+                       TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
                 FROM ChatSession__c WHERE Id = :session.Id WITH USER_MODE LIMIT 1
             ];
         }
@@ -120,9 +120,70 @@ public with sharing class AgentChatController {
         return r;
     }
 
+    /**
+     * Finds (or creates) the ChatSession__c for an automation-initiated
+     * conversation — e.g. WhatsAppRevivalInitiator's proactive outreach and
+     * WhatsAppAgentBridge's inbound-reply handling both need to land in the
+     * SAME session for one Closed-Lost Opportunity, but each is triggered
+     * by a different event (an Opportunity edit vs. an inbound-message
+     * webhook) that can run under a different Salesforce user context.
+     * startSession()'s reuse logic is scoped by User__c (right, for the
+     * interactive chat widget — sessions are private per user), which would
+     * NOT reliably match across those two different automations. This
+     * matches on (agent, recordContextId) alone instead. anchorUserId sets
+     * User__c on a newly-created session so it still shows up in a real
+     * person's Conversations list (e.g. the record's owner) — existing
+     * sessions are returned as-is, never re-anchored.
+     */
+    public static ChatSession__c findOrCreateAutomatedSession(String agentApiName, String recordContextId, String recordContextType, Id anchorUserId) {
+        AgentDefinition__c agent = loadAgent(agentApiName);
+        DateTime nowTs = System.now();
+        List<ChatSession__c> existing = [
+            SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
+                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
+                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+            FROM ChatSession__c
+            WHERE AgentDefinition__c = :agent.Id
+              AND RecordContextId__c = :recordContextId
+              AND Status__c = 'Active'
+              AND ExpiresAt__c > :nowTs
+            WITH USER_MODE
+            ORDER BY LastActivityAt__c DESC
+            LIMIT 1
+        ];
+        if (!existing.isEmpty()) return existing[0];
+
+        ChatSession__c session = new ChatSession__c(
+            AgentDefinition__c   = agent.Id,
+            User__c              = anchorUserId,
+            RecordContextId__c   = recordContextId,
+            RecordContextType__c = recordContextType,
+            Status__c            = 'Active',
+            LastActivityAt__c    = nowTs,
+            ExpiresAt__c         = nowTs.addHours(EXPIRY_HOURS),
+            Department__c        = agent.Department__c,
+            TotalTurns__c        = 0
+        );
+        insert session;
+        return [
+            SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
+                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
+                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+            FROM ChatSession__c WHERE Id = :session.Id WITH USER_MODE LIMIT 1
+        ];
+    }
+
+    /**
+     * Read-only session lookup — used both to resume an in-progress chat
+     * (any status is fine, the widget decides what to do with it) and to
+     * view a past conversation's transcript in Conversations, where Ended/
+     * Expired is the COMMON case, not an error.
+     */
     @AuraEnabled
     public static SessionWithMessages getSession(Id sessionId) {
-        ChatSession__c session = loadActiveSession(sessionId, false);  // don't throw if expired — let caller see
+        ChatSession__c session = loadSessionForViewing(sessionId);
         SessionWithMessages r = new SessionWithMessages();
         r.session  = session;
         r.messages = loadMessages(sessionId);
@@ -136,7 +197,7 @@ public with sharing class AgentChatController {
         List<ChatSession__c> rows = [
             SELECT Id, Name, AgentDefinition__r.Name, AgentDefinition__r.ApiName__c,
                    Title__c, Status__c, LastActivityAt__c, ExpiresAt__c, TotalTurns__c,
-                   RecordContextId__c
+                   RecordContextId__c, TokensIn__c, TokensOut__c
             FROM ChatSession__c
             WHERE User__c = :userId
             WITH USER_MODE
@@ -156,6 +217,8 @@ public with sharing class AgentChatController {
             o.expiresAt       = s.ExpiresAt__c;
             o.totalTurns      = (Integer) (s.TotalTurns__c == null ? 0 : s.TotalTurns__c);
             o.recordContextId = s.RecordContextId__c;
+            o.tokensIn        = (Integer) (s.TokensIn__c  == null ? 0 : s.TokensIn__c);
+            o.tokensOut       = (Integer) (s.TokensOut__c == null ? 0 : s.TokensOut__c);
             out.add(o);
         }
         return out;
@@ -173,6 +236,10 @@ public with sharing class AgentChatController {
 
     @AuraEnabled
     public static TurnResult sendTurn(Id sessionId, String userText, List<AttachmentInput> attachments) {
+        // Hard stop, checked first — zero cost if the org-wide budget is
+        // already used up (throws before any SOQL/DML/callout below).
+        AgentGuardrailsController.enforceBeforeTurn();
+
         Boolean hasText = !String.isBlank(userText);
         Boolean hasAttachments = attachments != null && !attachments.isEmpty();
         if (!hasText && !hasAttachments) throw new AuraHandledException('Send some text or attach a file.');
@@ -181,13 +248,14 @@ public with sharing class AgentChatController {
         // ── Phase 1: SELECTs + callout. ZERO DML before HTTP. ──
         ChatSession__c session = loadActiveSession(sessionId, true);
         AgentDefinition__c agent = [
-            SELECT Id, ApiName__c, Name
+            SELECT Id, ApiName__c, Name, PostTurnAutomationAgent__c, PostTurnAutomationAgent__r.ApiName__c, DebugMode__c
             FROM AgentDefinition__c WHERE Id = :session.AgentDefinition__c WITH USER_MODE LIMIT 1
         ];
         List<ChatMessage__c> history = loadMessages(sessionId);
 
         Map<String, Object> payload = buildTurnPayload(agent.ApiName__c, session, history, userText == null ? '' : userText);
         if (hasAttachments) payload.put('attachments', buildAttachmentsPayload(attachments));
+        if (agent.DebugMode__c == true) payload.put('debugMode', true);
 
         // Salesforce owns all connector config — MCP URLs + the admin's tool
         // selection travel with every turn so Node stays stateless for config.
@@ -216,11 +284,23 @@ public with sharing class AgentChatController {
 
         HttpResponse res = null;
         String errorMessage = null;
-        try {
-            res = callout('POST', '/api/chat/turn', JSON.serialize(payload));
-        } catch (Exception e) {
-            // Callout couldn't complete at the HTTP layer (DNS, TLS, timeout, blocked endpoint).
-            errorMessage = 'Could not reach the AI service: ' + e.getMessage();
+        // Free-tier Render sleeps idle services; while one wakes (~30-60s) its edge
+        // answers with an HTML "Application loading" page instead of queuing the
+        // request, so a single attempt can land mid-wake and see that placeholder.
+        // Retry a couple of times — still well inside Phase 1 (zero DML before HTTP).
+        for (Integer attempt = 1; attempt <= 3; attempt++) {
+            try {
+                res = callout('POST', '/api/chat/turn', JSON.serialize(payload));
+            } catch (Exception e) {
+                errorMessage = 'Could not reach the AI service: ' + e.getMessage();
+                res = null;
+                break; // network/DNS/timeout failures aren't the wake-up case — don't retry those
+            }
+            if (!isServerWakingResponse(res)) break;
+            if (attempt == 3) {
+                errorMessage = 'The AI service is still waking up from idle — please try again in a moment.';
+                res = null;
+            }
         }
         if (errorMessage == null && res != null && res.getStatusCode() >= 400) {
             errorMessage = extractServerError(res);
@@ -273,6 +353,19 @@ public with sharing class AgentChatController {
             r.newMessages = combined;
             // Post-callout DML: mark the resolved credential as recently used.
             if (resolvedConnectionId != null) AiEngineConnectionController.touchLastUsed(resolvedConnectionId);
+            // Generic hand-off: any chat agent can name a paired automation agent to
+            // run after each turn (AgentDefinition__c.PostTurnAutomationAgent__c). Opt-in,
+            // additive — a no-op for every agent that doesn't set it. Never let a problem
+            // here surface as a chat failure; the customer-facing reply is already decided.
+            if (agent.PostTurnAutomationAgent__c != null) {
+                try {
+                    List<ChatMessage__c> fullTranscript = new List<ChatMessage__c>(history);
+                    fullTranscript.addAll(combined);
+                    invokePostTurnAutomationAgent(agent.PostTurnAutomationAgent__r.ApiName__c, session, fullTranscript);
+                } catch (Exception e) {
+                    System.debug(LoggingLevel.ERROR, 'sendTurn post-turn automation hand-off failed: ' + e.getMessage());
+                }
+            }
             return r;
         }
 
@@ -298,6 +391,34 @@ public with sharing class AgentChatController {
     // approveToolCalls() was removed with the Managed MCP refactor.
     // Anthropic / OpenAI execute tools directly through the standalone MCP
     // server; there is no server-side pause to resume from.
+
+    /**
+     * Generic post-turn hand-off (see AgentDefinition__c.PostTurnAutomationAgent__c).
+     * Hands the transcript to the linked agent via the SAME invocable every other
+     * automation in this org already uses — no new integration, no direct AI call
+     * from Apex. AgentRunner.run only enqueues a Queueable and returns, so this adds
+     * no meaningful latency here.
+     */
+    private static void invokePostTurnAutomationAgent(String automationAgentApiName, ChatSession__c session, List<ChatMessage__c> messages) {
+        if (String.isBlank(automationAgentApiName)) return;
+        String transcript = buildTranscriptText(messages);
+
+        AgentRunner.AgentInput input = new AgentRunner.AgentInput();
+        input.agentApiName = automationAgentApiName;
+        input.recordId     = session.RecordContextId__c;
+        input.inputPayload = JSON.serialize(new Map<String, Object>{ 'transcript' => transcript });
+        AgentRunner.run(new List<AgentRunner.AgentInput>{ input });
+    }
+
+    private static String buildTranscriptText(List<ChatMessage__c> messages) {
+        List<String> lines = new List<String>();
+        for (ChatMessage__c m : messages) {
+            if (m.Role__c != 'User' && m.Role__c != 'Assistant') continue;
+            String speaker = m.Role__c == 'User' ? 'Customer' : 'Agent';
+            lines.add(speaker + ': ' + (m.Content__c == null ? '' : m.Content__c));
+        }
+        return String.join(lines, '\n');
+    }
 
     // ── INTERNALS ────────────────────────────────────────────────
 
@@ -414,7 +535,7 @@ public with sharing class AgentChatController {
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                    User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                   TokensIn__c, TokensOut__c, PendingApprovalToken__c
+                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
         ];
         if (rows.isEmpty()) throw new AuraHandledException('Session not found.');
@@ -429,12 +550,25 @@ public with sharing class AgentChatController {
         return s;
     }
 
+    /** No status checks — Ended/Expired is the normal case when viewing history, not an error. */
+    private static ChatSession__c loadSessionForViewing(Id sessionId) {
+        List<ChatSession__c> rows = [
+            SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
+                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
+                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+            FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
+        ];
+        if (rows.isEmpty()) throw new AuraHandledException('Session not found.');
+        return rows[0];
+    }
+
     private static List<ChatMessage__c> loadMessages(Id sessionId) {
         return [
             SELECT Id, Name, Role__c, Content__c, ToolCallsJson__c, ToolResultsJson__c,
                    ModelUsed__c, TokensIn__c, TokensOut__c, SequenceNumber__c,
                    Sensitive__c, RequiredApproval__c, ApprovedAt__c, ApprovalStatus__c,
-                   AttachedContentDocumentIds__c, CreatedDate
+                   AttachedContentDocumentIds__c, RequestPayload__c, ResponsePayload__c, CreatedDate
             FROM ChatMessage__c
             WHERE ChatSession__c = :sessionId
             WITH USER_MODE
@@ -472,7 +606,7 @@ public with sharing class AgentChatController {
         return String.join(ids, ',');
     }
 
-    private static Integer nextSequenceNumber(Id sessionId) {
+    public static Integer nextSequenceNumber(Id sessionId) {
         List<AggregateResult> ar = [
             SELECT MAX(SequenceNumber__c) maxSeq
             FROM ChatMessage__c WHERE ChatSession__c = :sessionId
@@ -500,6 +634,7 @@ public with sharing class AgentChatController {
             'sessionId'      => session.Id,
             'history'        => histPayload,
             'newUserMessage' => newUserText,
+            'previousTopicName' => session.ActiveTopic__c,
             'context'        => new Map<String, Object>{
                 'userId'            => UserInfo.getUserId(),
                 'recordContextId'   => session.RecordContextId__c,
@@ -541,8 +676,9 @@ public with sharing class AgentChatController {
                 ));
             }
         }
-        // Final assistant message
-        inserts.add(new ChatMessage__c(
+        // Final assistant message — debugRequest/debugResponse are only present
+        // when the agent's Debug Mode is on (see AgentDefinition__c.DebugMode__c).
+        ChatMessage__c assistantMsg = new ChatMessage__c(
             ChatSession__c    = session.Id,
             Role__c           = 'Assistant',
             Content__c        = assistantText == null ? '' : assistantText,
@@ -551,7 +687,14 @@ public with sharing class AgentChatController {
             TokensOut__c      = tokensOut,
             SequenceNumber__c = seq++,
             ApprovalStatus__c = 'NotRequired'
-        ));
+        );
+        if (body.get('debugRequest') != null) {
+            assistantMsg.RequestPayload__c = truncateForField(JSON.serialize(body.get('debugRequest')), 131072);
+        }
+        if (body.get('debugResponse') != null) {
+            assistantMsg.ResponsePayload__c = truncateForField(JSON.serialize(body.get('debugResponse')), 131072);
+        }
+        inserts.add(assistantMsg);
         insert inserts;
 
         // Update session totals + reset expiry
@@ -561,6 +704,12 @@ public with sharing class AgentChatController {
         session.TokensIn__c       = (session.TokensIn__c  == null ? 0 : session.TokensIn__c)  + tokensIn;
         session.TokensOut__c      = (session.TokensOut__c == null ? 0 : session.TokensOut__c) + tokensOut;
         session.PendingApprovalToken__c = null;
+        // Topics — persisted so next turn's classifier biases toward staying put
+        // instead of re-deciding cold. Node only ever sets this when the agent
+        // has Topics defined; absent/null just means "no topic scoping."
+        if (body.containsKey('activeTopicName')) {
+            session.ActiveTopic__c = (String) body.get('activeTopicName');
+        }
         if (String.isBlank(session.Title__c)) {
             // Auto-title from the first user message
             List<ChatMessage__c> first = [SELECT Content__c FROM ChatMessage__c WHERE ChatSession__c = :session.Id AND Role__c = 'User' ORDER BY SequenceNumber__c ASC LIMIT 1];
@@ -581,6 +730,14 @@ public with sharing class AgentChatController {
     // persistNeedsApproval() + markPendingMessages() removed with the
     // Managed MCP refactor — no more approval flow in chat mode.
 
+    /** Mirrors AgentConnectorController.throwIfServerWaking's detection, but returns a bool to retry on instead of throwing. */
+    private static Boolean isServerWakingResponse(HttpResponse res) {
+        if (res == null) return false;
+        String body = res.getBody();
+        Boolean htmlBody = body != null && body.trim().startsWith('<');
+        return htmlBody || res.getStatusCode() == 502 || res.getStatusCode() == 503;
+    }
+
     private static HttpResponse callout(String method, String path, String body) {
         SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
@@ -598,6 +755,13 @@ public with sharing class AgentChatController {
         if (String.isNotBlank(body)) req.setBody(body);
         req.setTimeout(CALLOUT_TIMEOUT_MS);
         return new Http().send(req);
+    }
+
+    /** Keeps a debug payload inside a Long Text Area's max length, with a visible truncation marker. */
+    private static String truncateForField(String s, Integer maxLen) {
+        if (s == null || s.length() <= maxLen) return s;
+        String suffix = '\n…[truncated]';
+        return s.left(maxLen - suffix.length()) + suffix;
     }
 
     /** Unwrap the server's JSON `{message}` field for the toast; fall back to raw body. */
@@ -640,6 +804,8 @@ public with sharing class AgentChatController {
         @AuraEnabled public DateTime expiresAt;
         @AuraEnabled public Integer  totalTurns;
         @AuraEnabled public String   recordContextId;
+        @AuraEnabled public Integer  tokensIn;
+        @AuraEnabled public Integer  tokensOut;
     }
 
     public class SessionWithMessages {

@@ -64,15 +64,18 @@ public with sharing class AgentKbController {
         return out;
     }
 
-    /** Plain-text / pasted-content upload. File upload (base64) uses the same route with fileBase64 instead of text. */
+    /** Plain-text / pasted-content upload. File upload (base64) uses the same route with fileBase64/fileName instead of text. */
     @AuraEnabled
-    public static KbDocumentDto uploadDocument(String agentApiName, String title, String text, String fileBase64) {
+    public static KbDocumentDto uploadDocument(String agentApiName, String title, String text, String fileBase64, String fileName) {
         Map<String, Object> payload = new Map<String, Object>{
             'agentApiName' => agentApiName,
             'title'        => title
         };
         if (String.isNotBlank(fileBase64)) {
             payload.put('fileBase64', fileBase64);
+            if (String.isNotBlank(fileName)) {
+                payload.put('fileName', fileName);
+            }
         } else {
             payload.put('text', text);
         }

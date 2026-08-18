@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ActiveTopic__c</fullName>
+    <label>Active Topic</label>
+    <description>Name of the Agent Topic this conversation is currently on. Persisted so the classifier biases toward staying put instead of re-deciding cold every turn. Blank when the agent has no Topics defined.</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+</CustomField>

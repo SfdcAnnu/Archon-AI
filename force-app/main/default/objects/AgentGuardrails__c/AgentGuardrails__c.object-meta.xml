@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customSettingsType>Hierarchy</customSettingsType>
+    <description>Org-wide chat token guardrail — a hard cap on total chat-mode AI usage (all agents combined) per day/month, checked before every turn.</description>
+    <enableFeeds>false</enableFeeds>
+    <label>Archon Guardrails</label>
+    <visibility>Public</visibility>
+</CustomObject>

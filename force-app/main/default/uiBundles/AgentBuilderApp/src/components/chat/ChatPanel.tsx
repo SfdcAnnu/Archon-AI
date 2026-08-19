@@ -184,9 +184,24 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
       });
 
       if (result.status === 'complete' && result.assistantText != null) {
+        // Tool RESULTS must survive into the next turn's history or the
+        // model loses every record Id it just looked up — found live: turn
+        // 1 finds the opportunity via soqlQuery, turn 2 queries WHERE
+        // Id = '006...' (a hallucinated placeholder) because the real Id
+        // existed only in a tool output that was never carried forward.
+        // Appended to the assistant HISTORY entry only — historyRef is
+        // what's sent to the model; the visible message list is separate.
+        let toolContext = '';
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          const summaries = result.toolCalls.slice(0, 6).map(tc => {
+            const output = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output ?? '');
+            return `${tc.name}(${JSON.stringify(tc.input ?? {}).slice(0, 200)}) -> ${output.slice(0, 600)}`;
+          });
+          toolContext = `\n\n[Internal tool results from this turn — reuse exact Ids/values from here in later turns, never invent or truncate them:\n${summaries.join('\n')}]`;
+        }
         historyRef.current = [
           ...historyRef.current,
-          { role: 'assistant', content: result.assistantText },
+          { role: 'assistant', content: result.assistantText + toolContext },
         ];
         setMessages(list => [
           ...list,

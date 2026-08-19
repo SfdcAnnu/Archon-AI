@@ -24,6 +24,10 @@ global with sharing class AgentGeneratorRestService {
     // AgentKbController's document upload/reindex callouts already use.
     private static final Integer GENERATE_TIMEOUT_MS = 60000;
 
+    /** One endpoint, three ops (body.op): 'analyze' (v2 capability plan),
+     *  'verify' (v2 free-text answer verification), default 'generate'.
+     *  Analyze additionally gathers the org grounding pack server-side, so
+     *  it gets the full 120s callout ceiling. */
     @HttpPost
     global static void generate() {
         RestRequest req = RestContext.request;
@@ -35,7 +39,12 @@ global with sharing class AgentGeneratorRestService {
                 Map<String, Object> engineOverride = buildOpenAiEngineOverride();
                 if (engineOverride != null) body.put('engineOverride', engineOverride);
             }
-            HttpResponse serverRes = ArchonServerClient.callout('POST', '/api/agent/generate', JSON.serialize(body), GENERATE_TIMEOUT_MS);
+            String op = (String) body.get('op');
+            String path = op == 'analyze' ? '/api/agent/analyze'
+                        : op == 'verify'  ? '/api/agent/verify-answer'
+                        : '/api/agent/generate';
+            Integer timeoutMs = op == 'analyze' ? 120000 : GENERATE_TIMEOUT_MS;
+            HttpResponse serverRes = ArchonServerClient.callout('POST', path, JSON.serialize(body), timeoutMs);
             if (serverRes.getStatusCode() >= 400) {
                 writeError(res, serverRes.getStatusCode(), ArchonServerClient.extractServerError(serverRes));
                 return;

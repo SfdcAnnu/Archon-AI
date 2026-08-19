@@ -54,7 +54,13 @@ export type GenerateResponse = { kind: 'questions'; questions: string[] } | Gene
 export async function generateAgentFromRequirement(
   requirementText: string,
   mode: GeneratorMode,
-  opts?: { fileBase64?: string; fileName?: string; qaHistory?: QaTurn[] }
+  opts?: {
+    fileBase64?: string;
+    fileName?: string;
+    qaHistory?: QaTurn[];
+    resolvedCapabilities?: ResolvedCapability[];
+    grounding?: GroundingPack;
+  }
 ): Promise<GenerateResponse> {
   return apexFetch<GenerateResponse>(
     GENERATE_BASE,
@@ -66,7 +72,105 @@ export async function generateAgentFromRequirement(
         fileBase64: opts?.fileBase64,
         fileName: opts?.fileName,
         qaHistory: opts?.qaHistory ?? [],
+        resolvedCapabilities: opts?.resolvedCapabilities,
+        grounding: opts?.grounding,
       }),
+    },
+    GENERATE_TIMEOUT_MS
+  );
+}
+
+// ── v2 guided flow: analyze + verify ─────────────────────────────────
+// Same Apex endpoint, dispatched via body.op — see
+// AgentGeneratorRestService.cls and server/src/agent-generator/analyze.ts
+// (the server owns the plan/verify logic and the one-follow-up-max rule).
+
+export type CapabilityResolution =
+  | { kind: 'catalog'; provider: string; allowedTools: string[]; description: string }
+  | { kind: 'mcp_tool'; provider: string; toolName: string; description: string }
+  | { kind: 'apex_tool'; name: string; description: string }
+  | { kind: 'flow_tool'; name: string; description: string }
+  | { kind: 'instruction'; note: string }
+  | { kind: 'deferred'; checklistTitle: string; description: string };
+
+export interface CapabilityOption {
+  id: string;
+  label: string;
+  description: string;
+  resolution: CapabilityResolution;
+}
+
+export interface Capability {
+  id: string;
+  title: string;
+  requirementQuote: string;
+  status: 'resolved' | 'question' | 'no_node';
+  /** Subagent/domain grouping — absent = attached to the root agent. */
+  domain?: string;
+  resolution?: CapabilityResolution;
+  explanation?: string;
+  question?: { text: string; options: CapabilityOption[]; recommendedId: string };
+}
+
+export interface CapabilityPlan {
+  agentName: string;
+  capabilities: Capability[];
+}
+
+/** Opaque to the client — echoed back verbatim on verify/generate calls. */
+export type GroundingPack = Record<string, unknown>;
+
+export interface ResolvedCapability {
+  title: string;
+  requirementQuote: string;
+  domain?: string;
+  resolution: CapabilityResolution;
+}
+
+export interface AnalyzeResponse {
+  plan: CapabilityPlan;
+  grounding: GroundingPack;
+  /** Requirement + extracted file text combined server-side — reuse for generate. */
+  requirementText: string;
+}
+
+export async function analyzeRequirement(
+  requirementText: string,
+  mode: GeneratorMode,
+  opts?: { fileBase64?: string; fileName?: string }
+): Promise<AnalyzeResponse> {
+  return apexFetch<AnalyzeResponse>(
+    GENERATE_BASE,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        op: 'analyze',
+        requirementText,
+        mode,
+        fileBase64: opts?.fileBase64,
+        fileName: opts?.fileName,
+      }),
+    },
+    125000
+  );
+}
+
+export type VerifyAnswerResponse =
+  | { kind: 'resolved'; resolution: CapabilityResolution; userSummary: string }
+  | { kind: 'question'; question: NonNullable<Capability['question']> };
+
+export async function verifyCapabilityAnswer(
+  capability: Capability,
+  answerText: string,
+  round: number,
+  mode: GeneratorMode,
+  grounding: GroundingPack
+): Promise<VerifyAnswerResponse> {
+  return apexFetch<VerifyAnswerResponse>(
+    GENERATE_BASE,
+    {
+      method: 'POST',
+      body: JSON.stringify({ op: 'verify', capability, answerText, round, mode, grounding }),
     },
     GENERATE_TIMEOUT_MS
   );

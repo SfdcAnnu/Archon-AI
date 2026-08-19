@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import type { AgentGraph, NodeConfig } from '@/types/agent';
 import { SubagentForm } from './properties/SubagentForm';
 import { ToolForm } from './properties/ToolForm';
+import { CatalogForm } from './properties/CatalogForm';
 import { AiRootForm } from './properties/AiRootForm';
 import { ReadOnlySummary } from './properties/ReadOnlySummary';
 import { EmptyPanel } from './properties/EmptyPanel';
@@ -161,6 +162,9 @@ export function PropertiesPanel({
                 {node.nodeType === 'tool' && (
                   <ToolForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
                 )}
+                {node.nodeType === 'catalog' && (
+                  <CatalogForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                )}
                 {node.nodeType === 'ai' && (
                   <AiRootForm
                     node={node}
@@ -169,7 +173,7 @@ export function PropertiesPanel({
                     onConnectionBound={connectionId => onConnectionBound(node.id, connectionId)}
                   />
                 )}
-                {node.nodeType !== 'subagent' && node.nodeType !== 'tool' && node.nodeType !== 'ai' && (
+                {node.nodeType !== 'subagent' && node.nodeType !== 'tool' && node.nodeType !== 'ai' && node.nodeType !== 'catalog' && (
                   <ReadOnlySummary node={node} />
                 )}
               </>

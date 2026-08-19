@@ -115,6 +115,19 @@ export const NODE_PALETTE: PaletteCategory[] = [
           requiresApproval: false,
         },
       },
+      {
+        nodeType: 'catalog',
+        nodeSubType: 'catalog',
+        label: 'Tool Catalog',
+        sub: 'Many tools from one MCP server',
+        iconClass: 'bg-secondary text-muted-foreground',
+        defaultConfig: {
+          description: '',
+          connectorId: '',
+          provider: '',
+          allowedTools: [],
+        },
+      },
     ],
   },
   {

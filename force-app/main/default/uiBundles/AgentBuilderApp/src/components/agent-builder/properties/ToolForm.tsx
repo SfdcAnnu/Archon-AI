@@ -358,6 +358,11 @@ export function ToolForm({ node, onConfigChange }: ToolFormProps) {
           >
             Enter a tool name manually instead ›
           </button>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            A Tool node runs exactly ONE action (its own description &amp; approval gate) — that's why this list is
+            single-select. To let the agent use MANY tools from this server, add a Tool Catalog node instead and tick
+            them there.
+          </p>
         </div>
       )}
 

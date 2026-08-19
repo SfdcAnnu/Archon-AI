@@ -785,7 +785,8 @@ export function DescribeAgentWizard({ onClose }: DescribeAgentWizardProps) {
         onEscapeKeyDown={e => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between gap-2">
+          {/* pr-8 keeps the step crumbs clear of the dialog's absolute ✕ button */}
+          <DialogTitle className="flex items-center justify-between gap-2 pr-8">
             <span className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
               {analysis?.plan.agentName ?? 'Describe your agent'}

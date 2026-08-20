@@ -1,5 +1,7 @@
 import type { RouteObject } from 'react-router';
 import HomePage from './pages/HomePage';
+import HomeDashboardPage from './pages/HomeDashboardPage';
+import EnvironmentsPage from './pages/EnvironmentsPage';
 import AgentBuilder from './pages/AgentBuilder';
 import SettingsPage from './pages/SettingsPage';
 import TemplatesPage from './pages/TemplatesPage';
@@ -22,6 +24,16 @@ export const routes: RouteObject[] = [
     path: '/',
     element: <HomePage />,
     handle: { showInNavigation: true, label: 'Workflows' },
+  },
+  {
+    path: '/home',
+    element: <HomeDashboardPage />,
+    handle: { showInNavigation: true, label: 'Home' },
+  },
+  {
+    path: '/environments',
+    element: <EnvironmentsPage />,
+    handle: { showInNavigation: true, label: 'Environments' },
   },
   {
     path: '/agent/:apiName',

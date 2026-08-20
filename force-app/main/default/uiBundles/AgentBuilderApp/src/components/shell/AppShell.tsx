@@ -27,7 +27,7 @@ interface NavItem {
 }
 
 const BUILD_ITEMS: NavItem[] = [
-  { icon: Home, label: 'Home', comingSoon: true },
+  { icon: Home, label: 'Home', href: '/home' },
   { icon: Workflow, label: 'Workflows', href: '/' },
   { icon: LayoutGrid, label: 'Templates', href: '/templates' },
   { icon: MessageCircle, label: 'Chat', href: '/chat' },
@@ -39,7 +39,7 @@ const MONITOR_ITEMS: NavItem[] = [
 ];
 const ADMIN_ITEMS: NavItem[] = [
   { icon: Users, label: 'Users & Roles', comingSoon: true },
-  { icon: Layers, label: 'Environments', comingSoon: true },
+  { icon: Layers, label: 'Environments', href: '/environments' },
   { icon: KeyRound, label: 'Credentials', href: '/ai-connections' },
   { icon: Plug, label: 'Connectors', href: '/connectors' },
   { icon: Settings, label: 'Settings', href: '/settings' },

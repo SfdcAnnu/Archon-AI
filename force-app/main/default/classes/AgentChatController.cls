@@ -12,6 +12,15 @@
 @SuppressWarnings('PMD.ApexCRUDViolation')
 public with sharing class AgentChatController {
 
+    /** Business-rule refusals ("Agent not Active.", "Session has expired.").
+     *  Deliberately NOT AuraHandledException: this controller now runs under
+     *  Apex REST (AgentChatRestService) and Queueables (WhatsAppAgentBridge),
+     *  where merely THROWING AuraHandledException detonates as an uncatchable
+     *  "Can only throw this exception type from VisualForce or Aura context"
+     *  LimitException — the caller's catch never runs and the client sees a
+     *  bare Salesforce 500 instead of the message. */
+    public class ChatException extends Exception {}
+
     private static final Integer CALLOUT_TIMEOUT_MS = 120000;   // 2-min — chat tool sequences can be slow
     public  static final Integer EXPIRY_HOURS = 24;              // also used by WhatsAppRevivalInitiator
 
@@ -48,7 +57,7 @@ public with sharing class AgentChatController {
     @AuraEnabled
     public static SessionWithMessages startSession(String agentApiName, String recordContextId, String recordContextType) {
         if (String.isBlank(agentApiName)) {
-            throw new AuraHandledException('agentApiName is required.');
+            throw new ChatException('agentApiName is required.');
         }
         AgentDefinition__c agent = loadAgent(agentApiName);
         Id userId = UserInfo.getUserId();
@@ -242,8 +251,8 @@ public with sharing class AgentChatController {
 
         Boolean hasText = !String.isBlank(userText);
         Boolean hasAttachments = attachments != null && !attachments.isEmpty();
-        if (!hasText && !hasAttachments) throw new AuraHandledException('Send some text or attach a file.');
-        if (hasText && userText.length() > 10000) throw new AuraHandledException('Message too long (max 10,000 chars).');
+        if (!hasText && !hasAttachments) throw new ChatException('Send some text or attach a file.');
+        if (hasText && userText.length() > 10000) throw new ChatException('Message too long (max 10,000 chars).');
 
         // ── Phase 1: SELECTs + callout. ZERO DML before HTTP. ──
         ChatSession__c session = loadActiveSession(sessionId, true);
@@ -522,10 +531,10 @@ public with sharing class AgentChatController {
             SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c
             FROM AgentDefinition__c WHERE ApiName__c = :apiName WITH USER_MODE LIMIT 1
         ];
-        if (rows.isEmpty()) throw new AuraHandledException('Agent not found: ' + apiName);
-        if (rows[0].Status__c != 'Active') throw new AuraHandledException('Agent not Active.');
+        if (rows.isEmpty()) throw new ChatException('Agent not found: ' + apiName);
+        if (rows[0].Status__c != 'Active') throw new ChatException('Agent not Active.');
         if (rows[0].ExecuteType__c != 'Chat' && rows[0].ExecuteType__c != 'Both') {
-            throw new AuraHandledException('Agent is not chat-enabled.');
+            throw new ChatException('Agent is not chat-enabled.');
         }
         return rows[0];
     }
@@ -538,14 +547,14 @@ public with sharing class AgentChatController {
                    TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
         ];
-        if (rows.isEmpty()) throw new AuraHandledException('Session not found.');
+        if (rows.isEmpty()) throw new ChatException('Session not found.');
         ChatSession__c s = rows[0];
-        if (s.Status__c == 'Ended')   throw new AuraHandledException('Session has been ended.');
-        if (s.Status__c == 'Expired') throw new AuraHandledException('Session has expired. Start a new chat.');
+        if (s.Status__c == 'Ended')   throw new ChatException('Session has been ended.');
+        if (s.Status__c == 'Expired') throw new ChatException('Session has expired. Start a new chat.');
         if (throwIfExpired && s.ExpiresAt__c != null && s.ExpiresAt__c < System.now()) {
             s.Status__c = 'Expired';
             update s;
-            throw new AuraHandledException('Session expired due to inactivity. Start a new chat.');
+            throw new ChatException('Session expired due to inactivity. Start a new chat.');
         }
         return s;
     }
@@ -559,7 +568,7 @@ public with sharing class AgentChatController {
                    TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
         ];
-        if (rows.isEmpty()) throw new AuraHandledException('Session not found.');
+        if (rows.isEmpty()) throw new ChatException('Session not found.');
         return rows[0];
     }
 
@@ -741,11 +750,11 @@ public with sharing class AgentChatController {
     private static HttpResponse callout(String method, String path, String body) {
         SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
-            throw new AuraHandledException('Synapse is not set up yet. Open Synapse Setup and click Authorize first.');
+            throw new ChatException('Synapse is not set up yet. Open Synapse Setup and click Authorize first.');
         }
         String base = getServerUrl();
         if (String.isBlank(base)) {
-            throw new AuraHandledException('SynapseConfig.Default.ServerUrl__c is not set.');
+            throw new ChatException('SynapseConfig.Default.ServerUrl__c is not set.');
         }
         HttpRequest req = new HttpRequest();
         req.setEndpoint(base.removeEnd('/') + path);

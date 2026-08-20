@@ -40,6 +40,12 @@ global with sharing class AgentGeneratorRestService {
                 if (engineOverride != null) body.put('engineOverride', engineOverride);
             }
             String op = (String) body.get('op');
+            // Generation must know which providers this org can actually
+            // RUN, or it emits ai/subagent nodes (spec default: claude)
+            // whose every chat turn dies with "no connection configured".
+            if (op != 'analyze' && op != 'verify') {
+                body.put('availableEngines', listAvailableEngines());
+            }
             String path = op == 'analyze' ? '/api/agent/analyze'
                         : op == 'verify'  ? '/api/agent/verify-answer'
                         : '/api/agent/generate';
@@ -72,6 +78,28 @@ global with sharing class AgentGeneratorRestService {
             'defaultModel' => cred.DefaultModel__c,
             'connectionId' => cred.Id
         };
+    }
+
+    /** Distinct engine types with at least one ACTIVE connection visible to
+     *  the running user, translated to AgentNode__c.NodeSubType__c vocabulary
+     *  ('openai' is stored on connections, 'gpt4' on nodes — same mapping
+     *  AiEngineConnectionController.normalizeEngineType() applies in
+     *  reverse). Order matters: the server uses the FIRST entry as the
+     *  fallback engine, so put the user's preferred provider first. */
+    private static List<String> listAvailableEngines() {
+        List<AiEngineConnection__c> rows = [
+            SELECT EngineType__c, IsPreferred__c
+            FROM AiEngineConnection__c
+            WHERE IsActive__c = true
+            WITH USER_MODE
+            ORDER BY IsPreferred__c DESC, LastUsedAt__c DESC NULLS LAST
+        ];
+        List<String> engines = new List<String>();
+        for (AiEngineConnection__c c : rows) {
+            String subType = c.EngineType__c == 'openai' ? 'gpt4' : c.EngineType__c;
+            if (!engines.contains(subType)) engines.add(subType);
+        }
+        return engines;
     }
 
     private static void writeError(RestResponse res, Integer statusCode, String message) {

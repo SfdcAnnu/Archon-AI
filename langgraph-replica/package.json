@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "chat": "tsx src/chat-cli.ts sample-agents/viva-money.json",
-    "demo": "tsx src/chat-cli.ts sample-agents/viva-money.json --scripted"
+    "demo": "tsx src/chat-cli.ts sample-agents/viva-money.json --scripted",
+    "example": "tsx src/example-create-agent.ts"
   },
   "dependencies": {
     "@langchain/anthropic": "^0.3.14",

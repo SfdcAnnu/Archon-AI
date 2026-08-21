@@ -1,0 +1,80 @@
+{
+  "agent": {
+    "apiName": "viva_money_ai_agent",
+    "name": "Viva Money AI Agent",
+    "systemPrompt": "Viva Money AI Agent: assist customers through chat, verifying identity and resolving queries. DATA BOUNDARY (non-negotiable): act ONLY within this conversation's own customer and their directly related records. Never list or summarize other customers' records; refuse org-wide queries politely."
+  },
+  "nodes": [
+    {
+      "id": "root",
+      "nodeType": "ai",
+      "nodeSubType": "openai",
+      "label": "Top-Level Agent",
+      "config": { "model": "gpt-4o", "systemPrompt": "" }
+    },
+    {
+      "id": "sub_verification",
+      "nodeType": "subagent",
+      "nodeSubType": "openai",
+      "label": "Customer Verification",
+      "config": {
+        "model": "gpt-4o-mini",
+        "routingDescription": "Verifies customer identity using PAN, Aadhaar, or mobile number, and handles OTP send/validation.",
+        "systemPrompt": "You are the Customer Verification specialist. Verify the customer using PAN/Aadhaar/mobile, send and validate OTPs. Never reveal another customer's data."
+      }
+    },
+    {
+      "id": "sub_conversation",
+      "nodeType": "subagent",
+      "nodeSubType": "openai",
+      "label": "Conversation Management",
+      "config": {
+        "model": "gpt-4o-mini",
+        "routingDescription": "Handles small talk, greetings, conversation summaries, and post-interaction feedback surveys.",
+        "systemPrompt": "You manage the conversation flow: greetings, summaries, feedback surveys. Keep replies short and friendly."
+      }
+    },
+    {
+      "id": "cat_salesforce",
+      "nodeType": "catalog",
+      "nodeSubType": "catalog",
+      "label": "Salesforce Tools",
+      "config": {
+        "description": "Read-only Salesforce data access for this customer.",
+        "provider": "salesforce_mcp",
+        "allowedTools": ["soql_query", "get_object_schema"]
+      }
+    },
+    {
+      "id": "tool_send_otp",
+      "nodeType": "tool",
+      "nodeSubType": "tool",
+      "label": "Send OTP",
+      "config": {
+        "description": "Sends a one-time password to the customer's registered mobile number via SMS.",
+        "actionType": "Apex",
+        "toolName": "send_otp",
+        "requiresApproval": true
+      }
+    },
+    {
+      "id": "tool_related",
+      "nodeType": "tool",
+      "nodeSubType": "tool",
+      "label": "Get Related Records",
+      "config": {
+        "description": "Fetches records related to the verified customer (loans, applications, documents).",
+        "actionType": "MCP",
+        "toolName": "get_related_records",
+        "requiresApproval": false
+      }
+    }
+  ],
+  "connections": [
+    { "from": "root", "to": "sub_verification", "fromPort": "tool", "toPort": "in" },
+    { "from": "root", "to": "sub_conversation", "fromPort": "tool", "toPort": "in" },
+    { "from": "root", "to": "cat_salesforce", "fromPort": "tool", "toPort": "in" },
+    { "from": "sub_verification", "to": "tool_send_otp", "fromPort": "tool", "toPort": "in" },
+    { "from": "sub_verification", "to": "tool_related", "fromPort": "tool", "toPort": "in" }
+  ]
+}

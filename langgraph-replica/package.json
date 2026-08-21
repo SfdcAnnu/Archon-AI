@@ -1,0 +1,26 @@
+{
+  "name": "archon-langgraph-replica",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Feature-by-feature replica of the Archon agent runtime built on LangChain + LangGraph, for side-by-side review against the hand-rolled server/ implementation.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "chat": "tsx src/chat-cli.ts sample-agents/viva-money.json",
+    "demo": "tsx src/chat-cli.ts sample-agents/viva-money.json --scripted"
+  },
+  "dependencies": {
+    "@langchain/anthropic": "^0.3.14",
+    "@langchain/core": "^0.3.40",
+    "@langchain/google-genai": "^0.1.8",
+    "@langchain/langgraph": "^0.2.63",
+    "@langchain/openai": "^0.4.4",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

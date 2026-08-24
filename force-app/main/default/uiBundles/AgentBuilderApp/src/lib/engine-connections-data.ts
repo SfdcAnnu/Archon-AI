@@ -77,6 +77,23 @@ export function parseEnabledModels(conn: ConnectionSummary | null | undefined): 
   }
 }
 
+/** Live chat-model ids straight from the provider (free management API, no
+ *  token spend). Pass a saved connection's recordId, OR raw engineType +
+ *  apiKey from the add dialog before saving. */
+export async function fetchProviderModels(input: {
+  recordId?: string | null;
+  engineType?: string;
+  apiKey?: string;
+  endpoint?: string | null;
+}): Promise<string[]> {
+  const result = await apexFetch<{ models: string[] }>(
+    ENGINE_CONNECTIONS_BASE,
+    { method: 'POST', body: JSON.stringify({ action: 'fetchModels', ...input }) },
+    45000
+  );
+  return result.models;
+}
+
 export async function saveConnectionModels(recordId: string, models: string[] | null): Promise<void> {
   await apexFetch<{ success: boolean }>(ENGINE_CONNECTIONS_BASE, {
     method: 'POST',

@@ -318,6 +318,61 @@ public with sharing class AiEngineConnectionController {
 
     // ── MODEL CATALOG ─────────────────────────────────────────────
 
+    /** REST-safe business error for the model-catalog surface — the rest of
+     *  this class predates the AuraHandledException-in-REST landmine and
+     *  still throws it; new code must not add more of those. */
+    public class EngineConnectionException extends Exception {}
+
+    /**
+     * Live chat-model list straight from the provider's API (free — no
+     * token spend; see the server's /api/engine/models). Two calling modes:
+     * a saved connection's recordId, or raw engineType+apiKey typed into
+     * the add-connection dialog before anything is saved.
+     */
+    public static List<String> fetchProviderModels(Id recordId, String engineType, String apiKey, String endpoint) {
+        if (recordId != null) {
+            AiEngineConnection__c rec = [
+                SELECT EngineType__c, ApiKey__c, Endpoint__c
+                FROM AiEngineConnection__c WHERE Id = :recordId WITH USER_MODE LIMIT 1
+            ];
+            engineType = rec.EngineType__c;
+            apiKey     = rec.ApiKey__c;
+            endpoint   = rec.Endpoint__c;
+        }
+        if (String.isBlank(engineType) || String.isBlank(apiKey)) {
+            throw new EngineConnectionException('Pass a saved connection or engineType + apiKey.');
+        }
+
+        SynapseInstall__c install = getInstall();
+        String base = getServerUrl();
+        if (install == null || String.isBlank(install.SessionKey__c) || String.isBlank(base)) {
+            throw new EngineConnectionException('Archon setup incomplete. Complete Archon Setup first.');
+        }
+
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(base.removeEnd('/') + '/api/engine/models');
+        req.setMethod('POST');
+        req.setHeader('Authorization', 'Bearer ' + install.SessionKey__c);
+        req.setHeader('Content-Type', 'application/json');
+        req.setBody(JSON.serialize(new Map<String, Object>{
+            'engineType' => engineType,
+            'apiKey'     => apiKey,
+            'endpoint'   => endpoint
+        }));
+        req.setTimeout(30000);
+        HttpResponse res = new Http().send(req);
+        if (res.getStatusCode() != 200) {
+            throw new EngineConnectionException(extractServerError(res));
+        }
+
+        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        List<String> models = new List<String>();
+        for (Object m : (List<Object>) body.get('models')) {
+            models.add((String) m);
+        }
+        return models;
+    }
+
     /** Replace the connection's enabled-models list (JSON array of model id
      *  strings). Validated here so a UI bug can never store non-JSON that
      *  every model picker would then choke on. Empty/null clears back to

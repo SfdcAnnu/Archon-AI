@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Plus, Star, TestTube2, Trash2 } from 'lucide-react';
+import { Check, Loader2, Plus, RefreshCw, Star, TestTube2, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -11,6 +11,7 @@ import {
   ENGINE_TYPES,
   listConnectionsForEngine,
   deleteEngineConnection,
+  fetchProviderModels,
   parseEnabledModels,
   saveConnectionModels,
   testEngineConnection,
@@ -77,13 +78,26 @@ function ModelCatalog({ conn, onSaved }: { conn: ConnectionSummary; onSaved: (mo
   const enabled = useMemo(() => parseEnabledModels(conn) ?? defaults, [conn, defaults]);
   const [customInput, setCustomInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fetched, setFetched] = useState<string[] | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Show every model we know about: provider defaults + anything custom
-  // that was ever enabled on this connection.
+  // Rows to show: the provider's LIVE list once fetched (the built-in
+  // defaults until then), plus whatever is already enabled on this
+  // connection so a ticked model never disappears from view.
   const allModels = useMemo(() => {
-    const set = new Set([...defaults, ...enabled]);
+    const set = new Set([...(fetched ?? defaults), ...enabled]);
     return [...set];
-  }, [defaults, enabled]);
+  }, [fetched, defaults, enabled]);
+
+  const refreshFromProvider = () => {
+    setFetching(true);
+    setFetchError(null);
+    fetchProviderModels({ recordId: conn.id })
+      .then(models => setFetched(models))
+      .catch(err => setFetchError(err instanceof Error ? err.message : 'Could not reach the provider.'))
+      .finally(() => setFetching(false));
+  };
 
   const persist = (next: string[]) => {
     setSaving(true);
@@ -106,12 +120,27 @@ function ModelCatalog({ conn, onSaved }: { conn: ConnectionSummary; onSaved: (mo
 
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-border">
-      <div className="flex items-center justify-between bg-secondary/60 px-3 py-1.5 text-[10.5px]">
+      <div className="flex items-center justify-between gap-2 bg-secondary/60 px-3 py-1.5 text-[10.5px]">
         <span className="font-bold text-foreground">
           Models · {enabled.length} enabled — ticked ones appear in every model picker
+          {fetched && <span className="ml-1.5 font-medium text-[var(--archon-success)]">· {fetched.length} fetched live</span>}
         </span>
-        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+        <span className="flex shrink-0 items-center gap-2">
+          {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          <button
+            type="button"
+            onClick={refreshFromProvider}
+            disabled={fetching}
+            className="flex items-center gap-1 font-semibold text-primary hover:underline disabled:opacity-50"
+          >
+            {fetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            {fetching ? 'Fetching…' : 'Refresh from provider'}
+          </button>
+        </span>
       </div>
+      {fetchError && (
+        <p className="border-t border-border bg-destructive/5 px-3 py-1.5 text-[10.5px] text-destructive">{fetchError}</p>
+      )}
       {allModels.map(m => {
         const on = enabled.includes(m);
         return (

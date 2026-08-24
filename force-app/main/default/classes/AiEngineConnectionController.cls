@@ -329,7 +329,7 @@ public with sharing class AiEngineConnectionController {
      * a saved connection's recordId, or raw engineType+apiKey typed into
      * the add-connection dialog before anything is saved.
      */
-    public static List<String> fetchProviderModels(Id recordId, String engineType, String apiKey, String endpoint) {
+    public static List<Object> fetchProviderModels(Id recordId, String engineType, String apiKey, String endpoint) {
         if (recordId != null) {
             AiEngineConnection__c rec = [
                 SELECT EngineType__c, ApiKey__c, Endpoint__c
@@ -365,12 +365,10 @@ public with sharing class AiEngineConnectionController {
             throw new EngineConnectionException(extractServerError(res));
         }
 
+        // Pass the server's [{id, description}] objects through untouched —
+        // the description text is display data the client renders verbatim.
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-        List<String> models = new List<String>();
-        for (Object m : (List<Object>) body.get('models')) {
-            models.add((String) m);
-        }
-        return models;
+        return (List<Object>) body.get('models');
     }
 
     /** Replace the connection's enabled-models list (JSON array of model id

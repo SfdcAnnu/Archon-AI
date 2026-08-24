@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,9 @@ import {
   fetchProviderModels,
   saveEngineConnection,
   type ConnectionSummary,
+  type ProviderModel,
 } from '@/lib/engine-connections-data';
+import { ModelCombobox } from './ModelCombobox';
 
 export interface EngineConnectionFormDialogProps {
   open: boolean;
@@ -41,25 +43,36 @@ export function EngineConnectionFormDialog({ open, defaultEngineType, editing, o
   const [isPreferred, setIsPreferred] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<ProviderModel[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
 
-  // Live model list for the Default-model field: uses the key typed above
-  // (works before anything is saved), or the saved record's key on edit.
-  const canFetchModels = apiKey.trim().length > 9 || !!editing;
-  const handleFetchModels = () => {
-    setFetchingModels(true);
-    setModelsError(null);
-    fetchProviderModels(
-      apiKey.trim()
-        ? { engineType, apiKey: apiKey.trim(), endpoint: endpoint.trim() || undefined }
-        : { recordId: editing!.id }
-    )
-      .then(list => setModels(list))
-      .catch(err => setModelsError(err instanceof Error ? err.message : 'Could not fetch models.'))
-      .finally(() => setFetchingModels(false));
-  };
+  // Live model list for the Default-model picker — fetched AUTOMATICALLY:
+  // on edit-open using the saved record's key, and while adding, shortly
+  // after the user finishes typing an API key (debounced so we don't hit
+  // the provider on every keystroke of the paste-in).
+  useEffect(() => {
+    if (!open) return;
+    const key = apiKey.trim();
+    if (key.length < 10 && !editing) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setFetchingModels(true);
+      setModelsError(null);
+      fetchProviderModels(
+        key.length >= 10
+          ? { engineType, apiKey: key, endpoint: endpoint.trim() || undefined }
+          : { recordId: editing!.id }
+      )
+        .then(list => !cancelled && setModels(list))
+        .catch(err => !cancelled && setModelsError(err instanceof Error ? err.message : 'Could not fetch models.'))
+        .finally(() => !cancelled && setFetchingModels(false));
+    }, key.length >= 10 ? 800 : 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, editing, engineType, apiKey, endpoint]);
 
   useEffect(() => {
     if (!open) return;
@@ -156,32 +169,26 @@ export function EngineConnectionFormDialog({ open, defaultEngineType, editing, o
               <Input value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="Custom endpoint" />
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <Label>Default model (optional)</Label>
-                <button
-                  type="button"
-                  onClick={handleFetchModels}
-                  disabled={!canFetchModels || fetchingModels}
-                  title={canFetchModels ? 'Fetch the live model list from the provider' : 'Enter an API key first'}
-                  className="flex items-center gap-1 text-[10.5px] font-semibold text-primary hover:underline disabled:opacity-40"
-                >
-                  {fetchingModels ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                  {fetchingModels ? 'Fetching…' : models.length > 0 ? `${models.length} models` : 'Fetch models'}
-                </button>
+                {defaultModel && (
+                  <code className="truncate font-mono text-[10px] text-[var(--archon-success)]">{defaultModel}</code>
+                )}
               </div>
-              {models.length > 0 ? (
-                <select
-                  className="h-8 w-full rounded-md border border-input bg-transparent px-2 font-mono text-[12px]"
+              {models.length > 0 || fetchingModels ? (
+                <ModelCombobox
+                  models={models}
+                  selectedIds={defaultModel ? [defaultModel] : []}
+                  loading={fetchingModels}
+                  placeholder={defaultModel || 'Search models…'}
+                  onSelect={m => setDefaultModel(m.id)}
+                />
+              ) : (
+                <Input
                   value={defaultModel}
                   onChange={e => setDefaultModel(e.target.value)}
-                >
-                  <option value="">— pick a model —</option>
-                  {models.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              ) : (
-                <Input value={defaultModel} onChange={e => setDefaultModel(e.target.value)} placeholder="or type a model id" />
+                  placeholder="Enter an API key above to load the list"
+                />
               )}
             </div>
           </div>

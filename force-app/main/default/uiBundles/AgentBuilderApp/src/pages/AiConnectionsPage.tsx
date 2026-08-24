@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Plus, RefreshCw, Star, TestTube2, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Star, TestTube2, Trash2, X } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { EngineConnectionFormDialog } from '@/components/connections/EngineConnectionFormDialog';
+import { ModelCombobox } from '@/components/connections/ModelCombobox';
 import {
   ENGINE_DEFAULT_MODELS,
   ENGINE_TYPES,
@@ -17,6 +17,7 @@ import {
   testEngineConnection,
   saveEngineConnection,
   type ConnectionSummary,
+  type ProviderModel,
 } from '@/lib/engine-connections-data';
 
 /** Emma-style two-pane layout: a provider rail on the left (brand chip +
@@ -76,28 +77,35 @@ function statusPillStyle(status: string | null) {
 function ModelCatalog({ conn, onSaved }: { conn: ConnectionSummary; onSaved: (models: string[]) => void }) {
   const defaults = ENGINE_DEFAULT_MODELS[conn.engineType] ?? [];
   const enabled = useMemo(() => parseEnabledModels(conn) ?? defaults, [conn, defaults]);
-  const [customInput, setCustomInput] = useState('');
   const [saving, setSaving] = useState(false);
-  const [fetched, setFetched] = useState<string[] | null>(null);
+  const [fetched, setFetched] = useState<ProviderModel[] | null>(null);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchSeq, setFetchSeq] = useState(0);
 
-  // Rows to show: the provider's LIVE list once fetched (the built-in
-  // defaults until then), plus whatever is already enabled on this
-  // connection so a ticked model never disappears from view.
-  const allModels = useMemo(() => {
-    const set = new Set([...(fetched ?? defaults), ...enabled]);
-    return [...set];
-  }, [fetched, defaults, enabled]);
-
-  const refreshFromProvider = () => {
+  // The live list loads automatically when the card renders — no manual
+  // refresh step. Until (or if) it arrives, the built-in defaults act as
+  // the searchable options so the picker is never empty.
+  useEffect(() => {
+    let cancelled = false;
     setFetching(true);
     setFetchError(null);
     fetchProviderModels({ recordId: conn.id })
-      .then(models => setFetched(models))
-      .catch(err => setFetchError(err instanceof Error ? err.message : 'Could not reach the provider.'))
-      .finally(() => setFetching(false));
-  };
+      .then(models => !cancelled && setFetched(models))
+      .catch(err => !cancelled && setFetchError(err instanceof Error ? err.message : 'Could not reach the provider.'))
+      .finally(() => !cancelled && setFetching(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [conn.id, fetchSeq]);
+
+  const options = useMemo<ProviderModel[]>(() => {
+    const live = fetched ?? defaults.map(id => ({ id, description: null }));
+    // Enabled ids missing from the live list (older/custom models) stay
+    // selectable so an active choice never silently disappears.
+    const known = new Set(live.map(m => m.id));
+    return [...live, ...enabled.filter(id => !known.has(id)).map(id => ({ id, description: 'Custom / not in provider list' }))];
+  }, [fetched, defaults, enabled]);
 
   const persist = (next: string[]) => {
     setSaving(true);
@@ -107,88 +115,63 @@ function ModelCatalog({ conn, onSaved }: { conn: ConnectionSummary; onSaved: (mo
       .finally(() => setSaving(false));
   };
 
-  const toggle = (m: string) => {
-    persist(enabled.includes(m) ? enabled.filter(x => x !== m) : [...enabled, m]);
-  };
-
-  const addCustom = () => {
-    const m = customInput.trim();
-    if (!m || enabled.includes(m)) return;
-    setCustomInput('');
-    persist([...enabled, m]);
+  const toggle = (id: string) => {
+    persist(enabled.includes(id) ? enabled.filter(x => x !== id) : [...enabled, id]);
   };
 
   return (
-    <div className="mt-3 overflow-hidden rounded-lg border border-border">
-      <div className="flex items-center justify-between gap-2 bg-secondary/60 px-3 py-1.5 text-[10.5px]">
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-between text-[10.5px]">
         <span className="font-bold text-foreground">
-          Models · {enabled.length} enabled — ticked ones appear in every model picker
-          {fetched && <span className="ml-1.5 font-medium text-[var(--archon-success)]">· {fetched.length} fetched live</span>}
+          Enabled models · {enabled.length} — these appear in every model picker
         </span>
-        <span className="flex shrink-0 items-center gap-2">
-          {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-          <button
-            type="button"
-            onClick={refreshFromProvider}
-            disabled={fetching}
-            className="flex items-center gap-1 font-semibold text-primary hover:underline disabled:opacity-50"
-          >
-            {fetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            {fetching ? 'Fetching…' : 'Refresh from provider'}
-          </button>
-        </span>
+        {(saving || fetching) && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
       </div>
-      {fetchError && (
-        <p className="border-t border-border bg-destructive/5 px-3 py-1.5 text-[10.5px] text-destructive">{fetchError}</p>
-      )}
-      {allModels.map(m => {
-        const on = enabled.includes(m);
-        return (
-          <label
-            key={m}
-            className={cn(
-              'flex cursor-pointer items-center gap-2.5 border-t border-border px-3 py-2',
-              on ? 'bg-accent/40' : 'hover:bg-secondary/50'
-            )}
-          >
-            <span
-              className={cn(
-                'flex h-4 w-4 shrink-0 items-center justify-center rounded',
-                on ? 'bg-[var(--archon-success)] text-white' : 'border-[1.5px] border-border bg-card'
-              )}
-            >
-              {on && <Check className="h-3 w-3" />}
-            </span>
-            <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(m)} disabled={saving} />
-            <code className="font-mono text-[11.5px] text-foreground">{m}</code>
-            {m === conn.defaultModel && (
-              <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9.5px] font-bold text-muted-foreground">
-                default
-              </span>
-            )}
-            {!defaults.includes(m) && (
-              <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9.5px] font-bold text-muted-foreground">
-                custom
-              </span>
-            )}
-          </label>
-        );
-      })}
-      <div className="flex items-center gap-2 border-t border-border px-3 py-2">
-        <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <Input
-          value={customInput}
-          onChange={e => setCustomInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addCustom()}
-          placeholder="Add a model id manually (e.g. gpt-5-mini)…"
-          className="h-7 border-0 px-0 text-[11.5px] shadow-none focus-visible:ring-0"
-        />
-        {customInput.trim() && (
-          <Button size="sm" variant="outline" className="h-6 text-[10.5px]" onClick={addCustom} disabled={saving}>
-            Add
-          </Button>
+
+      {/* Enabled set as compact chips — remove with ✕ */}
+      <div className="flex flex-wrap gap-1.5">
+        {enabled.length === 0 && (
+          <span className="text-[10.5px] text-muted-foreground">None yet — search below to enable models.</span>
         )}
+        {enabled.map(id => (
+          <span
+            key={id}
+            className="flex items-center gap-1 rounded-full border border-border bg-secondary/60 py-0.5 pl-2.5 pr-1 font-mono text-[10.5px] text-foreground"
+          >
+            {id}
+            {id === conn.defaultModel && (
+              <span className="rounded-full bg-card px-1.5 text-[8.5px] font-bold text-muted-foreground">default</span>
+            )}
+            <button
+              type="button"
+              onClick={() => toggle(id)}
+              disabled={saving}
+              aria-label={`Remove ${id}`}
+              className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
       </div>
+
+      <ModelCombobox
+        models={options}
+        selectedIds={enabled}
+        loading={fetching}
+        keepOpenOnSelect
+        placeholder={`Search ${options.length} models — click to enable/disable…`}
+        onSelect={m => toggle(m.id)}
+      />
+      {fetchError && (
+        <p className="text-[10.5px] text-destructive">
+          Couldn't fetch the live list ({fetchError}){' '}
+          <button type="button" className="font-semibold underline" onClick={() => setFetchSeq(s => s + 1)}>
+            retry
+          </button>{' '}
+          — showing built-in defaults meanwhile.
+        </p>
+      )}
     </div>
   );
 }

@@ -77,7 +77,14 @@ export function parseEnabledModels(conn: ConnectionSummary | null | undefined): 
   }
 }
 
-/** Live chat-model ids straight from the provider (free management API, no
+export interface ProviderModel {
+  id: string;
+  /** One-line description for the picker — provider-supplied (Gemini,
+   *  Anthropic) or derived from the id's family (OpenAI). */
+  description: string | null;
+}
+
+/** Live chat models straight from the provider (free management API, no
  *  token spend). Pass a saved connection's recordId, OR raw engineType +
  *  apiKey from the add dialog before saving. */
 export async function fetchProviderModels(input: {
@@ -85,13 +92,15 @@ export async function fetchProviderModels(input: {
   engineType?: string;
   apiKey?: string;
   endpoint?: string | null;
-}): Promise<string[]> {
-  const result = await apexFetch<{ models: string[] }>(
+}): Promise<ProviderModel[]> {
+  const result = await apexFetch<{ models: Array<ProviderModel | string> }>(
     ENGINE_CONNECTIONS_BASE,
     { method: 'POST', body: JSON.stringify({ action: 'fetchModels', ...input }) },
     45000
   );
-  return result.models;
+  // Tolerate the pre-descriptions server shape (bare id strings) during
+  // the window where Render is still rolling out the newer build.
+  return (result.models ?? []).map(m => (typeof m === 'string' ? { id: m, description: null } : m));
 }
 
 export async function saveConnectionModels(recordId: string, models: string[] | null): Promise<void> {

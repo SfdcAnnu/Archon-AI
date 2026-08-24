@@ -72,7 +72,7 @@ global with sharing class AgentEngineConnectionsRestService {
                 return;
             }
             if (action == 'fetchModels') {
-                List<String> models = AiEngineConnectionController.fetchProviderModels(
+                List<Object> models = AiEngineConnectionController.fetchProviderModels(
                     (String) body.get('recordId'),
                     (String) body.get('engineType'),
                     (String) body.get('apiKey'),

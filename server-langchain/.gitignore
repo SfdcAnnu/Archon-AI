@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.env
-keys/
-*.db
-prisma/*.db
-*.log
-boot*.log
-.DS_Store

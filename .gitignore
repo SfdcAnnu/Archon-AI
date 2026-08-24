@@ -82,3 +82,4 @@ force-app.zip
 /prisma/
 .graphqlrc.yml
 .tmp-retrieve/
+server-langchain/

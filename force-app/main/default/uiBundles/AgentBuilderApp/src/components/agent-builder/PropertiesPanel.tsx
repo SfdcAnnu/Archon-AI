@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import type { AgentGraph, NodeConfig } from '@/types/agent';
 import { SubagentForm } from './properties/SubagentForm';
 import { ToolForm } from './properties/ToolForm';
@@ -60,10 +61,15 @@ export function PropertiesPanel({
     if (selectedNodeId) setExpanded(true);
   }, [selectedNodeId]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!node) return;
-    if (!window.confirm(`Remove "${node.name}" from this agent?`)) return;
-    onDeleteNode(node.id);
+    const ok = await confirmDialog({
+      title: `Remove "${node.name}" from this agent?`,
+      description: 'Its connections are removed too. Unsaved canvas changes stay until you save.',
+      confirmLabel: 'Remove node',
+      variant: 'destructive',
+    });
+    if (ok) onDeleteNode(node.id);
   };
 
   const handleClose = () => {

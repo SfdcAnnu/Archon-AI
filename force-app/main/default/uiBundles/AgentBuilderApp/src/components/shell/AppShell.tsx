@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/sonner';
 
 interface NavItem {
   icon: typeof Home;
@@ -63,7 +64,7 @@ function NavSection({ title, items }: { title: string; items: NavItem[] }) {
             onClick={
               item.href
                 ? () => navigate(item.href!)
-                : () => window.alert(`${item.label} — coming soon.`)
+                : () => toast.info(`${item.label} — coming soon.`)
             }
             className={cn(
               'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors',
@@ -158,7 +159,7 @@ export function AppShell({
                     onClick={
                       item.href
                         ? () => navigate(item.href!)
-                        : () => window.alert(`${item.label} — coming soon.`)
+                        : () => toast.info(`${item.label} — coming soon.`)
                     }
                     className={cn(
                       'flex h-9 w-9 items-center justify-center rounded-lg',

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, MicOff, Paperclip, Send, Settings2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/sonner';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { renderMarkdown } from '@/lib/render-markdown';
 import { openChatSocket, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef } from '@/lib/ws-chat';
 import {
@@ -373,7 +375,7 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
       for (const file of files) {
         if (pendingAttachments.length >= MAX_ATTACHMENTS_PER_TURN) break;
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          window.alert(`${file.name} exceeds the 5 MB limit.`);
+          toast.warning(`${file.name} exceeds the 5 MB limit.`);
           continue;
         }
         const id = `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -497,15 +499,24 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
     [handleSend]
   );
 
-  const handleEnd = useCallback(() => {
+  const handleEnd = useCallback(async () => {
     if (!session) return;
-    if (!window.confirm('End this chat? You will start fresh next time.')) return;
+    const ok = await confirmDialog({
+      title: 'End this chat?',
+      description: 'You will start fresh next time — the conversation stays in your history.',
+      confirmLabel: 'End chat',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     endChatSession(session.Id)
       .then(() => {
         reportSessionChange({ sessionId: null, ended: true });
         onClose();
       })
-      .catch(err => console.error('Could not end session:', err));
+      .catch(err => {
+        console.error('Could not end session:', err);
+        toast.error('Could not end the session', { description: err instanceof Error ? err.message : undefined });
+      });
   }, [session, reportSessionChange, onClose]);
 
   // Thumbs on an assistant reply. Clicking the same thumb again clears it.

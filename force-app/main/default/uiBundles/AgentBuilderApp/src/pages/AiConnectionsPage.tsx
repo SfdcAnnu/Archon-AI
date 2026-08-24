@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Star, TestTube2, Trash2, X } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/sonner';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { EngineConnectionFormDialog } from '@/components/connections/EngineConnectionFormDialog';
@@ -205,12 +207,24 @@ export default function AiConnectionsPage() {
   const providerMeta = PROVIDERS.find(p => p.key === selected)!;
   const hasActive = (key: string) => rows.some(r => r.engineType === key && r.isActive);
 
-  const handleDelete = useCallback((row: ConnectionSummary) => {
-    if (!window.confirm(`Delete "${row.label}"?`)) return;
+  const handleDelete = useCallback(async (row: ConnectionSummary) => {
+    const ok = await confirmDialog({
+      title: `Delete "${row.label}"?`,
+      description: 'Agents using this connection will fall back to another active one, or fail.',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     setBusyId(row.id);
     deleteEngineConnection(row.id)
-      .then(() => setRows(list => list.filter(r => r.id !== row.id)))
-      .catch(err => console.error('Delete failed:', err))
+      .then(() => {
+        toast.success(`"${row.label}" deleted.`);
+        setRows(list => list.filter(r => r.id !== row.id));
+      })
+      .catch(err => {
+        console.error('Delete failed:', err);
+        toast.error('Delete failed', { description: err instanceof Error ? err.message : undefined });
+      })
       .finally(() => setBusyId(null));
   }, []);
 
@@ -218,8 +232,15 @@ export default function AiConnectionsPage() {
     (row: ConnectionSummary) => {
       setBusyId(row.id);
       testEngineConnection(row.id)
-        .then(result => window.alert(result.success ? 'Connection OK.' : result.message))
-        .catch(err => console.error('Test failed:', err))
+        .then(result =>
+          result.success
+            ? toast.success('Connection OK.')
+            : toast.error('Connection test failed', { description: result.message })
+        )
+        .catch(err => {
+          console.error('Test failed:', err);
+          toast.error('Connection test failed', { description: err instanceof Error ? err.message : undefined });
+        })
         .finally(() => {
           setBusyId(null);
           load();

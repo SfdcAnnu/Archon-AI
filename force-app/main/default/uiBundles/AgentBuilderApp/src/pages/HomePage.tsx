@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router';
 import { ChevronDown, Loader2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/sonner';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -91,15 +93,24 @@ export default function HomePage() {
   }, [newName, newDepartment, navigate]);
 
   const handleDelete = useCallback(
-    (e: React.MouseEvent, agent: AgentSummary) => {
+    async (e: React.MouseEvent, agent: AgentSummary) => {
       e.stopPropagation();
-      if (!window.confirm(`Delete "${agent.name}"? This can't be undone.`)) return;
+      const ok = await confirmDialog({
+        title: `Delete "${agent.name}"?`,
+        description: "The agent, its nodes, and its configuration are removed. This can't be undone.",
+        confirmLabel: 'Delete agent',
+        variant: 'destructive',
+      });
+      if (!ok) return;
       setDeletingId(agent.id);
       deleteAgent(agent.id)
-        .then(() => setAgents(list => list.filter(a => a.id !== agent.id)))
+        .then(() => {
+          toast.success(`"${agent.name}" deleted.`);
+          setAgents(list => list.filter(a => a.id !== agent.id));
+        })
         .catch(err => {
           console.error('Failed to delete agent:', err);
-          window.alert('Delete failed — see console for details.');
+          toast.error('Delete failed', { description: err instanceof Error ? err.message : 'See console for details.' });
         })
         .finally(() => setDeletingId(null));
     },

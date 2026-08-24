@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plug, Plus, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/sonner';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -150,34 +152,47 @@ export default function ConnectorsAdminPage() {
 
   const handleConnect = useCallback((entry: DirectoryEntry) => {
     if (entry.providerKey === 'salesforce_mcp') {
-      window.alert(
-        "Already connected via Setup — the org-wide Salesforce connection is managed on the Setup page, not here. Per-user access for PerUser-mode agents connects itself from inside a chat session."
-      );
+      toast.info('Already connected via Setup', {
+        description:
+          'The org-wide Salesforce connection is managed on the Setup page. Per-user access for PerUser-mode agents connects itself from inside a chat session.',
+      });
       return;
     }
-    window.alert(`${entry.displayName} isn't wired up yet — coming soon.`);
+    toast.info(`${entry.displayName} isn't wired up yet — coming soon.`);
   }, []);
 
   const handleDisconnect = useCallback(
-    (entry: DirectoryEntry) => {
+    async (entry: DirectoryEntry) => {
       if (!entry.connectorId) return;
-      if (!window.confirm(`Disconnect ${entry.displayName}?`)) return;
+      if (!(await confirmDialog({ title: `Disconnect ${entry.displayName}?`, confirmLabel: 'Disconnect', variant: 'destructive' }))) return;
       setBusyId(entry.connectorId);
       disconnectConnector(entry.connectorId)
-        .then(() => loadDirectory())
-        .catch(err => console.error('Disconnect failed:', err))
+        .then(() => {
+          toast.success(`${entry.displayName} disconnected.`);
+          loadDirectory();
+        })
+        .catch(err => {
+          console.error('Disconnect failed:', err);
+          toast.error('Disconnect failed', { description: err instanceof Error ? err.message : undefined });
+        })
         .finally(() => setBusyId(null));
     },
     [loadDirectory]
   );
 
   const handleDeleteCustom = useCallback(
-    (row: CustomMcpServer) => {
-      if (!window.confirm(`Delete "${row.Name}"?`)) return;
+    async (row: CustomMcpServer) => {
+      if (!(await confirmDialog({ title: `Delete "${row.Name}"?`, description: "This can't be undone.", confirmLabel: 'Delete', variant: 'destructive' }))) return;
       setBusyId(row.Id);
       deleteCustomMcpServer(row.Id)
-        .then(() => setCustomServers(list => list.filter(r => r.Id !== row.Id)))
-        .catch(err => console.error('Delete failed:', err))
+        .then(() => {
+          toast.success(`"${row.Name}" deleted.`);
+          setCustomServers(list => list.filter(r => r.Id !== row.Id));
+        })
+        .catch(err => {
+          console.error('Delete failed:', err);
+          toast.error('Delete failed', { description: err instanceof Error ? err.message : undefined });
+        })
         .finally(() => setBusyId(null));
     },
     []

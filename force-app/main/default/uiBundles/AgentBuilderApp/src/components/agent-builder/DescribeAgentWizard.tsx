@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { saveAgentGraph } from '@/lib/salesforce-data';
 import {
@@ -367,7 +368,17 @@ export function DescribeAgentWizard({ onClose }: DescribeAgentWizardProps) {
   const busy = step === 'analyzing' || step === 'generating' || creating;
   const handleRequestClose = useCallback(() => {
     if (busy) return;
-    if (step !== 'input' && !window.confirm('Discard this agent draft? Your answers and plan will be lost.')) return;
+    if (step !== 'input') {
+      void confirmDialog({
+        title: 'Discard this agent draft?',
+        description: 'Your answers and the generated plan will be lost.',
+        confirmLabel: 'Discard draft',
+        variant: 'destructive',
+      }).then(ok => {
+        if (ok) onClose();
+      });
+      return;
+    }
     onClose();
   }, [busy, step, onClose]);
 

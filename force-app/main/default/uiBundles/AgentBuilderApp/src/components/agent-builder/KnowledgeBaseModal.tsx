@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileText, Loader2, RefreshCw, Trash2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/sonner';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -163,12 +165,18 @@ export function KnowledgeBaseModal({ agentApiName, notesValue, onNotesChange, on
   );
 
   const handleDelete = useCallback(
-    (docId: string) => {
-      if (!window.confirm('Delete this document?')) return;
+    async (docId: string) => {
+      if (!(await confirmDialog({ title: 'Delete this document?', description: 'It is removed from the knowledge base and search index.', confirmLabel: 'Delete', variant: 'destructive' }))) return;
       setBusyDocId(docId);
       deleteDocument(docId)
-        .then(() => setDocs(list => list.filter(d => d.id !== docId)))
-        .catch(err => console.error('Delete failed:', err))
+        .then(() => {
+          toast.success('Document deleted.');
+          setDocs(list => list.filter(d => d.id !== docId));
+        })
+        .catch(err => {
+          console.error('Delete failed:', err);
+          toast.error('Delete failed', { description: err instanceof Error ? err.message : undefined });
+        })
         .finally(() => setBusyDocId(null));
     },
     []

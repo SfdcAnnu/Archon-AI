@@ -3,6 +3,8 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { toast as notify } from '@/components/ui/sonner';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { getSetupStatus, refreshSetupStatus, startSetup, resetSetup, type SetupStatus } from '@/lib/setup-data';
 
 /** Org-level Archon OAuth connection wizard — admin-only, rarely used
@@ -61,17 +63,25 @@ export default function SetupPage() {
       });
   }, []);
 
-  const handleReset = useCallback(() => {
-    if (!window.confirm('Reset the Archon connection? You will need to re-authorize.')) return;
+  const handleReset = useCallback(async () => {
+    const ok = await confirmDialog({
+      title: 'Reset the Archon connection?',
+      description: 'You will need to re-authorize before agents can run again.',
+      confirmLabel: 'Reset',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     setBusy(true);
     resetSetup()
       .then(() => getSetupStatus())
       .then(s => {
+        notify.success('Connection reset.');
         setStatus(s);
         setBusy(false);
       })
       .catch(err => {
         console.error('Failed to reset setup:', err);
+        notify.error('Reset failed', { description: err instanceof Error ? err.message : undefined });
         setBusy(false);
       });
   }, []);

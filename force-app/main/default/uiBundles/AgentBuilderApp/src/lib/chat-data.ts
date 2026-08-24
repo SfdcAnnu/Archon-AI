@@ -32,6 +32,7 @@ export interface RawChatMessage {
   TokensIn__c: number | null;
   TokensOut__c: number | null;
   SequenceNumber__c: number;
+  Feedback__c?: string | null;
   CreatedDate: string;
 }
 
@@ -89,6 +90,21 @@ export async function sendChatTurn(
   return apexFetch<TurnResult>(CHAT_BASE, {
     method: 'POST',
     body: JSON.stringify({ action: 'sendTurn', sessionId, userText, attachments }),
+  });
+}
+
+/** Thumbs-up/down on an assistant reply. Fresh WS replies may not have a
+ *  record Id client-side (persistence is async server-side), so content is
+ *  always sent as the fallback matcher. value '' clears the feedback. */
+export async function sendMessageFeedback(
+  sessionId: string,
+  messageId: string | null,
+  contentMatch: string,
+  value: 'up' | 'down' | ''
+): Promise<{ messageId: string }> {
+  return apexFetch<{ messageId: string }>(CHAT_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'feedback', sessionId, messageId, contentMatch, value }),
   });
 }
 

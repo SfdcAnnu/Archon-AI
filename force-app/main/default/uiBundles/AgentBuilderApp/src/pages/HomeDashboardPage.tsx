@@ -150,7 +150,7 @@ export default function HomeDashboardPage() {
                   <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Generate an agent
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => navigate('/')}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> All workflows
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> All agents
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => navigate('/chat')}>
                   <MessageSquare className="mr-1.5 h-3.5 w-3.5" /> Open chat

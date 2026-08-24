@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import {
   Home,
-  Workflow,
+  Bot,
   LayoutGrid,
   Activity,
   MessageCircle,
@@ -28,7 +28,7 @@ interface NavItem {
 
 const BUILD_ITEMS: NavItem[] = [
   { icon: Home, label: 'Home', href: '/home' },
-  { icon: Workflow, label: 'Workflows', href: '/' },
+  { icon: Bot, label: 'Agents', href: '/' },
   { icon: LayoutGrid, label: 'Templates', href: '/templates' },
   { icon: MessageCircle, label: 'Chat', href: '/chat' },
 ];
@@ -40,7 +40,7 @@ const MONITOR_ITEMS: NavItem[] = [
 const ADMIN_ITEMS: NavItem[] = [
   { icon: Users, label: 'Users & Roles', comingSoon: true },
   { icon: Layers, label: 'Environments', href: '/environments' },
-  { icon: KeyRound, label: 'Credentials', href: '/ai-connections' },
+  { icon: KeyRound, label: 'AI Models', href: '/ai-connections' },
   { icon: Plug, label: 'Connectors', href: '/connectors' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ];

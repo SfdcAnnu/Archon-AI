@@ -110,7 +110,7 @@ export default function HomePage() {
     <AppShell>
       <div className="flex h-full w-full flex-col overflow-y-auto">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-5">
-          <span className="text-[14px] font-bold text-foreground">Workflows</span>
+          <span className="text-[14px] font-bold text-foreground">Agents</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" className="h-8 text-xs">

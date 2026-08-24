@@ -27,7 +27,7 @@ public with sharing class AiEngineConnectionController {
             SELECT Id, Name, Label__c, User__c, User__r.Name, OwnershipType__c, EngineType__c,
                    Endpoint__c, DefaultModel__c, IsActive__c, IsPreferred__c,
                    ValidationStatus__c, LastValidatedAt__c, LastUsedAt__c, IsPublicShared__c,
-                   OwnerId
+                   AvailableModelsJson__c, OwnerId
             FROM AiEngineConnection__c
             WHERE EngineType__c = :engineType
             WITH USER_MODE
@@ -312,7 +312,30 @@ public with sharing class AiEngineConnectionController {
         s.validationStatus = c.ValidationStatus__c;
         s.lastValidatedAt  = c.LastValidatedAt__c;
         s.lastUsedAt       = c.LastUsedAt__c;
+        s.availableModels  = c.AvailableModelsJson__c;
         return s;
+    }
+
+    // ── MODEL CATALOG ─────────────────────────────────────────────
+
+    /** Replace the connection's enabled-models list (JSON array of model id
+     *  strings). Validated here so a UI bug can never store non-JSON that
+     *  every model picker would then choke on. Empty/null clears back to
+     *  provider defaults. */
+    @AuraEnabled
+    public static void saveModels(Id recordId, String modelsJson) {
+        if (recordId == null) throw new AuraHandledException('recordId is required.');
+        if (String.isNotBlank(modelsJson)) {
+            Object parsed = JSON.deserializeUntyped(modelsJson);
+            if (!(parsed instanceof List<Object>)) {
+                throw new AuraHandledException('modelsJson must be a JSON array of model ids.');
+            }
+        }
+        AiEngineConnection__c rec = [
+            SELECT Id FROM AiEngineConnection__c WHERE Id = :recordId WITH USER_MODE LIMIT 1
+        ];
+        rec.AvailableModelsJson__c = String.isBlank(modelsJson) ? null : modelsJson;
+        update rec;
     }
 
     private static SynapseInstall__c getInstall() {
@@ -370,6 +393,7 @@ public with sharing class AiEngineConnectionController {
         @AuraEnabled public String   validationStatus;
         @AuraEnabled public DateTime lastValidatedAt;
         @AuraEnabled public DateTime lastUsedAt;
+        @AuraEnabled public String   availableModels;
     }
 
     public class TestResult {

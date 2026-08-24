@@ -87,6 +87,17 @@ global with sharing class AgentChatRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(upload));
                 return;
             }
+            if (action == 'feedback') {
+                String savedId = AgentChatController.saveMessageFeedback(
+                    (String) body.get('sessionId'),
+                    (String) body.get('messageId'),
+                    (String) body.get('contentMatch'),
+                    (String) body.get('value')
+                );
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, String>{ 'messageId' => savedId }));
+                return;
+            }
             if (action == 'startMyConnection') {
                 AgentUserConnectionController.StartResult startResult =
                     AgentUserConnectionController.startMyConnection((String) body.get('returnUrl'));

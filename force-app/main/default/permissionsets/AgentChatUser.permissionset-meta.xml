@@ -121,6 +121,7 @@
     <fieldPermissions><field>ChatMessage__c.TokensIn__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.TokensOut__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Sensitive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.Feedback__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.RequiredApproval__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
@@ -170,6 +171,7 @@
     <fieldPermissions><field>AiEngineConnection__c.LastUsedAt__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.ValidationStatus__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.Notes__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.AvailableModelsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentNode__c.AiEngineConnection__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
 </PermissionSet>

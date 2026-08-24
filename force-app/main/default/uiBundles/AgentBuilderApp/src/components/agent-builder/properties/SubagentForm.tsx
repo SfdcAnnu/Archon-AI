@@ -2,7 +2,7 @@ import { Sparkles } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { MODEL_OPTIONS } from '@/data/node-catalog';
+import { useEngineModels } from '@/lib/use-engine-models';
 import type { AgentNode, SubagentNodeConfig } from '@/types/agent';
 
 export interface SubagentFormProps {
@@ -12,7 +12,7 @@ export interface SubagentFormProps {
 
 export function SubagentForm({ node, onConfigChange }: SubagentFormProps) {
   const cfg = node.config as SubagentNodeConfig;
-  const models = MODEL_OPTIONS[node.nodeSubType] ?? MODEL_OPTIONS.claude;
+  const models = useEngineModels(node.nodeSubType);
 
   return (
     <div className="space-y-4">

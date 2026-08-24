@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, MicOff, Paperclip, Send, Settings2, X } from 'lucide-react';
+import { Loader2, Mic, MicOff, Paperclip, Send, Settings2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { renderMarkdown } from '@/lib/render-markdown';
 import { openChatSocket, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef } from '@/lib/ws-chat';
@@ -9,6 +9,7 @@ import {
   startMyConnection,
   uploadChatFile,
   endChatSession,
+  sendMessageFeedback,
   type RawChatMessage,
   type RawChatSession,
   type ConnectionGate,
@@ -37,6 +38,7 @@ interface DisplayMessage {
   createdDate: string;
   isError?: boolean;
   isPending?: boolean;
+  feedback?: 'up' | 'down' | null;
 }
 
 function toDisplay(m: RawChatMessage): DisplayMessage | null {
@@ -55,6 +57,7 @@ function toDisplay(m: RawChatMessage): DisplayMessage | null {
     content: m.Content__c ?? '',
     toolLabel,
     createdDate: m.CreatedDate,
+    feedback: m.Feedback__c === 'up' || m.Feedback__c === 'down' ? m.Feedback__c : null,
   };
 }
 
@@ -505,6 +508,25 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
       .catch(err => console.error('Could not end session:', err));
   }, [session, reportSessionChange, onClose]);
 
+  // Thumbs on an assistant reply. Clicking the same thumb again clears it.
+  // Fresh WS replies have a client-generated id ('assistant_…') because
+  // persistence happens server-side after the turn — the Apex action then
+  // locates the record by exact content match instead.
+  const handleFeedback = useCallback(
+    (msg: DisplayMessage, value: 'up' | 'down') => {
+      if (!session) return;
+      const previous = msg.feedback ?? null;
+      const next = previous === value ? '' : value;
+      setMessages(list => list.map(x => (x.id === msg.id ? { ...x, feedback: next === '' ? null : next } : x)));
+      const isRecordId = /^[a-zA-Z0-9]{15,18}$/.test(msg.id);
+      sendMessageFeedback(session.Id, isRecordId ? msg.id : null, msg.content, next).catch(err => {
+        console.error('Feedback failed:', err);
+        setMessages(list => list.map(x => (x.id === msg.id ? { ...x, feedback: previous } : x)));
+      });
+    },
+    [session]
+  );
+
   const needsConnection = gate.accessMode === 'PerUser' && !gate.connected;
 
   return (
@@ -553,8 +575,11 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
             );
           }
           const isUser = m.role === 'User';
+          const time = m.createdDate
+            ? new Date(m.createdDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '';
           return (
-            <div key={m.id} className={isUser ? 'flex justify-end' : 'flex justify-start'}>
+            <div key={m.id} className={isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'}>
               <div
                 className={`max-w-[85%] rounded-lg px-3 py-2 text-[12.5px] leading-relaxed ${
                   isUser
@@ -572,6 +597,37 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}
                   />
                 )}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 px-1">
+                {!isUser && !m.isError && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(m, 'up')}
+                      aria-label="Good response"
+                      className={`flex h-5 w-5 items-center justify-center rounded border ${
+                        m.feedback === 'up'
+                          ? 'border-[var(--archon-success)]/40 bg-[var(--archon-success)]/10 text-[var(--archon-success)]'
+                          : 'border-border text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      <ThumbsUp className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(m, 'down')}
+                      aria-label="Bad response"
+                      className={`flex h-5 w-5 items-center justify-center rounded border ${
+                        m.feedback === 'down'
+                          ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                          : 'border-border text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      <ThumbsDown className="h-3 w-3" />
+                    </button>
+                  </>
+                )}
+                {time && <span className="text-[9.5px] text-muted-foreground/70">{time}</span>}
               </div>
             </div>
           );
@@ -642,6 +698,9 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          <p className="mt-1.5 text-center text-[9.5px] text-muted-foreground/60">
+            Responses are AI-generated and may be inaccurate.
+          </p>
         </div>
       )}
     </div>

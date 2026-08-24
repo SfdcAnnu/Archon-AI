@@ -572,12 +572,62 @@ public with sharing class AgentChatController {
         return rows[0];
     }
 
+    /**
+     * Record a thumbs-up/down on an assistant message. The WS chat path
+     * persists messages server-side AFTER the turn is delivered, so the
+     * browser often has no record Id for the reply it's rating — callers
+     * may pass contentMatch instead and we find the newest assistant
+     * message in the session with that exact content. value: 'up', 'down',
+     * or blank to clear.
+     */
+    public static String saveMessageFeedback(Id sessionId, Id messageId, String contentMatch, String value) {
+        if (String.isNotBlank(value) && value != 'up' && value != 'down') {
+            throw new ChatException('Feedback value must be "up", "down", or empty.');
+        }
+        // Ownership/visibility enforced by USER_MODE on the session lookup.
+        List<ChatSession__c> sessions = [
+            SELECT Id FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
+        ];
+        if (sessions.isEmpty()) throw new ChatException('Session not found.');
+
+        List<ChatMessage__c> msgs;
+        if (messageId != null) {
+            msgs = [
+                SELECT Id FROM ChatMessage__c
+                WHERE Id = :messageId AND ChatSession__c = :sessionId
+                WITH USER_MODE LIMIT 1
+            ];
+        } else {
+            if (String.isBlank(contentMatch)) throw new ChatException('Pass messageId or contentMatch.');
+            // Content__c is a long text area — not filterable in SOQL — so
+            // pull the session's recent assistant messages and match here.
+            msgs = new List<ChatMessage__c>();
+            for (ChatMessage__c candidate : [
+                SELECT Id, Content__c FROM ChatMessage__c
+                WHERE ChatSession__c = :sessionId AND Role__c = 'Assistant'
+                WITH USER_MODE
+                ORDER BY SequenceNumber__c DESC
+                LIMIT 20
+            ]) {
+                if (candidate.Content__c == contentMatch) {
+                    msgs.add(candidate);
+                    break;
+                }
+            }
+        }
+        if (msgs.isEmpty()) throw new ChatException('Message not found — it may not be saved yet. Try again in a moment.');
+
+        update new ChatMessage__c(Id = msgs[0].Id, Feedback__c = String.isBlank(value) ? null : value);
+        return msgs[0].Id;
+    }
+
     private static List<ChatMessage__c> loadMessages(Id sessionId) {
         return [
             SELECT Id, Name, Role__c, Content__c, ToolCallsJson__c, ToolResultsJson__c,
                    ModelUsed__c, TokensIn__c, TokensOut__c, SequenceNumber__c,
                    Sensitive__c, RequiredApproval__c, ApprovedAt__c, ApprovalStatus__c,
-                   AttachedContentDocumentIds__c, RequestPayload__c, ResponsePayload__c, CreatedDate
+                   AttachedContentDocumentIds__c, RequestPayload__c, ResponsePayload__c,
+                   Feedback__c, CreatedDate
             FROM ChatMessage__c
             WHERE ChatSession__c = :sessionId
             WITH USER_MODE

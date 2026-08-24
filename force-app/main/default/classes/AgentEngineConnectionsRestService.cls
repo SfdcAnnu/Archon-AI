@@ -71,6 +71,15 @@ global with sharing class AgentEngineConnectionsRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
                 return;
             }
+            if (action == 'saveModels') {
+                AiEngineConnectionController.saveModels(
+                    (String) body.get('recordId'),
+                    (String) body.get('modelsJson')
+                );
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
+                return;
+            }
             if (action == 'test') {
                 AiEngineConnectionController.TestResult result =
                     AiEngineConnectionController.testConnection((String) body.get('recordId'));

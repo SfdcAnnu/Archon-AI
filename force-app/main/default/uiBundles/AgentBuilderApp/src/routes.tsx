@@ -23,7 +23,7 @@ export const routes: RouteObject[] = [
   {
     path: '/',
     element: <HomePage />,
-    handle: { showInNavigation: true, label: 'Workflows' },
+    handle: { showInNavigation: true, label: 'Agents' },
   },
   {
     path: '/home',
@@ -68,7 +68,7 @@ export const routes: RouteObject[] = [
   {
     path: '/ai-connections',
     element: <AiConnectionsPage />,
-    handle: { showInNavigation: true, label: 'AI Connections' },
+    handle: { showInNavigation: true, label: 'AI Models' },
   },
   {
     path: '/connectors',

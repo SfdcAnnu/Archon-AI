@@ -2,7 +2,7 @@ import { Sparkles } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { MODEL_OPTIONS } from '@/data/node-catalog';
+import { useEngineModels } from '@/lib/use-engine-models';
 import { AiEngineConnectionPicker } from './AiEngineConnectionPicker';
 import type { AgentNode, AiNodeConfig } from '@/types/agent';
 
@@ -25,7 +25,7 @@ export interface AiRootFormProps {
  *  work" — never followed up on until now). */
 export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectionBound }: AiRootFormProps) {
   const cfg = node.config as AiNodeConfig;
-  const models = MODEL_OPTIONS[node.nodeSubType] ?? MODEL_OPTIONS.claude;
+  const models = useEngineModels(node.nodeSubType);
 
   return (
     <div className="space-y-4">

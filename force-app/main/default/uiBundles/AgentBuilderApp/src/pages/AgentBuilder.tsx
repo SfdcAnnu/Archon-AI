@@ -393,7 +393,7 @@ export default function AgentBuilder() {
                 onClick={() => navigate('/')}
                 className="text-[12.5px] font-medium text-muted-foreground hover:text-foreground hover:underline"
               >
-                Workflows /
+                Agents /
               </button>
               <span className="truncate text-[14px] font-bold text-foreground">{graph.agent.name}</span>
             </div>

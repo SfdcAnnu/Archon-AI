@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MemorySummary__c</fullName>
+    <label>Memory Summary</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>5</visibleLines>
+    <description>Running LLM-maintained summary of older turns (the "CONVERSATION SO FAR" block). Written asynchronously by the Node server after replies; sent to the model in place of raw history once the conversation passes the length threshold.</description>
+</CustomField>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MemoryFactsJson__c</fullName>
+    <label>Memory Facts (JSON)</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>5</visibleLines>
+    <description>Structured session scratchpad (verified identity, exact record Ids, amounts, rejected offers) maintained alongside MemorySummary__c. Pinned into every turn's system prompt so exact values survive summarization.</description>
+</CustomField>

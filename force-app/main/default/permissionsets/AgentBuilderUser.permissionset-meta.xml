@@ -317,6 +317,9 @@
     <fieldPermissions><field>ChatMessage__c.RequestPayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ResponsePayload__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.MemorySummary__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.MemoryFactsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.MemoryCoveredCount__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- ── AiEngineConnection__c field permissions (merged from ArchonAiEngineAdmin) ── -->
     <fieldPermissions><field>AiEngineConnection__c.User__c</field><readable>true</readable><editable>true</editable></fieldPermissions>

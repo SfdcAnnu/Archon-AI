@@ -174,4 +174,7 @@
     <fieldPermissions><field>AiEngineConnection__c.AvailableModelsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentNode__c.AiEngineConnection__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatSession__c.TitleGeneratedByAi__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.MemorySummary__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.MemoryFactsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatSession__c.MemoryCoveredCount__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 </PermissionSet>

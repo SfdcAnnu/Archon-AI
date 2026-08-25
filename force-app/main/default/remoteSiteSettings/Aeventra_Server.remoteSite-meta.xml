@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Aeventra AI Agent Server (LangChain/LangGraph edition) endpoint — the cutover target for ServerUrl__c on SynapseConfig.Default.</description>
+    <disableProtocolSecurity>false</disableProtocolSecurity>
+    <isActive>true</isActive>
+    <url>https://aeventra-ai-agent-server.onrender.com</url>
+</RemoteSiteSetting>

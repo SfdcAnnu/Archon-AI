@@ -82,12 +82,27 @@ public with sharing class WhatsAppAgentBridge {
         Id leadId = msg.tdc_tsw__Lead__c;
         Id contactId = msg.tdc_tsw__Contact__c;
 
-        // Priority order for "which record is this conversation about" —
-        // Opportunity is the most precise match for the business flow, but
-        // whichever of these the incoming message actually has populated
-        // varies by how 360 SMS App matched the inbound number. Unverified
-        // against real inbound data (org has none yet) — check this first
-        // when a real message arrives.
+        // 360 SMS usually matches an inbound number to the CONTACT, not the
+        // Opportunity — confirmed with real inbound data. A Contact-anchored
+        // session can never line up with WhatsAppRevivalInitiator's
+        // Opportunity-anchored one (template message + revival context live
+        // there), so when no Opportunity came in directly, derive the
+        // contact's most recent Closed Lost Opportunity and anchor to THAT.
+        if (oppId == null && contactId != null) {
+            try {
+                List<OpportunityContactRole> roles = [
+                    SELECT OpportunityId FROM OpportunityContactRole
+                    WHERE ContactId = :contactId AND Opportunity.StageName = 'Closed Lost'
+                    WITH USER_MODE
+                    ORDER BY Opportunity.CloseDate DESC, Opportunity.LastModifiedDate DESC
+                    LIMIT 1
+                ];
+                if (!roles.isEmpty()) oppId = roles[0].OpportunityId;
+            } catch (Exception e) {
+                logError('derive opportunity from contact', messageId, e);
+            }
+        }
+
         String recordContextId = oppId != null ? oppId : (leadId != null ? leadId : contactId);
         String recordContextType = oppId != null ? 'Opportunity' : (leadId != null ? 'Lead' : (contactId != null ? 'Contact' : null));
 
@@ -197,7 +212,15 @@ public with sharing class WhatsAppAgentBridge {
             Boolean sendFailed = false;
             if (String.isNotBlank(senderNumber)) {
                 try {
-                    tdc_tsw.GlobalSMSSender.sendSmsWithPhoneNumberAndMessageText(senderNumber, replyText, recordContextId);
+                    // Related record for the OUTGOING reply = the person
+                    // (Contact/Lead), never the Opportunity — 360 SMS threads
+                    // its Conversation View on the person record and the
+                    // customer's incoming messages already relate there.
+                    // recordContextId (the Opportunity since the session-
+                    // anchoring fix) stays the AGENT's context only.
+                    String smsRelatedId = contactId != null ? String.valueOf(contactId)
+                        : (leadId != null ? String.valueOf(leadId) : recordContextId);
+                    tdc_tsw.GlobalSMSSender.sendSmsWithPhoneNumberAndMessageText(senderNumber, replyText, smsRelatedId);
                 } catch (Exception e) {
                     logError('WhatsApp send', messageId, e);
                     sendFailed = true;

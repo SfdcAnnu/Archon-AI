@@ -96,13 +96,18 @@ public with sharing class WhatsAppRevivalInitiator {
         }
 
         try {
-            tdc_tsw.GlobalSMSSender.sendSmsWithPhoneNumberAndTemplateId(phone, template.Id, opportunityId);
+            // Related record = the CONTACT, not the Opportunity — 360 SMS
+            // threads its Conversation View on the person record, and the
+            // customer's own incoming replies relate to the Contact; mixing
+            // related objects splits one conversation across two views. The
+            // chat SESSION still anchors to the Opportunity (agent context).
+            tdc_tsw.GlobalSMSSender.sendSmsWithPhoneNumberAndTemplateId(phone, template.Id, ct.Id);
         } catch (Exception e) {
             logError('template send failed', opportunityId, e);
             return; // don't log a chat message for a send that never went out
         }
 
-        logSentTemplateAsFirstMessage(opportunityId, opp.OwnerId, template);
+        logSentTemplateAsFirstMessage(opportunityId, ct.Id, opp.OwnerId, template);
     }
 
     /**
@@ -115,7 +120,7 @@ public with sharing class WhatsAppRevivalInitiator {
      * like the outreach itself failed.
      */
     @TestVisible
-    private static void logSentTemplateAsFirstMessage(Id opportunityId, Id ownerId, tdc_tsw__Message_Template__c template) {
+    private static void logSentTemplateAsFirstMessage(Id opportunityId, Id contactId, Id ownerId, tdc_tsw__Message_Template__c template) {
         try {
             // Prefer the actual resolved/sent text from 360 SMS App's own
             // outgoing message log (merge fields like {!Contact.Name}
@@ -127,7 +132,7 @@ public with sharing class WhatsAppRevivalInitiator {
                 List<tdc_tsw__Message__c> sent = [
                     SELECT Id, tdc_tsw__Message_Text_New__c
                     FROM tdc_tsw__Message__c
-                    WHERE tdc_tsw__ContextId__c = :opportunityId
+                    WHERE tdc_tsw__ContextId__c = :contactId
                       AND RecordType.DeveloperName = 'Outgoing'
                     WITH USER_MODE
                     ORDER BY CreatedDate DESC

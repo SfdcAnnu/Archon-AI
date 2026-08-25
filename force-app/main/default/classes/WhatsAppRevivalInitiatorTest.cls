@@ -42,7 +42,7 @@ private class WhatsAppRevivalInitiatorTest {
         );
 
         Test.startTest();
-        WhatsAppRevivalInitiator.logSentTemplateAsFirstMessage(opp.Id, UserInfo.getUserId(), template);
+        WhatsAppRevivalInitiator.logSentTemplateAsFirstMessage(opp.Id, ct.Id, UserInfo.getUserId(), template);
         Test.stopTest();
 
         // No ChatSession__c should have been created — the agent lookup

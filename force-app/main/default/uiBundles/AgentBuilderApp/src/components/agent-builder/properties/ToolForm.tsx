@@ -25,6 +25,11 @@ const ACTION_TYPES: ToolNodeConfig['actionType'][] = ['MCP', 'Apex', 'Flow'];
 export interface ToolFormProps {
   node: AgentNode;
   onConfigChange: (patch: Partial<ToolNodeConfig>) => void;
+  /** Multi-select support: create one NEW tool node per entry, wired to the
+   *  same parent as this node (AgentBuilder implements the graph mutation).
+   *  This keeps the one-node-one-tool contract while letting the user pick
+   *  several tools in a single visit to this list. */
+  onAddSiblingTools?: (tools: Array<{ name: string; description: string | null }>) => void;
 }
 
 function ParamList({ title, icon: Icon, params }: { title: string; icon: typeof ArrowDownToLine; params: CustomActionParam[] }) {
@@ -62,8 +67,11 @@ function ParamList({ title, icon: Icon, params }: { title: string; icon: typeof 
  *  PROVIDER KEY in config.connectorId (e.g. 'salesforce_mcp'), so that
  *  stays the MCP select's value — changing that convention would orphan
  *  every saved tool binding. */
-export function ToolForm({ node, onConfigChange }: ToolFormProps) {
+export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormProps) {
   const cfg = node.config as ToolNodeConfig;
+  /** Tool names ticked for "also add as their own nodes" (never includes
+   *  this node's own bound tool). */
+  const [staged, setStaged] = useState<Set<string>>(new Set());
 
   const [directory, setDirectory] = useState<DirectoryEntry[] | null>(null);
   const [directoryWaking, setDirectoryWaking] = useState(false);
@@ -320,35 +328,79 @@ export function ToolForm({ node, onConfigChange }: ToolFormProps) {
                 )}
                 {tools.map(t => {
                   const selected = t.name === cfg?.toolName;
+                  const isStaged = staged.has(t.name);
                   return (
-                    <button
+                    <div
                       key={t.name}
-                      type="button"
-                      onClick={() => handlePickTool(t)}
                       className={cn(
-                        'flex w-full items-start gap-2 border-t border-border px-2.5 py-2 text-left first:border-t-0',
-                        selected ? 'bg-accent' : 'hover:bg-secondary'
+                        'flex w-full items-start gap-2 border-t border-border px-2.5 py-2 first:border-t-0',
+                        selected ? 'bg-accent' : isStaged ? 'bg-[var(--archon-success)]/5' : 'hover:bg-secondary'
                       )}
                     >
-                      <span
-                        className={cn(
-                          'mt-0.5 h-3 w-3 shrink-0 rounded-full border-2',
-                          selected ? 'border-[4px] border-primary' : 'border-border'
-                        )}
-                      />
-                      <span className="min-w-0">
-                        <span className="block font-mono text-[10.5px] font-semibold text-foreground">{t.name}</span>
-                        {t.description && (
-                          <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,#b45309)]' : 'text-muted-foreground')}>
-                            {isWriteTool(t.name) && <PenLine className="mr-1 inline h-2.5 w-2.5" />}
-                            {t.description}
-                          </span>
-                        )}
-                      </span>
-                    </button>
+                      <button type="button" onClick={() => handlePickTool(t)} className="flex min-w-0 flex-1 items-start gap-2 text-left">
+                        <span
+                          className={cn(
+                            'mt-0.5 h-3 w-3 shrink-0 rounded-full border-2',
+                            selected ? 'border-[4px] border-primary' : 'border-border'
+                          )}
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-mono text-[10.5px] font-semibold text-foreground">{t.name}</span>
+                          {t.description && (
+                            <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,#b45309)]' : 'text-muted-foreground')}>
+                              {isWriteTool(t.name) && <PenLine className="mr-1 inline h-2.5 w-2.5" />}
+                              {t.description}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                      {/* Multi-select: stage this tool to become its OWN node
+                          alongside this one — keeps one-node-one-tool while
+                          letting several be picked in one pass. */}
+                      {onAddSiblingTools && !selected && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setStaged(prev => {
+                              const next = new Set(prev);
+                              if (next.has(t.name)) next.delete(t.name);
+                              else next.add(t.name);
+                              return next;
+                            })
+                          }
+                          title={isStaged ? 'Remove from the add list' : 'Also add this tool as its own node'}
+                          className={cn(
+                            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[12px] font-bold leading-none',
+                            isStaged
+                              ? 'border-[var(--archon-success)]/50 bg-[var(--archon-success)]/10 text-[var(--archon-success)]'
+                              : 'border-border text-muted-foreground/70 hover:border-primary/50 hover:text-primary'
+                          )}
+                        >
+                          {isStaged ? '✓' : '+'}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
+              {staged.size > 0 && (
+                <div className="flex items-center justify-between gap-2 border-t border-border bg-[var(--archon-success)]/5 px-2.5 py-1.5">
+                  <span className="text-[10.5px] font-semibold text-foreground">
+                    {staged.size} more tool node{staged.size === 1 ? '' : 's'} will be added next to this one
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md bg-primary px-2.5 py-1 text-[10.5px] font-bold text-primary-foreground hover:opacity-90"
+                    onClick={() => {
+                      const picked = (tools ?? []).filter(t => staged.has(t.name)).map(t => ({ name: t.name, description: t.description }));
+                      onAddSiblingTools?.(picked);
+                      setStaged(new Set());
+                    }}
+                  >
+                    Add {staged.size} node{staged.size === 1 ? '' : 's'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
           <button
@@ -359,9 +411,9 @@ export function ToolForm({ node, onConfigChange }: ToolFormProps) {
             Enter a tool name manually instead ›
           </button>
           <p className="text-[10px] leading-snug text-muted-foreground">
-            A Tool node runs exactly ONE action (its own description &amp; approval gate) — that's why this list is
-            single-select. To let the agent use MANY tools from this server, add a Tool Catalog node instead and tick
-            them there.
+            A Tool node runs exactly ONE action (its own description &amp; approval gate) — the radio picks THIS
+            node's tool. Want several at once? Tick <b>+</b> on the other tools and each becomes its own node, wired
+            to the same parent. For broad access without per-tool settings, a Tool Catalog node does that too.
           </p>
         </div>
       )}

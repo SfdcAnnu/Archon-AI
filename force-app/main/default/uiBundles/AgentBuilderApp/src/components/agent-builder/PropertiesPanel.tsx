@@ -31,6 +31,8 @@ export interface PropertiesPanelProps {
   onProviderChange: (id: string, nodeSubType: string) => void;
   onConnectionBound: (id: string, connectionId: string | null) => void;
   onDeleteNode: (id: string) => void;
+  /** ToolForm multi-select: create extra tool nodes next to the given one. */
+  onAddSiblingTools?: (sourceNodeId: string, connectorId: string, tools: Array<{ name: string; description: string | null }>) => void;
   /** AutomationReviewView (Trigger-mode) — view only, no rename/delete, and
    *  every node type renders via ReadOnlySummary regardless of its usual
    *  editable form (a Trigger-mode "ai" step node must never hit the
@@ -52,6 +54,7 @@ export function PropertiesPanel({
   onProviderChange,
   onConnectionBound,
   onDeleteNode,
+  onAddSiblingTools,
   readOnly = false,
 }: PropertiesPanelProps) {
   const node = graph.nodes.find(n => n.id === selectedNodeId) ?? null;
@@ -166,7 +169,15 @@ export function PropertiesPanel({
                   <SubagentForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
                 )}
                 {node.nodeType === 'tool' && (
-                  <ToolForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  <ToolForm
+                    node={node}
+                    onConfigChange={patch => onConfigChange(node.id, patch)}
+                    onAddSiblingTools={
+                      onAddSiblingTools
+                        ? tools => onAddSiblingTools(node.id, (node.config as { connectorId?: string }).connectorId ?? '', tools)
+                        : undefined
+                    }
+                  />
                 )}
                 {node.nodeType === 'catalog' && (
                   <CatalogForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />

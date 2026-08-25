@@ -285,6 +285,60 @@ export default function AgentBuilder() {
     setGraph(g => ({ ...g, nodes: g.nodes.map(n => (n.id === id ? { ...n, name } : n)) }));
   }, []);
 
+  // ToolForm's multi-select: the user ticked extra tools in one tool node's
+  // live list — spawn one ready-wired sibling Tool node per tool, attached
+  // to the SAME parent (found via the node's incoming edge; root ai as the
+  // fallback), stacked below the source node. Same fromPort:'tool' rule as
+  // every other tool insertion — anything else is invisible at runtime.
+  const handleAddSiblingTools = useCallback(
+    (sourceNodeId: string, connectorId: string, picked: Array<{ name: string; description: string | null }>) => {
+      if (picked.length === 0) return;
+      setGraph(g => {
+        const source = g.nodes.find(n => n.id === sourceNodeId);
+        if (!source) return g;
+        const incoming = g.connections.find(c => c.toNodeId === sourceNodeId);
+        const ownerId = incoming?.fromNodeId ?? g.nodes.find(n => n.nodeType === 'ai')?.id;
+        const newNodes = picked.map((t, i) => {
+          nodeSeq += 1;
+          return {
+            id: `new_${nodeSeq}`,
+            name: t.name,
+            nodeType: 'tool' as const,
+            nodeSubType: 'tool',
+            config: {
+              description: t.description ?? '',
+              actionType: 'MCP' as const,
+              toolName: t.name,
+              connectorId,
+              requiresApproval: false,
+            },
+            positionX: source.positionX + 40 * (i + 1),
+            positionY: source.positionY + 80 * (i + 1),
+            sortOrder: g.nodes.length + i,
+            isEnabled: true,
+          };
+        });
+        return {
+          ...g,
+          nodes: [...g.nodes, ...newNodes],
+          connections: ownerId
+            ? [
+                ...g.connections,
+                ...newNodes.map((n, i) => ({
+                  id: `conn_${Date.now()}_${i}`,
+                  fromNodeId: ownerId,
+                  fromPort: 'tool' as const,
+                  toNodeId: n.id,
+                  toPort: 'in' as const,
+                })),
+              ]
+            : g.connections,
+        };
+      });
+    },
+    []
+  );
+
   // The 'ai' root node is the one thing every other node attaches to —
   // deleting it would orphan the whole graph, so it's the one node type
   // this doesn't allow (enforced again in PropertiesPanel, which hides the
@@ -529,6 +583,7 @@ export default function AgentBuilder() {
             onProviderChange={handleProviderChange}
             onConnectionBound={handleConnectionBound}
             onDeleteNode={handleDeleteNode}
+            onAddSiblingTools={handleAddSiblingTools}
           />
           {quickAdd && (
             <NodeQuickAdd

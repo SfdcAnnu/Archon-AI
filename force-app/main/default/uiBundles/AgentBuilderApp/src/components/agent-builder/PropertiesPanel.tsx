@@ -166,7 +166,11 @@ export function PropertiesPanel({
             ) : (
               <>
                 {node.nodeType === 'subagent' && (
-                  <SubagentForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  <SubagentForm
+                    node={node}
+                    onConfigChange={patch => onConfigChange(node.id, patch)}
+                    onProviderChange={subType => onProviderChange(node.id, subType)}
+                  />
                 )}
                 {node.nodeType === 'tool' && (
                   <ToolForm

@@ -8,6 +8,6 @@
     </values>
     <values>
         <field>ServerUrl__c</field>
-        <value xsi:type="xsd:string">https://archon-server-d31n.onrender.com</value>
+        <value xsi:type="xsd:string">https://aeventra-ai-agent-server.onrender.com</value>
     </values>
 </CustomMetadata>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MaxDiscountPercent__c</fullName>
+    <label>Max Discount %</label>
+    <precision>5</precision>
+    <scale>2</scale>
+    <type>Percent</type>
+    <description>CLIENT-ORG CUSTOMIZATION (not part of the packaged app). Per-product discount authority for the AI revival agent: the highest discount the agent may self-approve on this product. The server computes each deal's floor price deterministically from this field (list price x (1 - max %)) — the agent never does the math itself. Empty defaults to 15%.</description>
+</CustomField>

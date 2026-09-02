@@ -310,6 +310,10 @@
     <fieldPermissions><field>ChatMessage__c.TokensOut__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Sensitive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Feedback__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <!-- Client-org customization: competitor intel captured by the revival agent -->
+    <fieldPermissions><field>Opportunity.CompetitorIntel__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <!-- Client-org customization: per-product discount authority read by the server's price-floor guardrail -->
+    <fieldPermissions><field>Product2.MaxDiscountPercent__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.RequiredApproval__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.ApprovalStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>

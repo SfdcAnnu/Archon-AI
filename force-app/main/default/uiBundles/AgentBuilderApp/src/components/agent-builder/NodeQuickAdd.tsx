@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bolt, ChevronDown, ChevronRight, GitBranch, Loader2, PenLine, Play, Plug, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
+import { Bolt, ChevronDown, ChevronRight, GitBranch, Loader2, PenLine, Play, Plug, ShieldCheck, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import {
@@ -23,6 +23,7 @@ const ICON_BY_TYPE: Record<NodeType, LucideIcon> = {
   sms: Wrench,
   storage: Wrench,
   end: Square,
+  guardrail: ShieldCheck,
 };
 
 const CHIPS = ['All', 'Nodes', 'MCP', 'Tools', 'Connectors'] as const;

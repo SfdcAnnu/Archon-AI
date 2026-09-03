@@ -30,6 +30,7 @@ import { SubagentNode } from './nodes/SubagentNode';
 import { ToolNode } from './nodes/ToolNode';
 import { CatalogNode } from './nodes/CatalogNode';
 import { SimpleNode } from './nodes/SimpleNode';
+import { GuardrailNode } from './nodes/GuardrailNode';
 import { CanvasLegend } from './CanvasLegend';
 
 const NODE_TYPES: NodeTypes = {
@@ -38,6 +39,7 @@ const NODE_TYPES: NodeTypes = {
   tool: ToolNode,
   catalog: CatalogNode,
   simple: SimpleNode,
+  guardrail: GuardrailNode,
 };
 
 interface DeletableEdgeData extends Record<string, unknown> {
@@ -92,6 +94,7 @@ function flowTypeFor(node: AgentNode): keyof typeof NODE_TYPES {
   if (node.nodeType === 'subagent') return 'subagent';
   if (node.nodeType === 'tool') return 'tool';
   if (node.nodeType === 'catalog') return 'catalog';
+  if (node.nodeType === 'guardrail') return 'guardrail';
   return 'simple';
 }
 
@@ -125,6 +128,7 @@ function toFlowEdges(
     const isToolPort = c.fromPort === 'tool';
     const targetNode = byId.get(c.toNodeId);
     const isSubagentHandoff = isToolPort && targetNode?.nodeType === 'subagent';
+    const isGuardrail = targetNode?.nodeType === 'guardrail';
     const selected = c.id === selectedEdgeId;
 
     let stroke = selected ? 'var(--destructive)' : 'var(--muted-foreground)';
@@ -132,7 +136,14 @@ function toFlowEdges(
     let strokeDasharray: string | undefined;
     let opacity = 1;
 
-    if (!selected && isSubagentHandoff) {
+    if (!selected && isGuardrail) {
+      stroke = 'var(--node-amber)';
+      strokeWidth = 1.5;
+      strokeDasharray = '5 4';
+      opacity = 0.75;
+    } else if (selected && isGuardrail) {
+      strokeDasharray = '5 4';
+    } else if (!selected && isSubagentHandoff) {
       stroke = 'rgba(var(--archon-accent-rgb), .8)';
       strokeWidth = 2;
       strokeDasharray = '4.5 3.5';

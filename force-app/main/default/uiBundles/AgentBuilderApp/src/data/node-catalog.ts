@@ -131,6 +131,20 @@ export const NODE_PALETTE: PaletteCategory[] = [
     ],
   },
   {
+    category: 'Guardrails',
+    isNew: true,
+    items: [
+      {
+        nodeType: 'guardrail',
+        nodeSubType: 'guardrail',
+        label: 'Guardrail',
+        sub: 'Enforced in code, not asked in prompts',
+        iconClass: 'bg-[#FCF1E2] text-[#B26A1B] dark:bg-[#35281a] dark:text-[#e0a458]',
+        defaultConfig: { mechanism: '' },
+      },
+    ],
+  },
+  {
     category: 'End',
     items: [
       {

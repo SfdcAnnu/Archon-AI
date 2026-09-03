@@ -18,7 +18,8 @@ export type NodeType =
   | 'end'
   | 'catalog'
   | 'subagent'
-  | 'tool';
+  | 'tool'
+  | 'guardrail';
 
 export type EngineSubType = 'claude' | 'gpt4' | 'gemini';
 
@@ -54,6 +55,30 @@ export interface CatalogNodeConfig {
   allowedTools: string[];
 }
 
+/** One guardrail node = one instance of a generic mechanism. Which extra
+ *  keys apply depends on `mechanism` — see properties/GuardrailForm.tsx.
+ *  The server maps enabled guardrail nodes onto its enforcement engines
+ *  (server-langchain/src/chat/pricing-guardrails.ts readGuardrailsFromAgent). */
+export interface GuardrailNodeConfig {
+  mechanism: 'replyRule' | 'numberLimit' | 'dataCapture' | 'followUpAction' | 'liveFacts' | 'customLogic' | '';
+  /** replyRule: words/phrases that must never reach the customer. */
+  bannedWords?: string[];
+  /** numberLimit (deal pricing): per-product max-discount % field on Product2. */
+  maxDiscountField?: string;
+  firstOfferPct?: number;
+  defaultMaxPct?: number;
+  /** dataCapture: what to listen for (plain language), what to extract,
+   *  where to save it, and optional prefilter keywords. */
+  listenFor?: string;
+  extract?: string[];
+  targetField?: string;
+  keywords?: string[];
+  /** followUpAction: when the agent creates a Task/Event, set this field. */
+  stageField?: string;
+  fromStage?: string;
+  toStage?: string;
+}
+
 export interface GenericNodeConfig {
   [key: string]: unknown;
 }
@@ -63,6 +88,7 @@ export type NodeConfig =
   | SubagentNodeConfig
   | ToolNodeConfig
   | CatalogNodeConfig
+  | GuardrailNodeConfig
   | GenericNodeConfig;
 
 export interface AgentNode {

@@ -62,12 +62,13 @@ export function providerAccent(nodeSubType: string): NodeAccent {
  *  border color, which used to be forced blue on every unselected ai/
  *  subagent node and made selection invisible. Selection now owns
  *  border-color exclusively (see selectedRing); this owns border-LEFT only. */
-export type NodeKind = 'ai' | 'catalog' | 'tool';
+export type NodeKind = 'ai' | 'catalog' | 'tool' | 'guardrail';
 
 const KIND_STRIP_COLOR: Record<NodeKind, string> = {
   ai: 'var(--node-blue)',
   catalog: 'var(--node-green)',
   tool: 'var(--node-purple)',
+  guardrail: 'var(--node-amber)',
 };
 
 export function typeStripStyle(kind: NodeKind): CSSProperties {

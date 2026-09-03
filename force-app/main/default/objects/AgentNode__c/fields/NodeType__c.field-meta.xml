@@ -63,6 +63,11 @@
                 <default>false</default>
                 <label>tool</label>
             </value>
+            <value>
+                <fullName>guardrail</fullName>
+                <default>false</default>
+                <label>guardrail</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

@@ -38,6 +38,17 @@ const TOOL_PRESETS: PaletteItem[] = [
   {
     nodeType: 'tool',
     nodeSubType: 'tool',
+    label: 'Salesforce CRM Action',
+    sub: 'Create / update / get / search — pick object & fields',
+    iconClass: 'bg-[color-mix(in_oklab,var(--primary)_12%,transparent)] text-primary',
+    defaultConfig: {
+      description: '', actionType: 'Prebuilt', operation: 'create', object: '',
+      selectedFields: [], boundFields: [], toolName: '', connectorId: '', requiresApproval: false,
+    } satisfies ToolNodeConfig,
+  },
+  {
+    nodeType: 'tool',
+    nodeSubType: 'tool',
     label: 'Apex Tool',
     sub: 'Call an invocable Apex method',
     iconClass: 'bg-[var(--archon-warning-tint,#FEF3E0)] text-[var(--archon-warning,#B45309)]',
@@ -51,14 +62,9 @@ const TOOL_PRESETS: PaletteItem[] = [
     iconClass: 'bg-[var(--archon-success-tint,#E7F6EE)] text-[var(--archon-success,#1F9D61)]',
     defaultConfig: { description: '', actionType: 'Flow', toolName: '', connectorId: '', requiresApproval: false } satisfies ToolNodeConfig,
   },
-  {
-    nodeType: 'tool',
-    nodeSubType: 'tool',
-    label: 'Custom Tool (blank)',
-    sub: 'Configure connector & tool yourself',
-    iconClass: 'bg-secondary text-muted-foreground',
-    defaultConfig: { description: '', actionType: 'MCP', toolName: '', connectorId: '', requiresApproval: false } satisfies ToolNodeConfig,
-  },
+  // 'Custom Tool (blank)' removed at the user's request — the blank-MCP
+  // path stays reachable via the palette's "MCP Tool" preset and the
+  // properties panel's MCP action type.
 ];
 
 /** Node categories shown under the Nodes chip — everything except the old
@@ -171,7 +177,7 @@ export function NodeQuickAdd({ anchor, onClose, onAddNode, onAddConnector, onAdd
       label: item.label,
       sub: item.sub,
       iconClass: item.iconClass,
-      icon: item.label.startsWith('Apex') ? Zap : item.label.startsWith('Flow') ? Play : Wrench,
+      icon: item.label.startsWith('Salesforce') ? ShieldCheck : item.label.startsWith('Apex') ? Zap : item.label.startsWith('Flow') ? Play : Wrench,
       node: item,
     }));
     const connectorItems: Item[] = (connectors ?? [])

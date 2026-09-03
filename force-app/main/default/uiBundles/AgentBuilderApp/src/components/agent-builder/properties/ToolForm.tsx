@@ -19,8 +19,14 @@ import {
   type RemoteTool,
 } from '@/lib/connectors-data';
 import type { AgentNode, ToolNodeConfig } from '@/types/agent';
+import { PrebuiltActionForm } from './PrebuiltActionForm';
 
-const ACTION_TYPES: ToolNodeConfig['actionType'][] = ['MCP', 'Apex', 'Flow'];
+const ACTION_TYPES: Array<{ value: ToolNodeConfig['actionType']; label: string }> = [
+  { value: 'Prebuilt', label: 'Prebuilt' },
+  { value: 'MCP', label: 'MCP' },
+  { value: 'Apex', label: 'Apex' },
+  { value: 'Flow', label: 'Flow' },
+];
 
 export interface ToolFormProps {
   node: AgentNode;
@@ -225,27 +231,36 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
         <div className="flex gap-1.5">
           {ACTION_TYPES.map(t => (
             <button
-              key={t}
+              key={t.value}
               type="button"
               onClick={() => {
-                if (cfg?.actionType === t) return;
+                if (cfg?.actionType === t.value) return;
                 // A tool name never survives an action-type switch — an MCP
                 // tool name is meaningless as an Apex action and vice versa.
-                onConfigChange({ actionType: t, toolName: '' });
+                onConfigChange({ actionType: t.value, toolName: '' });
                 setManualEntry(false);
               }}
               className={cn(
                 'flex-1 rounded-md border px-0 py-1.5 text-center text-[11.5px] font-semibold transition-colors',
-                cfg?.actionType === t
+                cfg?.actionType === t.value
                   ? 'border-primary bg-accent text-primary'
                   : 'border-border text-muted-foreground hover:bg-secondary'
               )}
             >
-              {t}
+              {t.label}
             </button>
           ))}
         </div>
+        {cfg?.actionType === 'Prebuilt' && (
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            A scoped Salesforce action: pick the operation, object and fields — the AI fills a typed form and can&rsquo;t touch anything you didn&rsquo;t tick.
+          </p>
+        )}
       </div>
+
+      {cfg?.actionType === 'Prebuilt' && (
+        <PrebuiltActionForm cfg={cfg} onConfigChange={onConfigChange} />
+      )}
 
       {cfg?.actionType === 'MCP' && (
         <div className="space-y-1.5">

@@ -40,13 +40,31 @@ export interface SubagentNodeConfig {
   model?: string;
 }
 
+/** One field ticked for a Prebuilt Salesforce action — metadata captured
+ *  at config time from the live describe, so the runtime never re-fetches. */
+export interface PrebuiltFieldPick {
+  name: string;
+  label?: string;
+  type?: string;
+  required?: boolean;
+  picklistValues?: string[];
+}
+
 export interface ToolNodeConfig {
   description: string;
-  actionType: 'MCP' | 'Apex' | 'Flow';
+  actionType: 'MCP' | 'Apex' | 'Flow' | 'Prebuilt';
   toolName: string;
   connectorId: string;
   parameterSchema?: Record<string, unknown>;
   requiresApproval: boolean;
+  /** Prebuilt Salesforce action (actionType 'Prebuilt') — executed by the
+   *  generic server runtime (server-langchain/src/lc/prebuilt-tools.ts). */
+  operation?: 'create' | 'update' | 'get' | 'search';
+  object?: string;
+  selectedFields?: PrebuiltFieldPick[];
+  /** Fields the SERVER injects from the conversation's anchored record
+   *  (e.g. ['WhatId','WhoId'] or ['Id']) — never AI parameters. */
+  boundFields?: string[];
 }
 
 export interface CatalogNodeConfig {

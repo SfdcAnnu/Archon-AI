@@ -68,6 +68,11 @@
                 <default>false</default>
                 <label>guardrail</label>
             </value>
+            <value>
+                <fullName>automation</fullName>
+                <default>false</default>
+                <label>automation</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

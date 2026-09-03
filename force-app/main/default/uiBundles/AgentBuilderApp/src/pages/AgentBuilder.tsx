@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { toast } from '@/components/ui/sonner';
 import { AppShell } from '@/components/shell/AppShell';
 import { NodeQuickAdd } from '@/components/agent-builder/NodeQuickAdd';
 import { AgentInfoPopover } from '@/components/agent-builder/AgentInfoPopover';
@@ -119,6 +120,15 @@ export default function AgentBuilder() {
       i => i.nodeType === nodeType && i.nodeSubType === nodeSubType
     );
     if (!paletteItem) return;
+    // One Guardrails node per agent — its rules live INSIDE the node.
+    if (nodeType === 'guardrail') {
+      const existing = graph.nodes.find(n => n.nodeType === 'guardrail');
+      if (existing) {
+        toast.info('This agent already has a Guardrails node — add rules inside it.');
+        setSelectedNodeId(existing.id);
+        return;
+      }
+    }
     nodeSeq += 1;
     const id = `new_${nodeSeq}`;
     setGraph(g => ({
@@ -139,7 +149,7 @@ export default function AgentBuilder() {
       ],
     }));
     setSelectedNodeId(id);
-  }, []);
+  }, [graph.nodes]);
 
   const handleDropConnector = useCallback((entry: DirectoryEntry, x: number, y: number) => {
     nodeSeq += 1;
@@ -198,6 +208,14 @@ export default function AgentBuilder() {
   const handleQuickAddNode = useCallback(
     (item: PaletteItem) => {
       if (!quickAdd) return;
+      if (item.nodeType === 'guardrail') {
+        const existing = graph.nodes.find(n => n.nodeType === 'guardrail');
+        if (existing) {
+          toast.info('This agent already has a Guardrails node — add rules inside it.');
+          setSelectedNodeId(existing.id);
+          return;
+        }
+      }
       nodeSeq += 1;
       const id = `new_${nodeSeq}`;
       setGraph(g => ({
@@ -219,7 +237,7 @@ export default function AgentBuilder() {
       }));
       setSelectedNodeId(id);
     },
-    [quickAdd]
+    [quickAdd, graph.nodes]
   );
 
   const handleQuickAddConnector = useCallback(

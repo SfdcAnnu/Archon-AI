@@ -131,15 +131,23 @@ export const NODE_PALETTE: PaletteCategory[] = [
     ],
   },
   {
-    category: 'Guardrails',
+    category: 'Guardrails & Automations',
     isNew: true,
     items: [
       {
         nodeType: 'guardrail',
         nodeSubType: 'guardrail',
-        label: 'Guardrail',
-        sub: 'Enforced in code, not asked in prompts',
+        label: 'Guardrails',
+        sub: 'The agent’s rules — one node per agent',
         iconClass: 'bg-[#FCF1E2] text-[#B26A1B] dark:bg-[#35281a] dark:text-[#e0a458]',
+        defaultConfig: { rules: [] },
+      },
+      {
+        nodeType: 'automation',
+        nodeSubType: 'automation',
+        label: 'Automation',
+        sub: 'System does it — capture data, update stage',
+        iconClass: 'bg-[#E8F3EE] text-[#1E9E62] dark:bg-[#1b3327] dark:text-[#46c287]',
         defaultConfig: { mechanism: '' },
       },
     ],

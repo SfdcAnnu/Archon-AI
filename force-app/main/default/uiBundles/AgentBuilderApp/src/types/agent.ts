@@ -19,7 +19,8 @@ export type NodeType =
   | 'catalog'
   | 'subagent'
   | 'tool'
-  | 'guardrail';
+  | 'guardrail'
+  | 'automation';
 
 export type EngineSubType = 'claude' | 'gpt4' | 'gemini';
 
@@ -55,18 +56,30 @@ export interface CatalogNodeConfig {
   allowedTools: string[];
 }
 
-/** One guardrail node = one instance of a generic mechanism. Which extra
- *  keys apply depends on `mechanism` — see properties/GuardrailForm.tsx.
- *  The server maps enabled guardrail nodes onto its enforcement engines
- *  (server-langchain/src/chat/pricing-guardrails.ts readGuardrailsFromAgent). */
-export interface GuardrailNodeConfig {
-  mechanism: 'replyRule' | 'numberLimit' | 'dataCapture' | 'followUpAction' | 'liveFacts' | 'customLogic' | '';
-  /** replyRule: words/phrases that must never reach the customer. */
+/** ONE rule inside the agent's single Guardrails node — a line of control
+ *  ("must never / only this"), enforced by the server. */
+export interface GuardrailRule {
+  kind: 'bannedWords' | 'numberLimit';
+  /** bannedWords: words/phrases that must never reach the customer. */
   bannedWords?: string[];
   /** numberLimit (deal pricing): per-product max-discount % field on Product2. */
   maxDiscountField?: string;
   firstOfferPct?: number;
   defaultMaxPct?: number;
+}
+
+/** The agent's single Guardrails node: a LIST of restriction rules. At most
+ *  one guardrail node per agent (enforced in the builder). The server maps
+ *  it via readGuardrailsFromAgent (server-langchain/src/chat/
+ *  pricing-guardrails.ts). */
+export interface GuardrailNodeConfig {
+  rules: GuardrailRule[];
+}
+
+/** An Automation node: system work that happens deterministically alongside
+ *  the conversation — NOT a restriction. Any number per agent. */
+export interface AutomationNodeConfig {
+  mechanism: 'dataCapture' | 'followUpAction' | '';
   /** dataCapture: what to listen for (plain language), what to extract,
    *  where to save it, and optional prefilter keywords. */
   listenFor?: string;
@@ -89,6 +102,7 @@ export type NodeConfig =
   | ToolNodeConfig
   | CatalogNodeConfig
   | GuardrailNodeConfig
+  | AutomationNodeConfig
   | GenericNodeConfig;
 
 export interface AgentNode {

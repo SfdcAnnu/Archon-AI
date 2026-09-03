@@ -11,6 +11,7 @@ import { ToolForm } from './properties/ToolForm';
 import { CatalogForm } from './properties/CatalogForm';
 import { AiRootForm } from './properties/AiRootForm';
 import { GuardrailForm } from './properties/GuardrailForm';
+import { AutomationForm } from './properties/AutomationForm';
 import { ReadOnlySummary } from './properties/ReadOnlySummary';
 import { EmptyPanel } from './properties/EmptyPanel';
 
@@ -21,7 +22,8 @@ const KICKER: Record<string, string> = {
   subagent: 'Subagent',
   tool: 'Tool',
   catalog: 'Tool Catalog',
-  guardrail: 'Guardrail',
+  guardrail: 'Guardrails',
+  automation: 'Automation',
 };
 
 export interface PropertiesPanelProps {
@@ -152,7 +154,7 @@ export function PropertiesPanel({
               </div>
             </div>
 
-            {!readOnly && (node.nodeType === 'subagent' || node.nodeType === 'tool' || node.nodeType === 'guardrail') && (
+            {!readOnly && (node.nodeType === 'subagent' || node.nodeType === 'tool' || node.nodeType === 'guardrail' || node.nodeType === 'automation') && (
               <div className="mb-4 space-y-1.5">
                 <Label className="text-[11px] font-bold">Node label</Label>
                 <Input
@@ -191,6 +193,9 @@ export function PropertiesPanel({
                 {node.nodeType === 'guardrail' && (
                   <GuardrailForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
                 )}
+                {node.nodeType === 'automation' && (
+                  <AutomationForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                )}
                 {node.nodeType === 'ai' && (
                   <AiRootForm
                     node={node}
@@ -199,7 +204,7 @@ export function PropertiesPanel({
                     onConnectionBound={connectionId => onConnectionBound(node.id, connectionId)}
                   />
                 )}
-                {node.nodeType !== 'subagent' && node.nodeType !== 'tool' && node.nodeType !== 'ai' && node.nodeType !== 'catalog' && node.nodeType !== 'guardrail' && (
+                {!['subagent', 'tool', 'ai', 'catalog', 'guardrail', 'automation'].includes(node.nodeType) && (
                   <ReadOnlySummary node={node} />
                 )}
               </>

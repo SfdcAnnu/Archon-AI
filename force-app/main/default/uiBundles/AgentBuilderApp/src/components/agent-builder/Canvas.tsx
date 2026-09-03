@@ -31,6 +31,7 @@ import { ToolNode } from './nodes/ToolNode';
 import { CatalogNode } from './nodes/CatalogNode';
 import { SimpleNode } from './nodes/SimpleNode';
 import { GuardrailNode } from './nodes/GuardrailNode';
+import { AutomationNode } from './nodes/AutomationNode';
 import { CanvasLegend } from './CanvasLegend';
 
 const NODE_TYPES: NodeTypes = {
@@ -40,6 +41,7 @@ const NODE_TYPES: NodeTypes = {
   catalog: CatalogNode,
   simple: SimpleNode,
   guardrail: GuardrailNode,
+  automation: AutomationNode,
 };
 
 interface DeletableEdgeData extends Record<string, unknown> {
@@ -95,6 +97,7 @@ function flowTypeFor(node: AgentNode): keyof typeof NODE_TYPES {
   if (node.nodeType === 'tool') return 'tool';
   if (node.nodeType === 'catalog') return 'catalog';
   if (node.nodeType === 'guardrail') return 'guardrail';
+  if (node.nodeType === 'automation') return 'automation';
   return 'simple';
 }
 
@@ -128,7 +131,7 @@ function toFlowEdges(
     const isToolPort = c.fromPort === 'tool';
     const targetNode = byId.get(c.toNodeId);
     const isSubagentHandoff = isToolPort && targetNode?.nodeType === 'subagent';
-    const isGuardrail = targetNode?.nodeType === 'guardrail';
+    const isGuardrail = targetNode?.nodeType === 'guardrail' || targetNode?.nodeType === 'automation';
     const selected = c.id === selectedEdgeId;
 
     let stroke = selected ? 'var(--destructive)' : 'var(--muted-foreground)';

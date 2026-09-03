@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Bolt, ChevronRight, GitBranch, Plug, ShieldCheck, Sparkles, Square, Wrench, type LucideIcon } from 'lucide-react';
+import { Bolt, ChevronRight, GitBranch, Plug, ShieldCheck, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ const ICON_BY_TYPE: Record<NodeType, LucideIcon> = {
   storage: Wrench,
   end: Square,
   guardrail: ShieldCheck,
+  automation: Zap,
 };
 
 const CATEGORY_ORDER = ['CRM', 'Storage', 'Email', 'Channels', 'Other'];

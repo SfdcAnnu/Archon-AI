@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bolt, ChevronDown, ChevronRight, GitBranch, Loader2, PenLine, Play, Plug, ShieldCheck, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
+// (Zap serves both the quick-add action chip and the automation node icon.)
 import { cn } from '@/lib/utils';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import {
@@ -24,6 +25,7 @@ const ICON_BY_TYPE: Record<NodeType, LucideIcon> = {
   storage: Wrench,
   end: Square,
   guardrail: ShieldCheck,
+  automation: Zap,
 };
 
 const CHIPS = ['All', 'Nodes', 'MCP', 'Tools', 'Connectors'] as const;

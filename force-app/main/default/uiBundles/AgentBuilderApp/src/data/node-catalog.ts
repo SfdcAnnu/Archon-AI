@@ -104,8 +104,8 @@ export const NODE_PALETTE: PaletteCategory[] = [
       {
         nodeType: 'tool',
         nodeSubType: 'tool',
-        label: 'Salesforce action',
-        sub: 'Prebuilt: pick object & fields — typed & scoped',
+        label: 'Salesforce CRM Action',
+        sub: 'Create / update / get / search — pick object & fields',
         iconClass: 'bg-[color-mix(in_oklab,var(--primary)_12%,transparent)] text-primary',
         defaultConfig: {
           description: '',
@@ -122,12 +122,40 @@ export const NODE_PALETTE: PaletteCategory[] = [
       {
         nodeType: 'tool',
         nodeSubType: 'tool',
-        label: 'Tool',
-        sub: 'MCP / Apex / Flow action',
+        label: 'MCP Tool',
+        sub: 'Pick one tool from a connected MCP server',
         iconClass: 'bg-secondary text-muted-foreground',
         defaultConfig: {
           description: '',
           actionType: 'MCP',
+          toolName: '',
+          connectorId: '',
+          requiresApproval: false,
+        },
+      },
+      {
+        nodeType: 'tool',
+        nodeSubType: 'tool',
+        label: 'Apex Action',
+        sub: 'Your org’s invocable Apex, as a callable tool',
+        iconClass: 'bg-[var(--node-amber-tint)] text-[var(--node-amber)]',
+        defaultConfig: {
+          description: '',
+          actionType: 'Apex',
+          toolName: '',
+          connectorId: '',
+          requiresApproval: false,
+        },
+      },
+      {
+        nodeType: 'tool',
+        nodeSubType: 'tool',
+        label: 'Flow Action',
+        sub: 'An autolaunched Flow, as a callable tool',
+        iconClass: 'bg-[var(--node-green-tint)] text-[var(--node-green)]',
+        defaultConfig: {
+          description: '',
+          actionType: 'Flow',
           toolName: '',
           connectorId: '',
           requiresApproval: false,

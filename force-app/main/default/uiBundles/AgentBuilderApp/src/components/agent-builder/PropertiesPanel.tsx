@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Trash2, X } from 'lucide-react';
+import {
+  Bolt, ChevronLeft, GitBranch, Plug, ShieldCheck, Sparkles, Square, Trash2, Waypoints, Wrench, X, Zap,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,16 +18,21 @@ import { AutomationForm } from './properties/AutomationForm';
 import { ReadOnlySummary } from './properties/ReadOnlySummary';
 import { EmptyPanel } from './properties/EmptyPanel';
 
-const KICKER: Record<string, string> = {
-  trigger: 'Trigger',
-  end: 'Response',
-  ai: 'AI Agent · Root',
-  subagent: 'Subagent',
-  tool: 'Tool',
-  catalog: 'Tool Catalog',
-  guardrail: 'Guardrails',
-  automation: 'Automation',
+/** Per-node-type identity for the panel header — kicker text, icon and the
+ *  colored chip, matching the canvas cards' own accent language. */
+const NODE_META: Record<string, { kicker: string; icon: LucideIcon; chipClass: string; chipStyle?: React.CSSProperties }> = {
+  trigger: { kicker: 'Trigger', icon: Bolt, chipClass: 'bg-secondary text-muted-foreground' },
+  end: { kicker: 'Response', icon: Square, chipClass: 'bg-secondary text-muted-foreground' },
+  ai: { kicker: 'AI Agent · Root', icon: Sparkles, chipClass: 'bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary' },
+  subagent: { kicker: 'Subagent', icon: Waypoints, chipClass: 'bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary' },
+  tool: { kicker: 'Tool', icon: Wrench, chipClass: '', chipStyle: { backgroundColor: 'var(--node-purple-tint)', color: 'var(--node-purple)' } },
+  catalog: { kicker: 'Tool Catalog', icon: Plug, chipClass: '', chipStyle: { backgroundColor: 'var(--node-green-tint)', color: 'var(--node-green)' } },
+  guardrail: { kicker: 'Guardrails', icon: ShieldCheck, chipClass: '', chipStyle: { backgroundColor: 'var(--node-amber-tint)', color: 'var(--node-amber)' } },
+  automation: { kicker: 'Automation', icon: Zap, chipClass: '', chipStyle: { backgroundColor: 'var(--node-green-tint)', color: 'var(--node-green)' } },
+  logic: { kicker: 'Logic', icon: GitBranch, chipClass: 'bg-secondary text-muted-foreground' },
 };
+
+const RENAMABLE = new Set(['subagent', 'tool', 'guardrail', 'automation']);
 
 export interface PropertiesPanelProps {
   graph: AgentGraph;
@@ -45,10 +53,10 @@ export interface PropertiesPanelProps {
 }
 
 /** Collapses to a 22px edge tab when nothing needs it — no longer a
- *  permanent 280px column. Selecting a node (or clicking the tab) slides
- *  it in as an overlay over the canvas; must live inside a `relative`
- *  ancestor (AgentBuilder.tsx's canvas row) for the absolute positioning
- *  below to dock to the right canvas edge, not the whole viewport. */
+ *  permanent column. Selecting a node (or clicking the tab) slides it in as
+ *  an overlay over the canvas; must live inside a `relative` ancestor
+ *  (AgentBuilder.tsx's canvas row) for the absolute positioning below to
+ *  dock to the right canvas edge, not the whole viewport. */
 export function PropertiesPanel({
   graph,
   selectedNodeId,
@@ -84,6 +92,9 @@ export function PropertiesPanel({
     setExpanded(false);
   };
 
+  const meta = node ? (NODE_META[node.nodeType] ?? { kicker: node.nodeType, icon: Wrench, chipClass: 'bg-secondary text-muted-foreground' }) : null;
+  const Icon = meta?.icon ?? Wrench;
+
   return (
     <>
       <button
@@ -101,12 +112,12 @@ export function PropertiesPanel({
 
       <aside
         className={cn(
-          'absolute inset-y-0 right-0 z-40 w-[280px] overflow-y-auto border-l border-border bg-card p-4 shadow-2xl transition-transform duration-200',
+          'absolute inset-y-0 right-0 z-40 w-[344px] overflow-y-auto rounded-l-2xl border-l border-border bg-card shadow-2xl transition-transform duration-200',
           expanded ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         {!node ? (
-          <>
+          <div className="p-4">
             <div className="mb-3.5 flex items-center justify-end">
               <Button
                 variant="ghost"
@@ -119,96 +130,107 @@ export function PropertiesPanel({
               </Button>
             </div>
             <EmptyPanel />
-          </>
+          </div>
         ) : (
           <>
-            <div className="mb-3.5 flex items-start justify-between gap-2">
-              <div>
-                <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-primary">
-                  {KICKER[node.nodeType] ?? node.nodeType}
+            {/* Sticky identity header — stays put while long forms scroll. */}
+            <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-4 pb-3.5 pt-4 backdrop-blur">
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]', meta!.chipClass)}
+                  style={meta!.chipStyle}
+                >
+                  <Icon className="h-4 w-4" />
                 </div>
-                <div className="text-[15px] font-bold leading-tight text-foreground">{node.name}</div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {!readOnly && node.nodeType !== 'ai' && (
+                <div className="min-w-0 flex-1">
+                  <div className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                    {meta!.kicker}
+                  </div>
+                  <div className="truncate text-[15px] font-bold leading-snug text-foreground">{node.name}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                  {!readOnly && node.nodeType !== 'ai' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-md bg-secondary text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      onClick={handleDelete}
+                      aria-label="Delete node"
+                      title="Delete node"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-md bg-secondary text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    onClick={handleDelete}
-                    aria-label="Delete node"
-                    title="Delete node"
+                    className="h-6 w-6 rounded-md bg-secondary text-muted-foreground hover:text-foreground"
+                    onClick={handleClose}
+                    aria-label="Deselect"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <X className="h-3.5 w-3.5" />
                   </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 rounded-md bg-secondary text-muted-foreground hover:text-foreground"
-                  onClick={handleClose}
-                  aria-label="Deselect"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+                </div>
               </div>
             </div>
 
-            {!readOnly && (node.nodeType === 'subagent' || node.nodeType === 'tool' || node.nodeType === 'guardrail' || node.nodeType === 'automation') && (
-              <div className="mb-4 space-y-1.5">
-                <Label className="text-[11px] font-bold">Node label</Label>
-                <Input
-                  value={node.name}
-                  onChange={e => onRenameNode(node.id, e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-            )}
+            <div className="space-y-4 p-4">
+              {!readOnly && RENAMABLE.has(node.nodeType) && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold">Node label</Label>
+                  <Input
+                    value={node.name}
+                    onChange={e => onRenameNode(node.id, e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              )}
 
-            {readOnly ? (
-              <ReadOnlySummary node={node} />
-            ) : (
-              <>
-                {node.nodeType === 'subagent' && (
-                  <SubagentForm
-                    node={node}
-                    onConfigChange={patch => onConfigChange(node.id, patch)}
-                    onProviderChange={subType => onProviderChange(node.id, subType)}
-                  />
-                )}
-                {node.nodeType === 'tool' && (
-                  <ToolForm
-                    node={node}
-                    onConfigChange={patch => onConfigChange(node.id, patch)}
-                    onAddSiblingTools={
-                      onAddSiblingTools
-                        ? tools => onAddSiblingTools(node.id, (node.config as { connectorId?: string }).connectorId ?? '', tools)
-                        : undefined
-                    }
-                  />
-                )}
-                {node.nodeType === 'catalog' && (
-                  <CatalogForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
-                )}
-                {node.nodeType === 'guardrail' && (
-                  <GuardrailForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
-                )}
-                {node.nodeType === 'automation' && (
-                  <AutomationForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
-                )}
-                {node.nodeType === 'ai' && (
-                  <AiRootForm
-                    node={node}
-                    onConfigChange={patch => onConfigChange(node.id, patch)}
-                    onProviderChange={nodeSubType => onProviderChange(node.id, nodeSubType)}
-                    onConnectionBound={connectionId => onConnectionBound(node.id, connectionId)}
-                  />
-                )}
-                {!['subagent', 'tool', 'ai', 'catalog', 'guardrail', 'automation'].includes(node.nodeType) && (
-                  <ReadOnlySummary node={node} />
-                )}
-              </>
-            )}
+              {readOnly ? (
+                <ReadOnlySummary node={node} />
+              ) : (
+                <>
+                  {node.nodeType === 'subagent' && (
+                    <SubagentForm
+                      node={node}
+                      onConfigChange={patch => onConfigChange(node.id, patch)}
+                      onProviderChange={subType => onProviderChange(node.id, subType)}
+                    />
+                  )}
+                  {node.nodeType === 'tool' && (
+                    <ToolForm
+                      node={node}
+                      onConfigChange={patch => onConfigChange(node.id, patch)}
+                      onAddSiblingTools={
+                        onAddSiblingTools
+                          ? tools => onAddSiblingTools(node.id, (node.config as { connectorId?: string }).connectorId ?? '', tools)
+                          : undefined
+                      }
+                    />
+                  )}
+                  {node.nodeType === 'catalog' && (
+                    <CatalogForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  )}
+                  {node.nodeType === 'guardrail' && (
+                    <GuardrailForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  )}
+                  {node.nodeType === 'automation' && (
+                    <AutomationForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  )}
+                  {node.nodeType === 'ai' && (
+                    <AiRootForm
+                      node={node}
+                      onConfigChange={patch => onConfigChange(node.id, patch)}
+                      onProviderChange={nodeSubType => onProviderChange(node.id, nodeSubType)}
+                      onConnectionBound={connectionId => onConnectionBound(node.id, connectionId)}
+                    />
+                  )}
+                  {!['subagent', 'tool', 'ai', 'catalog', 'guardrail', 'automation'].includes(node.nodeType) && (
+                    <ReadOnlySummary node={node} />
+                  )}
+                </>
+              )}
+            </div>
           </>
         )}
       </aside>

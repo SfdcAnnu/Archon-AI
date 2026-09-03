@@ -22,7 +22,7 @@ import type { AgentNode, ToolNodeConfig } from '@/types/agent';
 import { PrebuiltActionForm } from './PrebuiltActionForm';
 
 const ACTION_TYPES: Array<{ value: ToolNodeConfig['actionType']; label: string }> = [
-  { value: 'Prebuilt', label: 'Prebuilt' },
+  { value: 'Prebuilt', label: 'Salesforce CRM' },
   { value: 'MCP', label: 'MCP' },
   { value: 'Apex', label: 'Apex' },
   { value: 'Flow', label: 'Flow' },
@@ -228,7 +228,7 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
 
       <div className="space-y-1.5">
         <Label className="text-[11px] font-bold">Action type</Label>
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           {ACTION_TYPES.map(t => (
             <button
               key={t.value}
@@ -241,7 +241,7 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
                 setManualEntry(false);
               }}
               className={cn(
-                'flex-1 rounded-md border px-0 py-1.5 text-center text-[11.5px] font-semibold transition-colors',
+                'rounded-md border px-0 py-1.5 text-center text-[11.5px] font-semibold transition-colors',
                 cfg?.actionType === t.value
                   ? 'border-primary bg-accent text-primary'
                   : 'border-border text-muted-foreground hover:bg-secondary'
@@ -253,7 +253,7 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
         </div>
         {cfg?.actionType === 'Prebuilt' && (
           <p className="text-[10px] leading-snug text-muted-foreground">
-            A scoped Salesforce action: pick the operation, object and fields — the AI fills a typed form and can&rsquo;t touch anything you didn&rsquo;t tick.
+            Standard CRM operations on your own objects: pick the operation, object and fields — the AI fills a typed form and can&rsquo;t touch anything you didn&rsquo;t tick.
           </p>
         )}
       </div>

@@ -130,28 +130,10 @@ export const NODE_PALETTE: PaletteCategory[] = [
       },
     ],
   },
-  {
-    category: 'Guardrails & Automations',
-    isNew: true,
-    items: [
-      {
-        nodeType: 'guardrail',
-        nodeSubType: 'guardrail',
-        label: 'Guardrails',
-        sub: 'The agent’s rules — one node per agent',
-        iconClass: 'bg-[#FCF1E2] text-[#B26A1B] dark:bg-[#35281a] dark:text-[#e0a458]',
-        defaultConfig: { rules: [] },
-      },
-      {
-        nodeType: 'automation',
-        nodeSubType: 'automation',
-        label: 'Automation',
-        sub: 'System does it — capture data, update stage',
-        iconClass: 'bg-[#E8F3EE] text-[#1E9E62] dark:bg-[#1b3327] dark:text-[#46c287]',
-        defaultConfig: { mechanism: '' },
-      },
-    ],
-  },
+  // Guardrails/Automations palette entries removed at the user's request
+  // (2026-09-03) — the server-side enforcement engines remain and read
+  // invisible root-node config; the node types stay renderable so any
+  // saved graph that still carries them doesn't break.
   {
     category: 'End',
     items: [

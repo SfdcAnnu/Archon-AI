@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Bolt, ChevronRight, GitBranch, Plug, ShieldCheck, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Bolt, ChevronRight, GitBranch, GripVertical, Plug, ShieldCheck, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -22,17 +23,6 @@ const ICON_BY_TYPE: Record<NodeType, LucideIcon> = {
   guardrail: ShieldCheck,
   automation: Zap,
 };
-
-const CATEGORY_ORDER = ['CRM', 'Storage', 'Email', 'Channels', 'Other'];
-
-function connectorCategory(entry: DirectoryEntry): string {
-  const t = entry.mapsToCatalogType ?? '';
-  if (t.includes('crm')) return 'CRM';
-  if (t.includes('storage')) return 'Storage';
-  if (t.includes('email')) return 'Email';
-  if (t.includes('channel')) return 'Channels';
-  return entry.category || 'Other';
-}
 
 /** A palette category header that collapses its items — keeps the default
  *  view from stacking every category's items at once (the "messy" left
@@ -63,7 +53,8 @@ function PaletteSection({
 }
 
 export function Palette() {
-  const [tab, setTab] = useState<'nodes' | 'connectors'>('nodes');
+  const [tab, setTab] = useState<'nodes' | 'tools'>('nodes');
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [connectors, setConnectors] = useState<DirectoryEntry[] | null>(null);
   const [connectorsError, setConnectorsError] = useState<string | null>(null);
@@ -80,7 +71,7 @@ export function Palette() {
   };
 
   useEffect(() => {
-    if (tab !== 'connectors' || connectors !== null) return;
+    if (tab !== 'tools' || connectors !== null) return;
     loadConnectorDirectory()
       .then(setConnectors)
       .catch(err => setConnectorsError(err instanceof Error ? err.message : String(err)));
@@ -91,19 +82,7 @@ export function Palette() {
     items: q ? cat.items.filter(i => i.label.toLowerCase().includes(q)) : cat.items,
   })).filter(cat => cat.items.length > 0);
 
-  const connectorGroups = (() => {
-    if (!connectors) return [];
-    const filtered = q
-      ? connectors.filter(c => c.displayName.toLowerCase().includes(q) || c.providerKey.toLowerCase().includes(q))
-      : connectors;
-    const byCategory = new Map<string, DirectoryEntry[]>();
-    for (const c of filtered) {
-      const cat = connectorCategory(c);
-      if (!byCategory.has(cat)) byCategory.set(cat, []);
-      byCategory.get(cat)!.push(c);
-    }
-    return CATEGORY_ORDER.filter(c => byCategory.has(c)).map(c => ({ category: c, items: byCategory.get(c)! }));
-  })();
+
 
   function handleNodeDragStart(e: React.DragEvent, item: PaletteItem) {
     e.dataTransfer.setData(
@@ -135,18 +114,18 @@ export function Palette() {
           Nodes
         </button>
         <button
-          onClick={() => setTab('connectors')}
+          onClick={() => setTab('tools')}
           className={cn(
             'flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-colors',
-            tab === 'connectors' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
+            tab === 'tools' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
         >
-          Connectors
+          Tools
         </button>
       </div>
       <div className="border-b border-border px-2.5 py-2">
         <Input
-          placeholder={tab === 'nodes' ? 'Search nodes…' : 'Search connectors…'}
+          placeholder={tab === 'nodes' ? 'Search nodes…' : 'Search tools…'}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="h-8 text-xs"
@@ -193,58 +172,79 @@ export function Palette() {
         </div>
       )}
 
-      {tab === 'connectors' && (
-        <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4 pt-1.5">
+      {tab === 'tools' && (
+        <div className="flex-1 space-y-2 overflow-y-auto px-2.5 pb-4 pt-2">
+          <div className="px-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Directory</div>
           {connectorsError && (
-            <p className="px-1.5 pt-3 text-[10.5px] leading-snug text-destructive">
-              Couldn&rsquo;t load connectors: {connectorsError}
+            <p className="px-0.5 text-[10.5px] leading-snug text-destructive">
+              Couldn&rsquo;t load tools: {connectorsError}
             </p>
           )}
           {!connectors && !connectorsError && (
-            <p className="px-1.5 pt-3 text-[10.5px] text-muted-foreground">Loading…</p>
+            <p className="px-0.5 text-[10.5px] text-muted-foreground">Loading…</p>
           )}
-          {connectorGroups.map(group => (
-            <PaletteSection
-              key={group.category}
-              title={group.category}
-              open={q ? true : !collapsed.has(group.category)}
-              onToggle={() => toggleCategory(group.category)}
-            >
-              {group.items.map(entry => {
-                const connected = entry.status === 'Connected';
-                return (
-                  <div
-                    key={entry.providerKey}
-                    draggable={connected}
-                    onDragStart={e => handleConnectorDragStart(e, entry)}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-lg px-1.5 py-1.5',
-                      connected ? 'cursor-grab hover:bg-secondary active:cursor-grabbing' : 'opacity-50'
-                    )}
-                    title={connected ? undefined : 'Not connected — set up this provider first'}
-                  >
+          {(connectors ?? [])
+            .filter(c => !q || c.displayName.toLowerCase().includes(q) || c.providerKey.toLowerCase().includes(q))
+            .map(entry => {
+              const connected = entry.status === 'Connected';
+              return (
+                <div
+                  key={entry.providerKey}
+                  draggable={connected}
+                  onDragStart={e => handleConnectorDragStart(e, entry)}
+                  className={cn(
+                    'rounded-xl border border-border bg-card p-2.5',
+                    connected && 'cursor-grab hover:border-primary/40 hover:shadow-sm active:cursor-grabbing'
+                  )}
+                  title={connected ? 'Drag onto the canvas to give an agent these tools' : undefined}
+                >
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-lg text-white"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] text-white"
                       style={{ backgroundColor: entry.brandColor ?? 'var(--muted-foreground)' }}
                     >
-                      <Plug className="h-3.5 w-3.5" />
+                      <Plug className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-semibold leading-tight text-foreground">
-                        {entry.displayName}
-                      </div>
-                      <div className="truncate text-[10px] text-muted-foreground">
-                        {entry.accountEmail || (connected ? 'Connected' : 'Not connected')}
-                      </div>
+                      <div className="truncate text-[12px] font-bold leading-tight text-foreground">{entry.displayName}</div>
+                      <span
+                        className="mt-0.5 inline-block rounded-full px-1.5 py-px text-[9px] font-bold"
+                        style={connected
+                          ? { backgroundColor: 'var(--archon-success-tint,#E7F6EE)', color: 'var(--archon-success,#1F9D61)' }
+                          : { backgroundColor: 'var(--muted,#F1F2F6)', color: 'var(--muted-foreground)' }}
+                      >
+                        {connected ? 'Connected' : 'Not configured'}
+                      </span>
                     </div>
-                    {connected && (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--archon-success)]" />
+                    {connected ? (
+                      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/connectors')}
+                        className="shrink-0 rounded-md border border-border px-2.5 py-1 text-[10.5px] font-bold text-foreground hover:bg-secondary"
+                      >
+                        Connect
+                      </button>
                     )}
                   </div>
-                );
-              })}
-            </PaletteSection>
-          ))}
+                  {connected && entry.accountEmail && (
+                    <div className="mt-1 truncate pl-[42px] text-[10px] text-muted-foreground">{entry.accountEmail}</div>
+                  )}
+                </div>
+              );
+            })}
+          <div className="pt-1.5 px-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Custom MCP servers</div>
+          <button
+            type="button"
+            onClick={() => navigate('/connectors')}
+            className="w-full rounded-xl border border-dashed border-border px-3 py-2.5 text-left text-[11.5px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            + Add server
+          </button>
+          <p className="px-0.5 text-[10px] leading-snug text-muted-foreground">
+            Pre-integrated tool servers — authorize once, then drag onto any agent. Connected ones are draggable.
+          </p>
         </div>
       )}
     </aside>

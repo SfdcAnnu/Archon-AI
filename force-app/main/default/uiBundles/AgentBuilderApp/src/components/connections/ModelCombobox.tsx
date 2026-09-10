@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TIER_META, TIER_ORDER, tierForModel, type ModelTier } from '@/lib/model-tiers';
 import type { ProviderModel } from '@/lib/engine-connections-data';
 
 export interface ModelComboboxProps {
@@ -40,6 +41,18 @@ export function ModelCombobox({
       m => m.id.toLowerCase().includes(q) || (m.description ?? '').toLowerCase().includes(q)
     );
   }, [models, query]);
+
+  // Phase 4: group by tier so latency vs quality is a visible, deliberate
+  // choice — Fast (routing/extraction) → Balanced (default) → Best.
+  const tiered = useMemo(() => {
+    const groups = new Map<ModelTier, ProviderModel[]>();
+    for (const m of filtered) {
+      const t = tierForModel(m.id);
+      if (!groups.has(t)) groups.set(t, []);
+      groups.get(t)!.push(m);
+    }
+    return TIER_ORDER.filter(t => groups.has(t)).map(t => ({ tier: t, items: groups.get(t)! }));
+  }, [filtered]);
 
   // Close on any click outside the component (standard combobox behavior).
   useEffect(() => {
@@ -91,43 +104,53 @@ export function ModelCombobox({
             </div>
           )}
           {!loading &&
-            filtered.map(m => {
-              const isSelected = selectedIds.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    onSelect(m);
-                    if (!keepOpenOnSelect) {
-                      setOpen(false);
-                      setQuery('');
-                    }
-                  }}
-                  className={cn(
-                    'flex w-full items-start gap-2 border-t border-border px-3 py-2 text-left first:border-t-0',
-                    isSelected ? 'bg-accent/50' : 'hover:bg-secondary/60'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center',
-                      isSelected ? 'text-[var(--archon-success)]' : 'text-transparent'
-                    )}
-                  >
-                    <Check className="h-3.5 w-3.5" />
+            tiered.map(group => (
+              <div key={group.tier}>
+                <div className="flex items-baseline gap-2 border-t border-border bg-secondary/50 px-3 py-1.5 first:border-t-0">
+                  <span className={cn('rounded-full px-1.5 py-px text-[9px] font-bold', TIER_META[group.tier].badgeClass)}>
+                    {TIER_META[group.tier].label}
                   </span>
-                  <span className="min-w-0">
-                    <span className="block font-mono text-[11.5px] font-semibold text-foreground">{m.id}</span>
-                    {m.description && (
-                      <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">
-                        {m.description}
+                  <span className="truncate text-[9.5px] text-muted-foreground">{TIER_META[group.tier].hint}</span>
+                </div>
+                {group.items.map(m => {
+                  const isSelected = selectedIds.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect(m);
+                        if (!keepOpenOnSelect) {
+                          setOpen(false);
+                          setQuery('');
+                        }
+                      }}
+                      className={cn(
+                        'flex w-full items-start gap-2 border-t border-border px-3 py-2 text-left',
+                        isSelected ? 'bg-accent/50' : 'hover:bg-secondary/60'
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center',
+                          isSelected ? 'text-[var(--archon-success)]' : 'text-transparent'
+                        )}
+                      >
+                        <Check className="h-3.5 w-3.5" />
                       </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
+                      <span className="min-w-0">
+                        <span className="block font-mono text-[11.5px] font-semibold text-foreground">{m.id}</span>
+                        {m.description && (
+                          <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">
+                            {m.description}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
         </div>
       )}
     </div>

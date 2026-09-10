@@ -1,0 +1,1 @@
+import{a as e}from"./apex-client-5pOOW0Pk.js";const a="/services/apexrest/agent-builder/approvals";async function s(){return e(a,{method:"GET"})}async function p(n,o,r){return e(a,{method:"POST",body:JSON.stringify({approvalId:n,decision:o,comments:r??""})})}export{p as d,s as l};

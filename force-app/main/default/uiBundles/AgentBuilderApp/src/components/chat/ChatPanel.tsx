@@ -5,6 +5,8 @@ import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { renderMarkdown } from '@/lib/render-markdown';
 import { openChatSocket, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef } from '@/lib/ws-chat';
+import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
+import { ChatApprovalCard } from './ChatApprovalCard';
 import {
   startChatSession,
   getConnectionGate,
@@ -90,6 +92,9 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
 
   const [gate, setGate] = useState<ConnectionGate>({ accessMode: 'Org', connected: true, accountEmail: null });
   const [connectPolling, setConnectPolling] = useState(false);
+  // Suspended agent actions for THIS session (approval-as-suspension) —
+  // rendered as inline decision cards in the transcript.
+  const [approvals, setApprovals] = useState<ChatApproval[]>([]);
 
   const socketRef = useRef<WebSocket | null>(null);
   const historyRef = useRef<ChatHistoryEntry[]>([]);
@@ -170,6 +175,13 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
       });
   }, [agentApiName]);
 
+  // Approvals are additive UI — a fetch failure must never break the chat.
+  const refreshApprovals = useCallback((sessionId: string) => {
+    listChatApprovals({ sessionId })
+      .then(rows => setApprovals(rows))
+      .catch(() => { /* stay with what we have */ });
+  }, []);
+
   // ── Send / receive ───────────────────────────────────────────────
   // Declared before the bootstrap effect below because that effect's
   // ws.onmessage handler references it — defining it after caused an
@@ -232,12 +244,19 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
           },
         ]);
       }
+      // A tool result saying PENDING_APPROVAL means the runtime suspended
+      // an action this turn — pull the fresh card(s) for this session.
+      const suspended = (result.toolCalls ?? []).some(tc => {
+        const output = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output ?? '');
+        return output.includes('PENDING_APPROVAL');
+      });
+      if (suspended && session) refreshApprovals(session.Id);
       setSending(false);
       scrollToBottom();
       if (session) reportSessionChange({ sessionId: session.Id, ended: false });
       console.log('[ChatPanel] handleTurnResult done', { sessionId: session?.Id });
     },
-    [session, reportSessionChange, scrollToBottom]
+    [session, reportSessionChange, scrollToBottom, refreshApprovals]
   );
 
   // ── Bootstrap: load/start session, open WS ──────────────────────
@@ -274,6 +293,8 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
         historyRef.current = result.messages
           .filter(m => m.Role__c !== 'System')
           .map(m => ({ role: m.Role__c.toLowerCase() as ChatHistoryEntry['role'], content: m.Content__c ?? '' }));
+        setApprovals([]);
+        refreshApprovals(result.session.Id);
         setLoading(false);
         scrollToBottom();
 
@@ -643,6 +664,13 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
             </div>
           );
         })}
+        {approvals.map(a => (
+          <ChatApprovalCard
+            key={a.id}
+            approval={a}
+            onChanged={u => setApprovals(list => list.map(x => (x.id === u.id ? u : x)))}
+          />
+        ))}
         {sending && (
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> Thinking…

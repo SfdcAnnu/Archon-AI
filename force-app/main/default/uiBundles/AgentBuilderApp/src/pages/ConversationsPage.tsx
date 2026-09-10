@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Settings2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Settings2, ShieldAlert } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import {
   listMySessions,
@@ -7,6 +7,8 @@ import {
   type SessionSummary,
   type SessionDetail,
 } from '@/lib/conversations-data';
+import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
+import { ChatApprovalCard } from '@/components/chat/ChatApprovalCard';
 
 function statusPillStyle(status: string) {
   if (status === 'Active') return { backgroundColor: 'var(--archon-success-tint)', color: 'var(--archon-success)' };
@@ -100,6 +102,10 @@ export default function ConversationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoadState, setDetailLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Chat approval-as-suspension: sessions with an action awaiting a human
+  // get a chip in the list; the detail view renders the decision cards.
+  const [pendingBySession, setPendingBySession] = useState<Set<string>>(new Set());
+  const [detailApprovals, setDetailApprovals] = useState<ChatApproval[]>([]);
 
   useEffect(() => {
     listMySessions(50)
@@ -111,11 +117,15 @@ export default function ConversationsPage() {
         console.error('Failed to load conversations:', err);
         setLoadState('error');
       });
+    listChatApprovals({ status: 'Pending' })
+      .then(rows => setPendingBySession(new Set(rows.map(r => r.sessionId))))
+      .catch(() => { /* approvals are additive — never break the list */ });
   }, []);
 
   const openSession = useCallback((id: string) => {
     setSelectedId(id);
     setDetailLoadState('loading');
+    setDetailApprovals([]);
     getSessionDetail(id)
       .then(d => {
         setDetail(d);
@@ -125,7 +135,23 @@ export default function ConversationsPage() {
         console.error('Failed to load session detail:', err);
         setDetailLoadState('error');
       });
+    listChatApprovals({ sessionId: id })
+      .then(setDetailApprovals)
+      .catch(() => { /* additive */ });
   }, []);
+
+  // Keep the list chip honest as approvals get decided in the open detail.
+  useEffect(() => {
+    if (!selectedId) return;
+    const hasPending = detailApprovals.some(a => a.status === 'Pending');
+    setPendingBySession(prev => {
+      if (prev.has(selectedId) === hasPending) return prev;
+      const next = new Set(prev);
+      if (hasPending) next.add(selectedId);
+      else next.delete(selectedId);
+      return next;
+    });
+  }, [detailApprovals, selectedId]);
 
   if (selectedId) {
     return (
@@ -173,6 +199,18 @@ export default function ConversationsPage() {
                   </div>
                 </div>
                 <Transcript detail={detail} />
+                {detailApprovals.length > 0 && (
+                  <div className="mt-6 space-y-3">
+                    <h2 className="text-[12.5px] font-bold text-foreground">Agent actions requiring approval</h2>
+                    {detailApprovals.map(a => (
+                      <ChatApprovalCard
+                        key={a.id}
+                        approval={a}
+                        onChanged={u => setDetailApprovals(list => list.map(x => (x.id === u.id ? u : x)))}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -224,9 +262,19 @@ export default function ConversationsPage() {
                       <td className="px-3 py-2 font-medium text-foreground">{s.agentName}</td>
                       <td className="px-3 py-2 text-muted-foreground">{s.title || s.name}</td>
                       <td className="px-3 py-2">
-                        <span className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold" style={statusPillStyle(s.status)}>
-                          {s.status}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold" style={statusPillStyle(s.status)}>
+                            {s.status}
+                          </span>
+                          {pendingBySession.has(s.id) && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                              style={{ backgroundColor: 'var(--node-amber-tint, #FDF3E1)', color: 'var(--node-amber, #B7791F)' }}
+                            >
+                              <ShieldAlert className="h-3 w-3" /> Needs approval
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{s.totalTurns ?? 0}</td>
                       <td className="px-3 py-2 text-muted-foreground">

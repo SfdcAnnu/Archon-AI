@@ -74,6 +74,49 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
       </div>
 
       <div className="space-y-1.5">
+        <Label className="text-[11px] font-bold">Mode</Label>
+        <Select
+          value={cfg?.mode ?? 'transfer'}
+          onValueChange={v => onConfigChange({ mode: v as SubagentNodeConfig['mode'] })}
+        >
+          <SelectTrigger className="h-8 w-full text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="transfer" className="text-xs">Reply directly to the customer (hand off)</SelectItem>
+            <SelectItem value="call" className="text-xs">Return a result to the lead agent (call)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          {cfg?.mode === 'call'
+            ? 'The lead agent gives this specialist a task, gets its result back, and keeps control of the reply. Best for background work — research, scoring, drafting.'
+            : 'This specialist takes over the turn and answers the customer itself. Fastest for conversation — 2 model calls total. The default.'}
+        </p>
+      </div>
+
+      {cfg?.mode === 'call' && (
+        <div className="space-y-1.5">
+          <Label className="text-[11px] font-bold">What this specialist sees</Label>
+          <Select
+            value={cfg?.contextPolicy ?? 'isolated'}
+            onValueChange={v => onConfigChange({ contextPolicy: v as SubagentNodeConfig['contextPolicy'] })}
+          >
+            <SelectTrigger className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="isolated" className="text-xs">Only its task (cheapest — recommended)</SelectItem>
+              <SelectItem value="windowed" className="text-xs">Recent conversation + its task</SelectItem>
+              <SelectItem value="full" className="text-xs">The whole conversation + its task</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Isolated keeps token cost flat no matter how many specialists run — it still knows which record the conversation is about. Full carries the entire transcript into every call.
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
         <Label className="text-[11px] font-bold">Routing condition</Label>
         <Textarea
           value={cfg?.routingDescription ?? ''}

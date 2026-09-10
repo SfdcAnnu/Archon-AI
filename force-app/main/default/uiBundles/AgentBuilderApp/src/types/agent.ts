@@ -38,6 +38,14 @@ export interface SubagentNodeConfig {
   routingDescription: string;
   systemPrompt: string;
   model?: string;
+  /** Phase 5 — how the root reaches this specialist:
+   *  'transfer' (default): the specialist replies directly to the customer.
+   *  'call': the specialist returns a RESULT to the root, which keeps the
+   *  reply (agent-as-tool). */
+  mode?: 'transfer' | 'call';
+  /** call mode only — what the specialist sees: 'isolated' (its task only;
+   *  cheapest, default), 'windowed' (recent turns), 'full' (everything). */
+  contextPolicy?: 'isolated' | 'windowed' | 'full';
 }
 
 /** One field ticked for a Prebuilt Salesforce action — metadata captured

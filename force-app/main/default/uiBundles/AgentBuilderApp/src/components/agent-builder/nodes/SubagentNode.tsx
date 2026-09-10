@@ -29,7 +29,14 @@ export function SubagentNode({ data, selected }: NodeProps & { data: SubagentFlo
       style={selected ? undefined : typeStripStyle('ai')}
     >
       <Handle type="target" id="in" position={Position.Top} className={HANDLE_BASE} />
-      <div className="mb-1 text-[8.5px] font-bold uppercase tracking-wide text-primary">Subagent</div>
+      <div className="mb-1 flex items-center gap-1.5 text-[8.5px] font-bold uppercase tracking-wide text-primary">
+        Subagent
+        {(cfg as { mode?: string })?.mode === 'call' && (
+          <span className="rounded-full bg-[var(--node-green-tint)] px-1.5 py-px text-[7.5px] text-[var(--node-green)]">
+            CALL · returns result
+          </span>
+        )}
+      </div>
       <div className="flex items-start gap-2.5">
         <div className={NODE_ICON_SQUARE} style={accentStyle(providerAccent(node.nodeSubType))}>
           <Waypoints className="h-3.5 w-3.5" />

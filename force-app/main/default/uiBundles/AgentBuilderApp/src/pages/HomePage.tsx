@@ -334,7 +334,7 @@ export default function HomePage() {
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
-              <Button size="sm" className="h-7 px-2.5 text-[11.5px]" onClick={() => setShowNewAgent(true)}>
+              <Button size="sm" className="h-7 px-2.5 text-[11.5px]" onClick={() => navigate('/new-agent')}>
                 <Plus className="mr-1 h-3 w-3" /> New agent
               </Button>
             </>

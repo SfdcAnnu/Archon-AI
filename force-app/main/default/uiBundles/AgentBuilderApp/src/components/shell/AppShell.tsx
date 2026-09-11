@@ -279,7 +279,7 @@ export function AppShell({
             </button>
             <button
               type="button"
-              onClick={() => navigate('/?new=1')}
+              onClick={() => navigate('/new-agent')}
               className="flex items-center gap-1 rounded-[5px] bg-primary px-2.5 py-[6px] text-[11.5px] font-semibold text-primary-foreground hover:bg-[#0b5cab]"
             >
               <Plus className="h-3 w-3" /> New agent

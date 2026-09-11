@@ -5,6 +5,10 @@
     <hasActivationRequired>false</hasActivationRequired>
 
     <classAccesses>
+        <apexClass>AgentArchitectRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>AgentChatApprovalsRestService</apexClass>
         <enabled>true</enabled>
     </classAccesses>

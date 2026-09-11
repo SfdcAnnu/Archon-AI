@@ -5,6 +5,9 @@ interface SpeechRecognitionResultItem {
 }
 interface SpeechRecognitionResultLike {
   [index: number]: SpeechRecognitionResultItem;
+  /** False while the engine is still refining this phrase — dictation that
+   *  appends text must only take final results, or every pause duplicates. */
+  isFinal: boolean;
 }
 interface SpeechRecognitionEventLike extends Event {
   resultIndex: number;

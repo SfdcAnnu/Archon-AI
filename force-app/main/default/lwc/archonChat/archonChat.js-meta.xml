@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Archon Chat</masterLabel>
+    <description>Chat with an Archon AI agent — drop on record pages, app/home pages, the utility bar, or open as a tab. On record pages the conversation anchors to the record being viewed.</description>
+    <targets>
+        <target>lightning__RecordPage</target>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+        <target>lightning__UtilityBar</target>
+        <target>lightning__Tab</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage,lightning__AppPage,lightning__HomePage,lightning__UtilityBar">
+            <property name="agentApiName" type="String" label="Agent API name" description="ApiName__c of the agent to chat with. Leave blank to let the user pick from chat-enabled agents."/>
+            <property name="greeting" type="String" label="Greeting" default="Hi! How can I help?" description="Shown before the first message."/>
+            <property name="componentHeight" type="Integer" label="Height (px)" default="520" description="Widget height. Utility bar panels usually fit 480–560."/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

@@ -68,6 +68,10 @@ function toDisplay(m: RawChatMessage): DisplayMessage | null {
 export interface ChatPanelProps {
   agentApiName: string;
   agentName: string;
+  /** 'overlay' (default): the 420px slide-over card (canvas test chat).
+   *  'full': fills its container — the Chat page's main area — with the
+   *  transcript centered in a readable column. */
+  variant?: 'overlay' | 'full';
   /** Resume a past conversation instead of starting a new one. */
   initialSessionId?: string | null;
   onClose: () => void;
@@ -76,7 +80,8 @@ export interface ChatPanelProps {
   onSessionChange?: (info: { sessionId: string | null; ended: boolean }) => void;
 }
 
-export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, onSessionChange }: ChatPanelProps) {
+export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange }: ChatPanelProps) {
+  const isFull = variant === 'full';
   const [session, setSession] = useState<RawChatSession | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -562,7 +567,13 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
   const needsConnection = gate.accessMode === 'PerUser' && !gate.connected;
 
   return (
-    <div className="absolute inset-y-0 right-0 z-50 flex w-[420px] max-w-[92vw] flex-col border-l border-border bg-card shadow-2xl">
+    <div
+      className={
+        isFull
+          ? 'flex h-full w-full flex-col bg-card'
+          : 'absolute inset-y-0 right-0 z-50 flex w-[420px] max-w-[92vw] flex-col border-l border-border bg-card shadow-2xl'
+      }
+    >
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <div className="min-w-0">
           <div className="truncate text-[13.5px] font-bold text-foreground">{agentName}</div>
@@ -582,7 +593,14 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
         </div>
       </div>
 
-      <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div
+        ref={listRef}
+        className={
+          isFull
+            ? 'flex-1 space-y-3 overflow-y-auto py-5 px-[max(1.5rem,calc((100%-46rem)/2))]'
+            : 'flex-1 space-y-3 overflow-y-auto p-4'
+        }
+      >
         {loading && (
           <div className="flex items-center gap-2 py-6 text-[12.5px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting chat…
@@ -689,7 +707,7 @@ export function ChatPanel({ agentApiName, agentName, initialSessionId, onClose, 
           </Button>
         </div>
       ) : (
-        <div className="border-t border-border p-3">
+        <div className={isFull ? 'border-t border-border py-3 px-[max(1.5rem,calc((100%-46rem)/2))]' : 'border-t border-border p-3'}>
           {pendingAttachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {pendingAttachments.map(a => (

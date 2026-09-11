@@ -1,0 +1,64 @@
+<template>
+  <div class="root" style={rootStyle}>
+    <div class="head">
+      <div class="mark">A</div>
+      <div class="who">
+        <div class="name">{agentName}</div>
+        <template lwc:if={sessionId}>
+          <div class="sub">Connected</div>
+        </template>
+        <template lwc:else>
+          <div class="sub">Archon AI</div>
+        </template>
+      </div>
+      <template lwc:if={sessionId}>
+        <button class="endbtn" onclick={handleEnd} title="End this conversation">End chat</button>
+      </template>
+    </div>
+
+    <template lwc:if={needsAgentPick}>
+      <div class="pick">
+        <div class="pick-title">Who do you want to talk to?</div>
+        <template lwc:if={loadingAgents}>
+          <div class="muted">Loading agents…</div>
+        </template>
+        <template for:each={agents} for:item="a">
+          <button key={a.apiName} class="agent" data-apiname={a.apiName} onclick={pickAgent}>
+            <span class="agent-name">{a.name}</span>
+            <span class="agent-dept">{a.department}</span>
+          </button>
+        </template>
+        <template lwc:if={errorText}>
+          <div class="err">{errorText}</div>
+        </template>
+      </div>
+    </template>
+
+    <template lwc:else>
+      <div class="messages">
+        <template lwc:if={showGreeting}>
+          <div class="greeting">{greeting}</div>
+        </template>
+        <template for:each={messages} for:item="m">
+          <div key={m.key} class={m.rowClass}>
+            <div class={m.bubbleClass}>{m.text}</div>
+          </div>
+        </template>
+        <template lwc:if={sending}>
+          <div class="row bot"><div class="bubble bot thinking">Thinking…</div></div>
+        </template>
+      </div>
+
+      <div class="composer">
+        <textarea
+          placeholder="Type a message…"
+          onkeydown={handleKeyDown}
+          oninput={handleInput}
+          rows="1"
+        ></textarea>
+        <button class="send" disabled={sendDisabled} onclick={handleSend} title="Send">➤</button>
+      </div>
+      <div class="footnote">Responses are AI-generated and may be inaccurate.</div>
+    </template>
+  </div>
+</template>

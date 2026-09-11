@@ -124,7 +124,7 @@ export default function ChatPage() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          {!active && (
+          {!active ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <p className="text-[13px] text-muted-foreground">Pick a conversation or start a new one.</p>
               <button
@@ -135,19 +135,18 @@ export default function ChatPage() {
                 New chat
               </button>
             </div>
+          ) : (
+            <ChatPanel
+              key={active.sessionId ?? active.agentApiName}
+              variant="full"
+              agentApiName={active.agentApiName}
+              agentName={active.agentName}
+              initialSessionId={active.sessionId}
+              onClose={() => setActive(null)}
+              onSessionChange={handleSessionChange}
+            />
           )}
         </div>
-
-        {active && (
-          <ChatPanel
-            key={active.sessionId ?? active.agentApiName}
-            agentApiName={active.agentApiName}
-            agentName={active.agentName}
-            initialSessionId={active.sessionId}
-            onClose={() => setActive(null)}
-            onSessionChange={handleSessionChange}
-          />
-        )}
 
         {showPicker && (
           <>

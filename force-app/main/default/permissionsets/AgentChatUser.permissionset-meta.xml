@@ -93,7 +93,11 @@
         <modifyAllRecords>false</modifyAllRecords>
     </objectPermissions>
 
-    <userPermissions>
+    <tabSettings>
+        <tab>Archon_Chat</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+<userPermissions>
         <enabled>true</enabled>
         <name>ApiEnabled</name>
     </userPermissions>

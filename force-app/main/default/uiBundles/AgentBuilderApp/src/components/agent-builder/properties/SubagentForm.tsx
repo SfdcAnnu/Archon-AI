@@ -1,7 +1,7 @@
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEngineModels } from '@/lib/use-engine-models';
+import { FieldLabel, Hint, Segmented } from './controls';
 import type { AgentNode, SubagentNodeConfig } from '@/types/agent';
 
 const PROVIDERS = [
@@ -14,29 +14,79 @@ export interface SubagentFormProps {
   node: AgentNode;
   onConfigChange: (patch: Partial<SubagentNodeConfig>) => void;
   /** Changes the node's provider (NodeSubType__c) — same handler the root
-   *  ai node uses; subagents were the only model-running node without an
-   *  editable provider until now. */
+   *  ai node uses. */
   onProviderChange: (nodeSubType: string) => void;
 }
 
+/** Sub-agent inspector, per the approved builder design: how it answers
+ *  (call/return vs handoff) as a pill choice, when to use it, what it can
+ *  see, then its own model. */
 export function SubagentForm({ node, onConfigChange, onProviderChange }: SubagentFormProps) {
   const cfg = node.config as SubagentNodeConfig;
   const models = useEngineModels(node.nodeSubType);
+  const mode = cfg?.mode ?? 'transfer';
 
   return (
-    <div className="space-y-4">
-      {/* Provider + model live at the TOP — they define what this subagent
-          IS; the prompts below define what it does. */}
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">AI Provider</Label>
+    <div className="space-y-[15px]">
+      <div>
+        <FieldLabel>How it answers</FieldLabel>
+        <Segmented
+          value={mode}
+          options={[
+            { value: 'call', label: 'Returns a value' },
+            { value: 'transfer', label: 'Hands off' },
+          ]}
+          onChange={v => onConfigChange({ mode: v as SubagentNodeConfig['mode'] })}
+        />
+        <Hint>
+          {mode === 'call'
+            ? 'The lead agent gives it a task, gets the result back, and keeps control of the reply. Several of these in one turn run in parallel.'
+            : 'It takes over the conversation and replies to the customer itself; control does not come back. The default, and fastest for conversation.'}
+        </Hint>
+      </div>
+
+      <div>
+        <FieldLabel>When to use it</FieldLabel>
+        <Textarea
+          value={cfg?.routingDescription ?? ''}
+          onChange={e => onConfigChange({ routingDescription: e.target.value })}
+          placeholder='e.g. "Customer states a target price, asks for a discount, or says the price is too high."'
+          className="min-h-[74px] text-xs"
+        />
+        <Hint>The lead model reads this like a tool description when deciding to use this specialist.</Hint>
+      </div>
+
+      {mode === 'call' && (
+        <div>
+          <FieldLabel>What it can see</FieldLabel>
+          <Select
+            value={cfg?.contextPolicy ?? 'isolated'}
+            onValueChange={v => onConfigChange({ contextPolicy: v as SubagentNodeConfig['contextPolicy'] })}
+          >
+            <SelectTrigger className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="isolated" className="text-xs">Only what it is given</SelectItem>
+              <SelectItem value="windowed" className="text-xs">Last few turns</SelectItem>
+              <SelectItem value="full" className="text-xs">The whole conversation</SelectItem>
+            </SelectContent>
+          </Select>
+          <Hint>
+            "Only what it is given" keeps token cost flat no matter how many specialists run — it still knows
+            which record the conversation is about.
+          </Hint>
+        </div>
+      )}
+
+      <div>
+        <FieldLabel>Provider</FieldLabel>
         <Select
           value={node.nodeSubType}
           onValueChange={v => {
             if (v === node.nodeSubType) return;
             onProviderChange(v);
-            // A model id only exists on its own provider — clearing lets
-            // the runtime fall back to the new provider's default until a
-            // model is picked below.
+            // A model id only exists on its own provider.
             onConfigChange({ model: '' });
           }}
         >
@@ -51,8 +101,8 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
         </Select>
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">Model</Label>
+      <div>
+        <FieldLabel>Model</FieldLabel>
         <Select value={cfg?.model ?? ''} onValueChange={v => onConfigChange({ model: v })}>
           <SelectTrigger className="h-8 w-full font-mono text-xs">
             <SelectValue placeholder="Provider default" />
@@ -63,80 +113,19 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
             ))}
           </SelectContent>
         </Select>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          The list comes from the enabled models on this provider's connection (AI Models page).
-        </p>
+        <Hint>
+          Runs its own model call on the org's active connection for this provider — no separate credential
+          needed.
+        </Hint>
       </div>
 
-      <div className="rounded-lg border border-border bg-secondary/60 px-3 py-2.5 text-[11px] leading-relaxed text-foreground/80">
-        <span className="font-semibold text-foreground">No separate credential needed.</span> A
-        subagent runs its own model call using the org's active connection for its provider.
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">Mode</Label>
-        <Select
-          value={cfg?.mode ?? 'transfer'}
-          onValueChange={v => onConfigChange({ mode: v as SubagentNodeConfig['mode'] })}
-        >
-          <SelectTrigger className="h-8 w-full text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="transfer" className="text-xs">Reply directly to the customer (hand off)</SelectItem>
-            <SelectItem value="call" className="text-xs">Return a result to the lead agent (call)</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          {cfg?.mode === 'call'
-            ? 'The lead agent gives this specialist a task, gets its result back, and keeps control of the reply. Best for background work — research, scoring, drafting.'
-            : 'This specialist takes over the turn and answers the customer itself. Fastest for conversation — 2 model calls total. The default.'}
-        </p>
-      </div>
-
-      {cfg?.mode === 'call' && (
-        <div className="space-y-1.5">
-          <Label className="text-[11px] font-bold">What this specialist sees</Label>
-          <Select
-            value={cfg?.contextPolicy ?? 'isolated'}
-            onValueChange={v => onConfigChange({ contextPolicy: v as SubagentNodeConfig['contextPolicy'] })}
-          >
-            <SelectTrigger className="h-8 w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="isolated" className="text-xs">Only its task (cheapest — recommended)</SelectItem>
-              <SelectItem value="windowed" className="text-xs">Recent conversation + its task</SelectItem>
-              <SelectItem value="full" className="text-xs">The whole conversation + its task</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            Isolated keeps token cost flat no matter how many specialists run — it still knows which record the conversation is about. Full carries the entire transcript into every call.
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">Routing condition</Label>
-        <Textarea
-          value={cfg?.routingDescription ?? ''}
-          onChange={e => onConfigChange({ routingDescription: e.target.value })}
-          placeholder="When should the root agent hand off to this subagent? e.g. &quot;Customer wants a discount beyond range.&quot;"
-          className="min-h-16 text-xs"
-        />
-        <p className="text-[10.5px] leading-snug text-muted-foreground">
-          The root model reads this alongside its other tools when deciding whether to hand off —
-          write it like a tool description.
-        </p>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">System prompt</Label>
+      <div>
+        <FieldLabel>Instructions</FieldLabel>
         <Textarea
           value={cfg?.systemPrompt ?? ''}
           onChange={e => onConfigChange({ systemPrompt: e.target.value })}
-          placeholder="Instructions this subagent follows once it takes over the turn…"
-          className="min-h-24 text-xs"
+          placeholder="Instructions this specialist follows once it takes the task…"
+          className="min-h-28 font-mono text-[11.5px] leading-relaxed"
         />
       </div>
     </div>

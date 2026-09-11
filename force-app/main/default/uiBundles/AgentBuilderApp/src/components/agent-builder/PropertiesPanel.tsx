@@ -112,7 +112,7 @@ export function PropertiesPanel({
 
       <aside
         className={cn(
-          'absolute inset-y-0 right-0 z-40 w-[344px] overflow-y-auto rounded-l-2xl border-l border-border bg-card shadow-2xl transition-transform duration-200',
+          'absolute inset-y-0 right-0 z-40 flex w-[420px] flex-col rounded-l-2xl border-l border-border bg-card shadow-2xl transition-transform duration-200',
           expanded ? 'translate-x-0' : 'translate-x-full'
         )}
       >
@@ -133,8 +133,8 @@ export function PropertiesPanel({
           </div>
         ) : (
           <>
-            {/* Sticky identity header — stays put while long forms scroll. */}
-            <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-4 pb-3.5 pt-4 backdrop-blur">
+            {/* Identity header — the body below scrolls on its own. */}
+            <div className="shrink-0 border-b border-border bg-card px-4 pb-3.5 pt-4">
               <div className="flex items-start gap-3">
                 <div
                   className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]', meta!.chipClass)}
@@ -149,18 +149,6 @@ export function PropertiesPanel({
                   <div className="truncate text-[15px] font-bold leading-snug text-foreground">{node.name}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
-                  {!readOnly && node.nodeType !== 'ai' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 rounded-md bg-secondary text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      onClick={handleDelete}
-                      aria-label="Delete node"
-                      title="Delete node"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -174,7 +162,7 @@ export function PropertiesPanel({
               </div>
             </div>
 
-            <div className="space-y-4 p-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
               {!readOnly && RENAMABLE.has(node.nodeType) && (
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-bold">Node label</Label>
@@ -231,6 +219,25 @@ export function PropertiesPanel({
                 </>
               )}
             </div>
+
+            {/* Footer — per the approved inspector. Edits apply to the
+                canvas live; the top bar's Save persists the agent. */}
+            {!readOnly && (
+              <div className="flex shrink-0 items-center gap-3 border-t border-border px-4 py-3">
+                <span className="text-[10px] leading-snug text-[var(--archon-faint)]">
+                  Changes apply to the canvas — Save in the top bar persists them.
+                </span>
+                {node.nodeType !== 'ai' && (
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    className="ml-auto flex shrink-0 items-center gap-1 text-[11.5px] font-semibold text-destructive hover:underline"
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </aside>

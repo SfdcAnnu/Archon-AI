@@ -1,13 +1,14 @@
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEngineModels } from '@/lib/use-engine-models';
 import { AiEngineConnectionPicker } from './AiEngineConnectionPicker';
+import { FieldLabel, Hint, Segmented } from './controls';
 import type { AgentNode, AiNodeConfig } from '@/types/agent';
 
 const PROVIDERS = [
   { value: 'claude', label: 'Claude (Anthropic)' },
-  { value: 'gpt4', label: 'GPT-4 (OpenAI)' },
+  { value: 'gpt4', label: 'GPT (OpenAI)' },
   { value: 'gemini', label: 'Gemini (Google)' },
 ];
 
@@ -18,25 +19,25 @@ export interface AiRootFormProps {
   onConnectionBound: (connectionId: string | null) => void;
 }
 
-/** The top-level 'ai' node's editable form — was entirely read-only until
- *  this stage (see ReadOnlySummary.tsx's own TODO comment: "Editable
- *  config for 'ai' nodes... wired up alongside the Step 2 data-layer
- *  work" — never followed up on until now). */
+/** The root AI agent's inspector, per the approved builder design:
+ *  provider/model, fallback (disabled until the runtime supports it),
+ *  answer style, thinking effort, longest reply, then instructions. The
+ *  three new knobs persist into ConfigJson — client-owned config the
+ *  runtime reads generically, same pattern as `budgets`. */
 export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectionBound }: AiRootFormProps) {
   const cfg = node.config as AiNodeConfig;
   const models = useEngineModels(node.nodeSubType);
 
   return (
-    <div className="space-y-4">
-      {/* Provider + model together at the top — they define WHAT runs;
-          the prompt below defines what it does. */}
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">AI Provider</Label>
+    <div className="space-y-[15px]">
+      <div>
+        <FieldLabel>Provider</FieldLabel>
         <Select
           value={node.nodeSubType}
           onValueChange={v => {
             if (v === node.nodeSubType) return;
             onProviderChange(v);
+            // A model id only exists on its own provider.
             onConfigChange({ model: '' });
           }}
         >
@@ -51,8 +52,8 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
         </Select>
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">Model</Label>
+      <div>
+        <FieldLabel>Model</FieldLabel>
         <Select value={cfg?.model ?? ''} onValueChange={v => onConfigChange({ model: v })}>
           <SelectTrigger className="h-8 w-full font-mono text-xs">
             <SelectValue placeholder="Provider default" />
@@ -63,18 +64,75 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
             ))}
           </SelectContent>
         </Select>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          The list comes from the enabled models on this provider's connection (AI Models page).
-        </p>
+        <Hint>Only models enabled on this provider's connection appear here.</Hint>
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">System prompt</Label>
+      <div>
+        <FieldLabel>If this model fails</FieldLabel>
+        <Select disabled value="none">
+          <SelectTrigger className="h-8 w-full text-xs opacity-60">
+            <SelectValue placeholder="No fallback yet" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No fallback yet</SelectItem>
+          </SelectContent>
+        </Select>
+        <Hint>Model fallback arrives with the runtime's next update — a rejected key will degrade quality instead of failing the turn.</Hint>
+      </div>
+
+      <div>
+        <FieldLabel>Answer style</FieldLabel>
+        <Segmented
+          value={cfg?.answerStyle ?? 'balanced'}
+          options={[
+            { value: 'precise', label: 'Precise' },
+            { value: 'balanced', label: 'Balanced' },
+            { value: 'exploratory', label: 'Exploratory' },
+          ]}
+          onChange={v => onConfigChange({ answerStyle: v })}
+        />
+      </div>
+
+      <div>
+        <FieldLabel>Thinking effort</FieldLabel>
+        <Segmented
+          value={cfg?.thinkingEffort ?? 'standard'}
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: 'standard', label: 'Standard' },
+            { value: 'deep', label: 'Deep' },
+          ]}
+          onChange={v => onConfigChange({ thinkingEffort: v })}
+        />
+      </div>
+
+      <div>
+        <FieldLabel>Longest reply</FieldLabel>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={64}
+            step={64}
+            value={cfg?.maxReplyTokens ?? ''}
+            placeholder="1024"
+            onChange={e => {
+              const n = Number(e.target.value);
+              onConfigChange({ maxReplyTokens: Number.isFinite(n) && n > 0 ? n : undefined });
+            }}
+            className="h-8 w-28 font-mono text-xs"
+          />
+          <span className="text-[11px] text-muted-foreground">tokens</span>
+        </div>
+        <Hint>Replies are about half your bill. This cap moves cost more than shortening instructions.</Hint>
+      </div>
+
+      <div>
+        <FieldLabel>Instructions</FieldLabel>
         <Textarea
           value={cfg?.systemPrompt ?? ''}
           onChange={e => onConfigChange({ systemPrompt: e.target.value })}
           placeholder="You are... Your job is to... Use tools to look up real data before answering."
-          className="min-h-24 text-xs"
+          className="min-h-32 font-mono text-[11.5px] leading-relaxed"
         />
       </div>
 

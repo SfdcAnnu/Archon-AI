@@ -32,6 +32,13 @@ export interface AiNodeConfig {
   systemPrompt?: string;
   instruction?: string;
   useKnowledgeBase?: boolean;
+  /** Approved inspector knobs — client-owned config the runtime reads
+   *  generically (same pattern as `budgets`): answer style maps to
+   *  sampling temperature, thinking effort to reasoning effort, and
+   *  maxReplyTokens caps a single reply's length. */
+  answerStyle?: 'precise' | 'balanced' | 'exploratory';
+  thinkingEffort?: 'off' | 'standard' | 'deep';
+  maxReplyTokens?: number;
 }
 
 export interface SubagentNodeConfig {

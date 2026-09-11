@@ -542,7 +542,8 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
         <div>
           <div className="text-[11px] font-bold text-foreground">Requires approval</div>
           <p className="mt-0.5 text-[10.5px] text-muted-foreground">
-            Write-type actions pause for human approval before executing.
+            Calls suspend for a human decision before anything runs — the customer is told the action is
+            awaiting approval, and approvers decide from the conversation or the Approvals page.
           </p>
         </div>
         <Switch

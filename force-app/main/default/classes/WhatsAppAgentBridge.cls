@@ -153,6 +153,27 @@ public with sharing class WhatsAppAgentBridge {
             this.contactId = contactId;
         }
 
+        /**
+         * The customer's message plus the record ids this conversation is
+         * about. The session already anchors the agent to ONE record (the
+         * Opportunity), which its prompt names — but the agent could not
+         * see the Contact or the originating message, so it had no way to
+         * pass them to a tool that needs them. Ids go BELOW the customer's
+         * words and are labelled as system context, so the model never
+         * mistakes them for something the customer said.
+         */
+        private String withRecordContext() {
+            String text = String.isBlank(bodyText) ? '' : bodyText.trim();
+            List<String> ids = new List<String>();
+            if (contactId != null) ids.add('contactId: ' + contactId);
+            if (leadId != null)    ids.add('leadId: ' + leadId);
+            if (oppId != null)     ids.add('opportunityId: ' + oppId);
+            if (messageId != null) ids.add('messageId: ' + messageId);
+            if (ids.isEmpty()) return text;
+            String header = '[RECORD CONTEXT - not from the customer, use these ids for lookups and actions]';
+            return text + '\n\n' + header + '\n' + String.join(ids, '\n');
+        }
+
         public void execute(QueueableContext qc) {
             String replyText;
             Boolean aiFailed = false;
@@ -160,7 +181,7 @@ public with sharing class WhatsAppAgentBridge {
             if (sessionId != null) {
                 try {
                     AgentChatController.TurnResult tr =
-                        AgentChatController.sendTurn(sessionId, bodyText, null);
+                        AgentChatController.sendTurn(sessionId, withRecordContext(), null);
                     if (tr.status == 'complete' && tr.newMessages != null && !tr.newMessages.isEmpty()) {
                         replyText = tr.newMessages[tr.newMessages.size() - 1].Content__c;
                     }

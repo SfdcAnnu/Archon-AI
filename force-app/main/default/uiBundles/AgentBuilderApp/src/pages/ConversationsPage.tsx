@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Settings2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, MessageSquare, Settings2, ShieldAlert } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { IconSquare, SpecCard, StatusBadge, T } from '@/components/spec/blocks';
+import { cn } from '@/lib/utils';
 import {
   listMySessions,
   getSessionDetail,
@@ -10,10 +12,14 @@ import {
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from '@/components/chat/ChatApprovalCard';
 
-function statusPillStyle(status: string) {
-  if (status === 'Active') return { backgroundColor: 'var(--archon-success-tint)', color: 'var(--archon-success)' };
-  if (status === 'Expired') return { backgroundColor: 'var(--node-gray-tint)', color: 'var(--node-gray)' };
-  return { backgroundColor: 'var(--node-gray-tint)', color: 'var(--node-gray)' };
+/** Approved spec screen 11 — "Who is talking to my agents?" One sessions
+ *  table (Session · Agent · Messages · Tokens · Last activity — the spec's
+ *  $ column stays out because dollars aren't tracked; real token totals
+ *  are shown instead), and the same detail transcript as before: tool
+ *  bubbles, raw request/response toggles, and chat-approval cards. */
+
+function sessionTone(status: string): 'ok' | 'muted' {
+  return status === 'Active' ? 'ok' : 'muted';
 }
 
 function extractToolName(toolCallsJson: string | null): string {
@@ -42,10 +48,10 @@ function MessageDebugToggle({ requestPayload, responsePayload }: { requestPayloa
       {open && (
         <div className="mt-1.5 space-y-1.5">
           {requestPayload && (
-            <pre className="max-h-64 overflow-auto rounded-md bg-muted/60 p-2 text-[10.5px] leading-snug">{requestPayload}</pre>
+            <pre className="max-h-64 overflow-auto rounded-md bg-muted/60 p-2 font-mono text-[10.5px] leading-snug">{requestPayload}</pre>
           )}
           {responsePayload && (
-            <pre className="max-h-64 overflow-auto rounded-md bg-muted/60 p-2 text-[10.5px] leading-snug">{responsePayload}</pre>
+            <pre className="max-h-64 overflow-auto rounded-md bg-muted/60 p-2 font-mono text-[10.5px] leading-snug">{responsePayload}</pre>
           )}
         </div>
       )}
@@ -63,7 +69,7 @@ function Transcript({ detail }: { detail: SessionDetail }) {
               <Settings2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--node-amber)]" />
               <div className="min-w-0 flex-1">
                 <div className="text-[11.5px] font-semibold text-foreground">{extractToolName(m.ToolCallsJson__c)}</div>
-                <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] text-muted-foreground">
+                <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
                   {m.Content__c}
                 </pre>
               </div>
@@ -77,13 +83,13 @@ function Transcript({ detail }: { detail: SessionDetail }) {
               <span className="text-[11.5px] font-semibold text-foreground">
                 {m.Role__c === 'User' ? 'User' : 'Assistant'}
               </span>
-              <span className="text-[10.5px] text-muted-foreground">
+              <span className="text-[10.5px] text-[var(--archon-faint)]">
                 {new Date(m.CreatedDate).toLocaleString()}
               </span>
             </div>
             <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground">{m.Content__c}</p>
             {hasTokens && (
-              <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+              <p className="mt-0.5 font-mono text-[10.5px] text-muted-foreground">
                 {m.ModelUsed__c ? `${m.ModelUsed__c} · ` : ''}
                 {m.TokensIn__c ?? 0} in / {m.TokensOut__c ?? 0} out
               </p>
@@ -155,53 +161,48 @@ export default function ConversationsPage() {
 
   if (selectedId) {
     return (
-      <AppShell>
-        <div className="flex h-full w-full flex-col overflow-y-auto">
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-5">
-            <button
-              type="button"
-              onClick={() => setSelectedId(null)}
-              className="flex items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Conversations
-            </button>
-          </header>
-          <div className="mx-auto w-full max-w-2xl flex-1 p-6">
-            {detailLoadState === 'loading' && (
-              <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
-              </div>
-            )}
-            {detailLoadState === 'error' && (
-              <p className="py-8 text-[12.5px] text-destructive">Couldn't load this conversation.</p>
-            )}
-            {detailLoadState === 'ready' && detail && (
-              <>
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h1 className="text-[16px] font-bold text-foreground">
-                      {detail.session.Title__c || detail.session.Name}
-                    </h1>
-                    <p className="text-[12px] text-muted-foreground">
-                      {detail.session['AgentDefinition__r.Name']}
-                    </p>
-                  </div>
-                  <div className="text-right text-[11px] text-muted-foreground">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
-                      style={statusPillStyle(detail.session.Status__c)}
-                    >
-                      {detail.session.Status__c}
-                    </span>
-                    <div className="mt-1">
+      <AppShell title="Conversations">
+        <div className="mx-auto w-full max-w-3xl p-5">
+          <button
+            type="button"
+            onClick={() => setSelectedId(null)}
+            className="mb-3.5 flex items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> All conversations
+          </button>
+
+          {detailLoadState === 'loading' && (
+            <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            </div>
+          )}
+          {detailLoadState === 'error' && (
+            <p className="py-8 text-[12.5px] text-destructive">Couldn't load this conversation.</p>
+          )}
+          {detailLoadState === 'ready' && detail && (
+            <>
+              <SpecCard
+                title={detail.session.Title__c || detail.session.Name}
+                muted={detail.session['AgentDefinition__r.Name']}
+                right={
+                  <>
+                    <span className="font-mono text-[10.5px] text-muted-foreground">
                       {detail.session.TokensIn__c ?? 0} in / {detail.session.TokensOut__c ?? 0} out
-                    </div>
-                  </div>
+                    </span>
+                    <StatusBadge tone={sessionTone(detail.session.Status__c)}>
+                      {detail.session.Status__c}
+                    </StatusBadge>
+                  </>
+                }
+              >
+                <div className="p-4">
+                  <Transcript detail={detail} />
                 </div>
-                <Transcript detail={detail} />
-                {detailApprovals.length > 0 && (
-                  <div className="mt-6 space-y-3">
-                    <h2 className="text-[12.5px] font-bold text-foreground">Agent actions requiring approval</h2>
+              </SpecCard>
+
+              {detailApprovals.length > 0 && (
+                <SpecCard className="mt-3.5" title="Agent actions requiring approval">
+                  <div className="space-y-3 p-3.5">
                     {detailApprovals.map(a => (
                       <ChatApprovalCard
                         key={a.id}
@@ -210,86 +211,88 @@ export default function ConversationsPage() {
                       />
                     ))}
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                </SpecCard>
+              )}
+            </>
+          )}
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell>
-      <div className="flex h-full w-full flex-col overflow-y-auto">
-        <header className="flex h-14 shrink-0 items-center border-b border-border bg-card px-5">
-          <span className="text-[14px] font-bold text-foreground">Conversations</span>
-        </header>
-        <div className="mx-auto w-full max-w-4xl flex-1 p-6">
-          {loadState === 'loading' && (
-            <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
-            </div>
-          )}
-          {loadState === 'error' && (
-            <p className="py-8 text-[12.5px] text-destructive">Couldn't load conversations.</p>
-          )}
-          {loadState === 'ready' && sessions.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border py-16 text-center">
-              <p className="text-[13px] text-muted-foreground">No conversations yet.</p>
-            </div>
-          )}
-          {loadState === 'ready' && sessions.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-[12.5px]">
-                <thead className="bg-muted/40">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Agent</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Title</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Status</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Turns</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Tokens</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Last activity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessions.map(s => (
-                    <tr
-                      key={s.id}
-                      className="cursor-pointer border-t border-border hover:bg-muted/30"
-                      onClick={() => openSession(s.id)}
-                    >
-                      <td className="px-3 py-2 font-medium text-foreground">{s.agentName}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{s.title || s.name}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold" style={statusPillStyle(s.status)}>
-                            {s.status}
-                          </span>
-                          {pendingBySession.has(s.id) && (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={{ backgroundColor: 'var(--node-amber-tint, #FDF3E1)', color: 'var(--node-amber, #B7791F)' }}
-                            >
-                              <ShieldAlert className="h-3 w-3" /> Needs approval
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">{s.totalTurns ?? 0}</td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {(s.tokensIn ?? 0) + (s.tokensOut ?? 0)}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleString() : '—'}
-                      </td>
+    <AppShell title="Conversations">
+      <div className="mx-auto w-full max-w-5xl p-5">
+        {loadState === 'loading' && (
+          <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+          </div>
+        )}
+        {loadState === 'error' && (
+          <p className="py-8 text-[12.5px] text-destructive">Couldn't load conversations.</p>
+        )}
+        {loadState !== 'loading' && loadState !== 'error' && (
+          <SpecCard title="Chat sessions" muted="people talking to your agents">
+            {sessions.length === 0 ? (
+              <p className="px-3.5 py-12 text-center text-[12.5px] text-muted-foreground">
+                No conversations yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-b-lg">
+                <table className={T.table}>
+                  <thead>
+                    <tr>
+                      <th className={T.th}>Session</th>
+                      <th className={T.th}>Agent</th>
+                      <th className={cn(T.th, 'text-right')}>Messages</th>
+                      <th className={cn(T.th, 'text-right')}>Tokens</th>
+                      <th className={cn(T.th, 'text-right')}>Last activity</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {sessions.map(s => (
+                      <tr key={s.id} className={T.trClick} onClick={() => openSession(s.id)}>
+                        <td className={T.td}>
+                          <div className="flex items-center gap-2.5">
+                            <IconSquare bg="var(--node-blue-tint)" color="var(--node-blue)" size={26}>
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </IconSquare>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[12px] font-semibold text-primary">
+                                  {s.name}
+                                </span>
+                                <StatusBadge tone={sessionTone(s.status)}>{s.status}</StatusBadge>
+                                {pendingBySession.has(s.id) && (
+                                  <StatusBadge tone="warn">
+                                    <ShieldAlert className="h-3 w-3" /> Needs approval
+                                  </StatusBadge>
+                                )}
+                              </div>
+                              {s.title && (
+                                <div className="max-w-[36ch] truncate text-[10.5px] text-[var(--archon-faint)]">
+                                  {s.title}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className={cn(T.td, 'text-muted-foreground')}>{s.agentName}</td>
+                        <td className={cn(T.td, 'text-right font-mono')}>{s.totalTurns ?? 0}</td>
+                        <td className={cn(T.td, 'text-right font-mono font-semibold')}>
+                          {((s.tokensIn ?? 0) + (s.tokensOut ?? 0)).toLocaleString()}
+                        </td>
+                        <td className={cn(T.td, 'text-right font-mono text-[var(--archon-faint)]')}>
+                          {s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleString() : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SpecCard>
+        )}
       </div>
     </AppShell>
   );

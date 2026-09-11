@@ -51,6 +51,16 @@ export const routes: RouteObject[] = [
     handle: { showInNavigation: true, label: 'Conversations' },
   },
   {
+    path: '/knowledge',
+    lazy: page(() => import('./pages/KnowledgePage')),
+    handle: { showInNavigation: true, label: 'Knowledge' },
+  },
+  {
+    path: '/cost',
+    lazy: page(() => import('./pages/CostPage')),
+    handle: { showInNavigation: true, label: 'Cost' },
+  },
+  {
     path: '/executions',
     lazy: page(() => import('./pages/ExecutionLogsPage')),
     handle: { showInNavigation: true, label: 'Executions' },

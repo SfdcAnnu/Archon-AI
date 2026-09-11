@@ -1,4 +1,11 @@
 @import 'tailwindcss';
+@import '@fontsource/public-sans/400.css';
+@import '@fontsource/public-sans/500.css';
+@import '@fontsource/public-sans/600.css';
+@import '@fontsource/public-sans/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
 
 @layer base {
   /* Salesforce sometimes injects its own <sf-session-banner> chrome above
@@ -65,6 +72,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-sans: 'Public Sans', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -111,124 +120,79 @@
  * read as one visual system, not two apps stitched together.
  */
 :root {
-  --radius: 0.625rem;
-  --background: #F6F7FA;
-  --foreground: #12141C;
+  /* Approved interface spec (Archon-AI-UI-Screens, Sep 2026). Light
+     content on a fixed dark rail; Lightning blue brand; numbers always
+     IBM Plex Mono with tabular figures. Single-look by design — there is
+     no dark workspace theme. */
+  --radius: 0.5rem; /* 8px cards; controls use radius-sm ≈ 5px */
+  --background: #f2f3f5;
+  --foreground: #16181d;
   --card: #FFFFFF;
-  --card-foreground: #12141C;
+  --card-foreground: #16181d;
   --popover: #FFFFFF;
-  --popover-foreground: #12141C;
-  --primary: #3854E0;
+  --popover-foreground: #16181d;
+  --primary: #0176d3;
   --primary-foreground: #FFFFFF;
-  --secondary: #F0F2F6;
-  --secondary-foreground: #12141C;
-  --muted: #F0F2F6;
-  --muted-foreground: #7C8199;
-  --accent: #EEF1FD;
-  --accent-foreground: #3854E0;
-  --destructive: #C22222;
-  --border: #E3E6EC;
-  --input: #E3E6EC;
-  --ring: #3854E0;
-  --chart-1: #3854E0;
-  --chart-2: #10A37F;
-  --chart-3: #4285F4;
-  --chart-4: #A9670A;
-  --chart-5: #7C4DFF;
-  /* The app-shell sidebar is a fixed dark treatment regardless of the
-     main workspace's own light/dark mode — same pattern as Linear/Vercel/
-     Notion's nav rail. Not swapped in .dark below on purpose. */
-  --sidebar: #0E1015;
-  --sidebar-foreground: #F4F5F9;
-  --sidebar-primary: #6B85F5;
+  --secondary: #eef0f3;
+  --secondary-foreground: #16181d;
+  --muted: #eef0f3;
+  --muted-foreground: #5a616d;
+  --accent: #e6f2fb;
+  --accent-foreground: #0176d3;
+  --destructive: #ba0517;
+  --border: #e2e4e8;
+  --input: #e2e4e8;
+  --ring: #0176d3;
+  --chart-1: #0176d3;
+  --chart-2: #9050e9;
+  --chart-3: #06a59a;
+  --chart-4: #dd7a01;
+  --chart-5: #ba0517;
+  /* Fixed dark navigation rail — never themed. */
+  --sidebar: #14171f;
+  --sidebar-foreground: #f4f5f9;
+  --sidebar-primary: #0176d3;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1B1E28;
+  --sidebar-accent: #272e3d;
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #22252F;
-  --sidebar-muted: #8A8F9E;
-  --sidebar-ring: #6B85F5;
+  --sidebar-border: #232834;
+  --sidebar-muted: #8a919e;
+  --sidebar-ring: #0176d3;
 
-  /* Archon-specific tokens not covered by the shadcn slot set above —
-     reused verbatim by agent-builder components (node cards, edges,
-     legend) rather than inventing a second palette. */
-  --archon-success: #0F7A56;
-  --archon-success-tint: #E5F5EE;
-  --archon-warning: #A9670A;
-  --archon-warning-tint: #FCF1DC;
-  --archon-apex-tint: #FCEFE1;
-  --archon-apex-text: #8A4B00;
-  --archon-flow-tint: #E5F5EE;
-  --archon-accent-rgb: 56, 84, 224;
-  --archon-dot: rgba(56, 84, 224, .16);
+  /* Archon semantic tokens (spec: success/warning/error pairs) */
+  --archon-success: #2e844a;
+  --archon-success-tint: #e3f5da;
+  --archon-warning: #8c4b02;
+  --archon-warning-tint: #fcf1e0;
+  --archon-error: #ba0517;
+  --archon-error-tint: #fde7e4;
+  --archon-faint: #8a919e;
+  --archon-apex-tint: #fdf1e2;
+  --archon-apex-text: #8c4b02;
+  --archon-flow-tint: #e3f5da;
+  --archon-accent-rgb: 1, 118, 211;
+  --archon-dot: rgba(1, 118, 211, .14);
 
-  /* Node icon-chip colors — small colored squares as functional accents
-     (trigger/logic/action/message/wait), matching the reference's muted
-     enterprise palette rather than the earlier saturated "colorful" pass. */
-  --node-blue: #2563EB;    --node-blue-tint: #EAF1FE;
-  --node-purple: #7C3AED;  --node-purple-tint: #F1EBFC;
-  --node-amber: #D97706;   --node-amber-tint: #FDF1E2;
-  --node-green: #16A34A;   --node-green-tint: #E7F7ED;
-  --node-gray: #6B7280;    --node-gray-tint: #F1F2F5;
+  /* Node/entity accents (spec: purple agents · teal knowledge · orange
+     approvals) */
+  --node-blue: #0176d3;    --node-blue-tint: #e6f2fb;
+  --node-purple: #9050e9;  --node-purple-tint: #f1e8fd;
+  --node-amber: #dd7a01;   --node-amber-tint: #fdf1e2;
+  --node-green: #2e844a;   --node-green-tint: #e3f5da;
+  --node-gray: #6b7280;    --node-gray-tint: #eef0f3;
+  --node-teal: #06a59a;    --node-teal-tint: #dff4f2;
 }
 
-.dark {
-  --background: #0E0F14;
-  --foreground: #EBEDF5;
-  --card: #171922;
-  --card-foreground: #EBEDF5;
-  --popover: #171922;
-  --popover-foreground: #EBEDF5;
-  --primary: #6B85F5;
-  --primary-foreground: #0E0F14;
-  --secondary: #1D202B;
-  --secondary-foreground: #EBEDF5;
-  --muted: #1D202B;
-  --muted-foreground: #B0B4C7;
-  --accent: #1B2140;
-  --accent-foreground: #6B85F5;
-  --destructive: #F0716B;
-  --border: #2A2D3A;
-  --input: #2A2D3A;
-  --ring: #6B85F5;
-  --chart-1: #6B85F5;
-  --chart-2: #4ED9A4;
-  --chart-3: #7ba7f7;
-  --chart-4: #E3AC4C;
-  --chart-5: #a996ff;
-  /* Same fixed dark sidebar as :root — this rail doesn't change with the
-     workspace's own theme toggle. */
-  --sidebar: #0E1015;
-  --sidebar-foreground: #F4F5F9;
-  --sidebar-primary: #6B85F5;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1B1E28;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #22252F;
-  --sidebar-muted: #8A8F9E;
-  --sidebar-ring: #6B85F5;
-
-  --archon-success: #4ED9A4;
-  --archon-success-tint: #123528;
-  --archon-warning: #E3AC4C;
-  --archon-warning-tint: #3A2C11;
-  --archon-apex-tint: #3A2A14;
-  --archon-apex-text: #E3AC4C;
-  --archon-flow-tint: #123528;
-  --archon-accent-rgb: 107, 133, 245;
-  --archon-dot: rgba(107, 133, 245, .22);
-
-  --node-blue: #5B8DEF;    --node-blue-tint: #16233D;
-  --node-purple: #A78BFA;  --node-purple-tint: #241F3D;
-  --node-amber: #E3AC4C;   --node-amber-tint: #3A2C11;
-  --node-green: #4ED9A4;   --node-green-tint: #123528;
-  --node-gray: #9AA0B0;    --node-gray-tint: #1D202B;
-}
+/* .dark theme removed — the approved spec commits to one look. */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+  .font-mono, [class*='font-mono'] {
+    font-variant-numeric: tabular-nums;
   }
 }

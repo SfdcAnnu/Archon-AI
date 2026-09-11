@@ -57,7 +57,13 @@ export async function apexFetch<T>(path: string, init?: RequestInit, requestTime
   const body = (await res.json()) as T | { error: string };
   if (!res.ok) {
     const message = (body as { error?: string })?.error ?? `Request failed (${res.status})`;
-    throw new Error(message);
+    // Copy rule: never surface a raw provider/host error body. The Archon
+    // server's free-tier host answers with an HTML "Application loading"
+    // page while it wakes — translate that (or any HTML body) into words.
+    const friendly = /<!doctype|<html/i.test(message)
+      ? 'The Archon server is starting up — try again in a few seconds.'
+      : message;
+    throw new Error(friendly);
   }
   return body as T;
 }

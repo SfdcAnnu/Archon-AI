@@ -1,0 +1,1 @@
+import{a as s}from"./AppShell-BUWQqEh5.js";const n="/services/apexrest/agent-builder/conversations/";async function o(e=50){return s(`${n}?limit=${e}`,{method:"GET"})}async function i(e){return s(`${n}?sessionId=${encodeURIComponent(e)}`,{method:"GET"})}export{i as g,o as l};

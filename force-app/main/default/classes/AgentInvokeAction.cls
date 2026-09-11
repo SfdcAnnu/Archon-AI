@@ -140,10 +140,19 @@ public with sharing class AgentInvokeAction {
             return r;
         }
 
+        // The object type is DERIVED from the Id, never asked for: the
+        // runtime's record-anchoring line reads it ("anchored to the
+        // Opportunity with Id 006…" instead of a vague "record"), and
+        // record-bound tool parameters resolve against it. Passing null
+        // here — as this action used to — left Flow-invoked turns with a
+        // weaker context than the WhatsApp bridge gives the same agent.
+        String recordContextId = String.isNotBlank(req.recordId) ? req.recordId.trim() : null;
+        String recordContextType = sobjectTypeOf(recordContextId);
+
         ChatSession__c session = AgentChatController.findOrCreateAutomatedSession(
             agent.ApiName__c,
-            String.isNotBlank(req.recordId) ? req.recordId : null,
-            null,
+            recordContextId,
+            recordContextType,
             null
         );
         r.sessionId = session.Id;
@@ -199,6 +208,16 @@ public with sharing class AgentInvokeAction {
     }
 
     // ── HELPERS ───────────────────────────────────────────────────────
+
+    /** Object API name for a record Id, or null when it is not an Id. */
+    private static String sobjectTypeOf(String recordId) {
+        if (String.isBlank(recordId)) return null;
+        try {
+            return Id.valueOf(recordId).getSobjectType().getDescribe().getName();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     private static AgentDefinition__c resolveAgent(String idOrApiName) {
         Id maybeId = null;

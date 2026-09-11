@@ -5,6 +5,10 @@
     <hasActivationRequired>false</hasActivationRequired>
 
     <classAccesses>
+        <apexClass>SendWhatsAppMessage</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>AgentArchitectRestService</apexClass>
         <enabled>true</enabled>
     </classAccesses>

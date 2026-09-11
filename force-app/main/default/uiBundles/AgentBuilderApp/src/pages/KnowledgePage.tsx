@@ -252,10 +252,15 @@ function AddSourceDialog({
               <label className="mb-1 block text-[11px] font-semibold text-muted-foreground">File</label>
               <input
                 type="file"
+                accept=".pdf,.txt,.md,.markdown,.csv,.json,.log,application/pdf,text/plain"
                 onChange={e => handleFile(e.target.files?.[0])}
                 className="block w-full text-[12px] text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-card file:px-2.5 file:py-1 file:text-[11.5px] file:font-semibold file:text-primary"
               />
-              {file && <p className="mt-1 text-[11px] text-muted-foreground">{file.name} ready to upload.</p>}
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                PDF or plain text (.txt, .md, .csv, .json). Word and Excel can't be read yet — save as PDF, or
+                paste the text on the other tab.
+              </p>
+              {file && <p className="mt-1 text-[11px] text-foreground">{file.name} ready to upload.</p>}
             </div>
           )}
         </div>

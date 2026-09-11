@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2 } from 'lucide-react';
+import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/sonner';
@@ -12,6 +12,8 @@ import { PropertiesPanel } from '@/components/agent-builder/PropertiesPanel';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { KnowledgeBaseModal } from '@/components/agent-builder/KnowledgeBaseModal';
 import { SetupChecklistPanel } from '@/components/agent-builder/SetupChecklistPanel';
+import { ArchonCopilot, applyCopilotOperations } from '@/components/agent-builder/ArchonCopilot';
+import type { CopilotOperation } from '@/lib/architect-data';
 import AutomationReviewView from './AutomationReviewView';
 import { MOCK_AGENT_GRAPH } from '@/data/mock-agent';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
@@ -36,6 +38,7 @@ export default function AgentBuilder() {
   const [dataSource, setDataSource] = useState<'loading' | 'live' | 'mock'>('loading');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [chatOpen, setChatOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [quickAdd, setQuickAdd] = useState<QuickAddState | null>(null);
@@ -542,6 +545,15 @@ export default function AgentBuilder() {
                 </span>
               </button>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => setCopilotOpen(v => !v)}
+              title="Ask Archon about this agent or your org"
+            >
+              <Sparkles className="mr-1.5 h-3 w-3" /> Ask Archon
+            </Button>
             <Button size="sm" className="h-8 text-xs" onClick={() => setChatOpen(v => !v)}>
               <Play className="mr-1.5 h-3 w-3 fill-current" /> Test Agent
             </Button>
@@ -604,6 +616,13 @@ export default function AgentBuilder() {
             notesValue={graph.agent.knowledgeBase}
             onNotesChange={handleKnowledgeBaseChange}
             onClose={() => setKbOpen(false)}
+          />
+        )}
+        {copilotOpen && (
+          <ArchonCopilot
+            graph={graph}
+            onApplyOperations={(ops: CopilotOperation[]) => setGraph(g => applyCopilotOperations(g, ops))}
+            onClose={() => setCopilotOpen(false)}
           />
         )}
         {checklistOpen && (

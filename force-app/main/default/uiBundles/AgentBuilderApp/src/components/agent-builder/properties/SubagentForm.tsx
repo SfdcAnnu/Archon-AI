@@ -2,6 +2,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEngineModels } from '@/lib/use-engine-models';
 import { FieldLabel, Hint, Segmented } from './controls';
+import { PromptAssist } from './PromptAssist';
 import type { AgentNode, SubagentNodeConfig } from '@/types/agent';
 
 const PROVIDERS = [
@@ -46,7 +47,18 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
       </div>
 
       <div>
-        <FieldLabel>When to use it</FieldLabel>
+        <div className="mb-1.5 flex items-baseline gap-2">
+          <span className="text-[10.5px] font-bold text-muted-foreground">When to use it</span>
+          <div className="ml-auto">
+            <PromptAssist
+              draft={cfg?.routingDescription ?? ''}
+              role="tool"
+              modelId={cfg?.model ?? ''}
+              agentName={node.name}
+              onAccept={text => onConfigChange({ routingDescription: text })}
+            />
+          </div>
+        </div>
         <Textarea
           value={cfg?.routingDescription ?? ''}
           onChange={e => onConfigChange({ routingDescription: e.target.value })}
@@ -120,7 +132,18 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
       </div>
 
       <div>
-        <FieldLabel>Instructions</FieldLabel>
+        <div className="mb-1.5 flex items-baseline gap-2">
+          <span className="text-[10.5px] font-bold text-muted-foreground">Instructions</span>
+          <div className="ml-auto">
+            <PromptAssist
+              draft={cfg?.systemPrompt ?? ''}
+              role="subagent"
+              modelId={cfg?.model ?? ''}
+              agentName={node.name}
+              onAccept={text => onConfigChange({ systemPrompt: text })}
+            />
+          </div>
+        </div>
         <Textarea
           value={cfg?.systemPrompt ?? ''}
           onChange={e => onConfigChange({ systemPrompt: e.target.value })}

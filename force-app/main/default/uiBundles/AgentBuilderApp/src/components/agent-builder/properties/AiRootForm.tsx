@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEngineModels } from '@/lib/use-engine-models';
 import { AiEngineConnectionPicker } from './AiEngineConnectionPicker';
 import { FieldLabel, Hint, Segmented } from './controls';
+import { PromptAssist } from './PromptAssist';
 import type { AgentNode, AiNodeConfig } from '@/types/agent';
 
 const PROVIDERS = [
@@ -127,11 +128,22 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
       </div>
 
       <div>
-        <FieldLabel>Instructions</FieldLabel>
+        <div className="mb-1.5 flex items-baseline gap-2">
+          <span className="text-[10.5px] font-bold text-muted-foreground">Instructions</span>
+          <div className="ml-auto">
+            <PromptAssist
+              draft={cfg?.systemPrompt ?? ''}
+              role="agent"
+              modelId={cfg?.model ?? ''}
+              agentName={node.name}
+              onAccept={text => onConfigChange({ systemPrompt: text })}
+            />
+          </div>
+        </div>
         <Textarea
           value={cfg?.systemPrompt ?? ''}
           onChange={e => onConfigChange({ systemPrompt: e.target.value })}
-          placeholder="You are... Your job is to... Use tools to look up real data before answering."
+          placeholder="Write it however you like — rough notes or your own language. Then press Improve and I'll rewrite it properly for this model."
           className="min-h-32 font-mono text-[11.5px] leading-relaxed"
         />
       </div>

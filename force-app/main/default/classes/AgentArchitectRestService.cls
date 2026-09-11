@@ -18,6 +18,24 @@ global with sharing class AgentArchitectRestService {
         res.addHeader('Content-Type', 'application/json');
         try {
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(req.requestBody.toString());
+
+            // Two interactive surfaces share this POST: the instruction
+            // rewriter (the sparkle on a prompt box) and the copilot. Both
+            // are synchronous — unlike a build, they answer in one call.
+            String action = (String) body.get('action');
+            if (action == 'rewrite' || action == 'copilot') {
+                body.remove('action');
+                String path = action == 'rewrite' ? '/api/architect/rewrite-prompt' : '/api/architect/copilot';
+                HttpResponse assistRes = ArchonServerClient.callout('POST', path, JSON.serialize(body), 120000);
+                if (assistRes.getStatusCode() >= 400) {
+                    writeError(res, 400, ArchonServerClient.extractServerError(assistRes));
+                    return;
+                }
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(assistRes.getBody());
+                return;
+            }
+
             String requirement = (String) body.get('requirement');
             if (String.isBlank(requirement) || requirement.length() < 20) {
                 writeError(res, 400, 'Describe the agent in at least a sentence or two.');

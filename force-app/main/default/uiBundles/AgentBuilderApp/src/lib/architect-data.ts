@@ -69,3 +69,70 @@ export const ASSIGNEE_LABEL: Record<string, string> = {
   data_owner: 'Needs the data owner',
   business_owner: 'Needs a business decision',
 };
+
+// ── ✦ Rewrite an instruction for the model that will run it ──────────
+export interface RewriteResult {
+  instructions: string;
+  changed: string[];
+  costUsd: number;
+}
+
+export async function rewritePrompt(input: {
+  draft: string;
+  role: 'agent' | 'subagent' | 'tool';
+  modelId: string;
+  agentName?: string;
+  department?: string;
+  channel?: string;
+  toolNames?: string[];
+}): Promise<RewriteResult> {
+  return apexFetch<RewriteResult>(
+    `${BASE}/rewrite`,
+    { method: 'POST', body: JSON.stringify({ action: 'rewrite', ...input }) },
+    120000,
+  );
+}
+
+// ── ✦ Ask Archon ─────────────────────────────────────────────────────
+export type CopilotOperation =
+  | { kind: 'setInstructions'; nodeId: string; value: string; why: string }
+  | { kind: 'setDescription'; nodeId: string; value: string; why: string }
+  | { kind: 'setRoutingDescription'; nodeId: string; value: string; why: string }
+  | { kind: 'setModel'; nodeId: string; value: string; why: string }
+  | { kind: 'setApproval'; nodeId: string; value: boolean; why: string }
+  | { kind: 'setContextPolicy'; nodeId: string; value: 'isolated' | 'windowed' | 'full'; why: string }
+  | { kind: 'setMode'; nodeId: string; value: 'call' | 'transfer'; why: string };
+
+export interface CopilotReply {
+  reply: string;
+  operations: CopilotOperation[];
+  costUsd: number;
+}
+
+export async function askArchon(input: {
+  message: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  agent?: {
+    apiName: string;
+    name: string;
+    department?: string;
+    nodes: Array<{ id: string; name: string; nodeType: string; nodeSubType: string; config: Record<string, unknown> }>;
+  };
+}): Promise<CopilotReply> {
+  return apexFetch<CopilotReply>(
+    `${BASE}/copilot`,
+    { method: 'POST', body: JSON.stringify({ action: 'copilot', ...input }) },
+    120000,
+  );
+}
+
+/** Human label for a proposed change, for the preview list. */
+export const OPERATION_LABEL: Record<CopilotOperation['kind'], string> = {
+  setInstructions: 'Rewrite its instructions',
+  setDescription: 'Change the description',
+  setRoutingDescription: 'Change when it gets used',
+  setModel: 'Change the model',
+  setApproval: 'Change the approval setting',
+  setContextPolicy: 'Change what it can see',
+  setMode: 'Change how it answers',
+};

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { ChevronDown, Loader2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
@@ -15,14 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { NoteBar, SpecCard, StatCard, StatusBadge, T, type BadgeTone } from '@/components/spec/blocks';
-import { DescribeAgentWizard } from '@/components/agent-builder/DescribeAgentWizard';
 import { cn } from '@/lib/utils';
 import { loadAgents, deleteAgent, createAgent, type AgentSummary } from '@/lib/agents-data';
 import { loadExecutionLogs, type RawAgentExecution } from '@/lib/executions-data';
@@ -170,7 +163,6 @@ export default function HomePage() {
   const [execs, setExecs] = useState<RawAgentExecution[] | null | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [showNewAgent, setShowNewAgent] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDepartment, setNewDepartment] = useState('Sales');
   const [creating, setCreating] = useState(false);
@@ -291,7 +283,6 @@ export default function HomePage() {
 
   return (
     <AppShell title="Agents" onRefresh={refresh}>
-      {showWizard && <DescribeAgentWizard onClose={() => setShowWizard(false)} />}
 
       <div className="mx-auto w-full max-w-5xl p-5">
         <div className="grid grid-cols-3 gap-3.5">
@@ -343,21 +334,9 @@ export default function HomePage() {
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="h-7 px-2.5 text-[11.5px]">
-                    <Plus className="mr-1 h-3 w-3" /> New <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowWizard(true)}>
-                    <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" /> Describe your agent
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowNewAgent(true)}>
-                    <Plus className="mr-2 h-3.5 w-3.5" /> Start blank
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button size="sm" className="h-7 px-2.5 text-[11.5px]" onClick={() => setShowNewAgent(true)}>
+                <Plus className="mr-1 h-3 w-3" /> New agent
+              </Button>
             </>
           }
         >

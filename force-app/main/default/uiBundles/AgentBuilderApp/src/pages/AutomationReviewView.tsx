@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Check, ListChecks, Loader2, Save, Sparkles } from 'lucide-react';
+import { Check, ListChecks, Loader2, Save } from 'lucide-react';
 import { Canvas } from '@/components/agent-builder/Canvas';
 import { PropertiesPanel } from '@/components/agent-builder/PropertiesPanel';
 import { AgentInfoPopover } from '@/components/agent-builder/AgentInfoPopover';
 import { SetupChecklistPanel } from '@/components/agent-builder/SetupChecklistPanel';
-import { CopilotPanel } from '@/components/agent-builder/CopilotPanel';
-import type { CopilotOperation } from '@/lib/copilot-data';
 import type { AgentGraph } from '@/types/agent';
 
 export interface AutomationReviewViewProps {
@@ -14,7 +12,6 @@ export interface AutomationReviewViewProps {
   saveState: 'idle' | 'saving' | 'error';
   justSaved: boolean;
   onSave: () => void;
-  onApplyCopilotOperations: (ops: CopilotOperation[]) => void;
 }
 
 /**
@@ -33,12 +30,10 @@ export default function AutomationReviewView({
   saveState,
   justSaved,
   onSave,
-  onApplyCopilotOperations,
 }: AutomationReviewViewProps) {
   const navigate = useNavigate();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
-  const [copilotOpen, setCopilotOpen] = useState(false);
   const isActiveStatus = graph.agent.status === 'Active';
 
   return (
@@ -110,15 +105,6 @@ export default function AutomationReviewView({
               </span>
             </button>
           )}
-          <button
-            type="button"
-            title="Copilot"
-            aria-label="Copilot"
-            onClick={() => setCopilotOpen(v => !v)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-          </button>
         </div>
       </header>
       <div className="relative flex min-h-0 flex-1">
@@ -149,14 +135,6 @@ export default function AutomationReviewView({
       </div>
       {checklistOpen && (
         <SetupChecklistPanel items={graph.agent.setupChecklist} onClose={() => setChecklistOpen(false)} />
-      )}
-      {copilotOpen && (
-        <CopilotPanel
-          graph={graph}
-          mode="trigger"
-          onApply={onApplyCopilotOperations}
-          onClose={() => setCopilotOpen(false)}
-        />
       )}
     </div>
   );

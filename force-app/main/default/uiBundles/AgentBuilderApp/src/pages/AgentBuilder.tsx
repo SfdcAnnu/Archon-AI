@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles } from 'lucide-react';
+import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/sonner';
@@ -12,13 +12,10 @@ import { PropertiesPanel } from '@/components/agent-builder/PropertiesPanel';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { KnowledgeBaseModal } from '@/components/agent-builder/KnowledgeBaseModal';
 import { SetupChecklistPanel } from '@/components/agent-builder/SetupChecklistPanel';
-import { CopilotPanel } from '@/components/agent-builder/CopilotPanel';
 import AutomationReviewView from './AutomationReviewView';
 import { MOCK_AGENT_GRAPH } from '@/data/mock-agent';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import { loadAgentGraph, saveAgentGraph } from '@/lib/salesforce-data';
-import { applyCopilotOperations } from '@/lib/copilot-apply';
-import type { CopilotOperation } from '@/lib/copilot-data';
 import type { DirectoryEntry } from '@/lib/connectors-data';
 import type { AgentGraph, NodeConfig } from '@/types/agent';
 
@@ -41,7 +38,6 @@ export default function AgentBuilder() {
   const [chatOpen, setChatOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
-  const [copilotOpen, setCopilotOpen] = useState(false);
   const [quickAdd, setQuickAdd] = useState<QuickAddState | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const addRailBtnRef = useRef<HTMLButtonElement>(null);
@@ -385,14 +381,6 @@ export default function AgentBuilder() {
   }, []);
 
   // Same real-state-mutation contract as every other handler here — the
-  // Copilot (CopilotPanel.tsx) only ever calls this on an explicit Apply
-  // click; applyCopilotOperations itself is a pure function with no access
-  // to setGraph, so there is no path from "proposed" to "real" that skips
-  // this one call site.
-  const handleApplyCopilotOperations = useCallback((ops: CopilotOperation[]) => {
-    setGraph(g => applyCopilotOperations(g, ops));
-  }, []);
-
   const handleConfigChange = useCallback((id: string, patch: Partial<NodeConfig>) => {
     setGraph(g => ({
       ...g,
@@ -453,7 +441,6 @@ export default function AgentBuilder() {
           saveState={saveState}
           justSaved={justSaved}
           onSave={handleSave}
-          onApplyCopilotOperations={handleApplyCopilotOperations}
         />
       ) : (
       <div className="relative flex h-full w-full flex-col">
@@ -555,15 +542,6 @@ export default function AgentBuilder() {
                 </span>
               </button>
             )}
-            <button
-              type="button"
-              title="Copilot"
-              aria-label="Copilot"
-              onClick={() => setCopilotOpen(v => !v)}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-            </button>
             <Button size="sm" className="h-8 text-xs" onClick={() => setChatOpen(v => !v)}>
               <Play className="mr-1.5 h-3 w-3 fill-current" /> Test Agent
             </Button>
@@ -630,14 +608,6 @@ export default function AgentBuilder() {
         )}
         {checklistOpen && (
           <SetupChecklistPanel items={graph.agent.setupChecklist} onClose={() => setChecklistOpen(false)} />
-        )}
-        {copilotOpen && (
-          <CopilotPanel
-            graph={graph}
-            mode="chat"
-            onApply={handleApplyCopilotOperations}
-            onClose={() => setCopilotOpen(false)}
-          />
         )}
       </div>
       )}

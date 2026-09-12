@@ -276,7 +276,10 @@ export default function ConversationsPage() {
                     <tr>
                       <th className={T.th}>Session</th>
                       <th className={T.th}>Agent</th>
-                      <th className={cn(T.th, 'text-right')}>Messages</th>
+                      {/* TotalTurns__c counts exchanges, not rows — a turn
+                          also writes tool results. "Messages" read as a
+                          row count and did not match the transcript. */}
+                      <th className={cn(T.th, 'text-right')}>Turns</th>
                       <th className={cn(T.th, 'text-right')}>Tokens</th>
                       <th className={cn(T.th, 'text-right')}>Last activity</th>
                     </tr>

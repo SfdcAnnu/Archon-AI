@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 import { Label } from '@/components/ui/label';
 import {
   listConnectionsForEngine,
@@ -57,7 +58,15 @@ export function AiEngineConnectionPicker({ nodeId, nodeSubType, currentConnectio
       setBinding(true);
       bindEngineConnectionToNode(nodeId, connectionId)
         .then(() => onBound(connectionId))
-        .catch(err => console.error('Failed to bind engine connection:', err))
+        .catch(err => {
+          // This select writes straight to Salesforce — it is not part of
+          // the batched Save. A silent failure looked exactly like "the
+          // dropdown won't let me pick anything", so say so.
+          console.error('Failed to bind engine connection:', err);
+          toast.error("Couldn't change the AI connection", {
+            description: err instanceof Error ? err.message : undefined,
+          });
+        })
         .finally(() => setBinding(false));
     },
     [nodeId, onBound]

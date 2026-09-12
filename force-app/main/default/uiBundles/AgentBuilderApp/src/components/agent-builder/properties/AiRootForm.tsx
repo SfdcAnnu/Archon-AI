@@ -74,6 +74,15 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
         </Hint>
       </div>
 
+      {/* Directly under Model: which key this agent runs on belongs with
+          the model it runs, not at the far end of a scrolling panel. */}
+      <AiEngineConnectionPicker
+        nodeId={node.id}
+        nodeSubType={node.nodeSubType}
+        currentConnectionId={node.aiEngineConnectionId}
+        onBound={onConnectionBound}
+      />
+
       <div>
         <FieldLabel>If this model fails</FieldLabel>
         <Select disabled value="none">
@@ -84,7 +93,11 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
             <SelectItem value="none">No fallback yet</SelectItem>
           </SelectContent>
         </Select>
-        <Hint>Model fallback arrives with the runtime's next update — a rejected key will degrade quality instead of failing the turn.</Hint>
+        <Hint>
+          Not built yet, so it stays switched off rather than pretending to hold a setting. When it lands,
+          a turn whose model is rejected or unavailable will retry on the backup you name here instead of
+          failing.
+        </Hint>
       </div>
 
       <div>
@@ -121,7 +134,7 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
             min={64}
             step={64}
             value={cfg?.maxReplyTokens ?? ''}
-            placeholder="1024"
+            placeholder="8000"
             onChange={e => {
               const n = Number(e.target.value);
               onConfigChange({ maxReplyTokens: Number.isFinite(n) && n > 0 ? n : undefined });
@@ -130,7 +143,11 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
           />
           <span className="text-[11px] text-muted-foreground">tokens</span>
         </div>
-        <Hint>Replies are about half your bill. This cap moves cost more than shortening instructions.</Hint>
+        <Hint>
+          The most a single reply may generate. Leave it empty for the 8000-token default. Replies are
+          about half your bill, so this cap moves cost more than shortening instructions — press Save to
+          apply it.
+        </Hint>
       </div>
 
       <div>
@@ -153,13 +170,6 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
           className="min-h-32 font-mono text-[11.5px] leading-relaxed"
         />
       </div>
-
-      <AiEngineConnectionPicker
-        nodeId={node.id}
-        nodeSubType={node.nodeSubType}
-        currentConnectionId={node.aiEngineConnectionId}
-        onBound={onConnectionBound}
-      />
     </div>
   );
 }

@@ -57,11 +57,19 @@ export async function saveEngineConnection(input: SaveConnectionInput): Promise<
   return result.id;
 }
 
-/** Models every provider is known to offer — the pickers' fallback when a
- *  connection has no saved catalog. Keyed by EngineType__c vocabulary. */
+/**
+ * The starting set a provider offers before an admin curates one — what
+ * "enabled" means for a connection whose catalogue was never saved.
+ *
+ * Keep this current. It is not cosmetic: it is the enabled set until
+ * someone presses "Refresh list" and picks, so a model missing from here
+ * gets reported as not-enabled even while an agent is happily running on
+ * it. Use "Refresh list" on the AI Models page for the provider's real
+ * live catalogue — this is only the bootstrap.
+ */
 export const ENGINE_DEFAULT_MODELS: Record<string, string[]> = {
   claude: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o4-mini'],
+  openai: ['gpt-5.5', 'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o4-mini'],
   gemini: ['gemini-2.5-pro', 'gemini-2.5-flash'],
   custom: [],
 };
@@ -75,6 +83,21 @@ export function parseEnabledModels(conn: ConnectionSummary | null | undefined): 
   } catch {
     return null;
   }
+}
+
+/**
+ * THE definition of "enabled" for one connection: the admin's saved set, or
+ * the provider defaults when they have never curated one.
+ *
+ * Single source of truth on purpose. The AI Models page and the canvas
+ * model pickers both call this, so what the page reports as enabled is
+ * exactly what a builder can choose. They used to disagree — the pickers
+ * fell back to the provider's full live catalogue whenever nothing was
+ * saved, so the page could say "3 models enabled" while the picker offered
+ * every model the provider had ever shipped.
+ */
+export function effectiveEnabledModels(conn: ConnectionSummary): string[] {
+  return parseEnabledModels(conn) ?? ENGINE_DEFAULT_MODELS[conn.engineType] ?? [];
 }
 
 export interface ProviderModel {

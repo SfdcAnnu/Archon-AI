@@ -18,9 +18,11 @@ import {
 import { EngineConnectionFormDialog } from '@/components/connections/EngineConnectionFormDialog';
 import { ModelCombobox } from '@/components/connections/ModelCombobox';
 import { TIER_META, tierForModel } from '@/lib/model-tiers';
+import { invalidateEngineModelsCache } from '@/lib/use-engine-models';
 import {
   ENGINE_DEFAULT_MODELS,
   ENGINE_TYPES,
+  effectiveEnabledModels,
   listConnectionsForEngine,
   deleteEngineConnection,
   fetchProviderModels,
@@ -49,13 +51,6 @@ const PROVIDERS: ProviderMeta[] = [
   { key: 'gemini', name: 'Google', sub: 'Gemini' },
   { key: 'custom', name: 'Custom endpoint', sub: 'OpenAI compatible' },
 ];
-
-/** Models a connection actually offers in the pickers — the saved set, or
- *  the provider defaults when none was ever saved (same rule as
- *  use-engine-models.ts). */
-function effectiveEnabledModels(conn: ConnectionSummary): string[] {
-  return parseEnabledModels(conn) ?? ENGINE_DEFAULT_MODELS[conn.engineType] ?? [];
-}
 
 /** Status dot: green = last test passed, red = last test failed,
  *  grey = never tested. */
@@ -166,7 +161,12 @@ function ModelsCard({
   const persist = (next: string[]) => {
     setSaving(true);
     saveConnectionModels(conn.id, next)
-      .then(() => onSaved(next))
+      .then(() => {
+        // The canvas pickers offer exactly this set — make them re-read it
+        // instead of serving a stale list for the rest of the session.
+        invalidateEngineModelsCache();
+        onSaved(next);
+      })
       .catch(err => console.error('Failed to save models:', err))
       .finally(() => setSaving(false));
   };

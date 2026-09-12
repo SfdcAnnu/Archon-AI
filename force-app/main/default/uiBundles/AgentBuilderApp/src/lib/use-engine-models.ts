@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { MODEL_OPTIONS } from '@/data/node-catalog';
-import { fetchProviderModels, listConnectionsForEngine, parseEnabledModels } from './engine-connections-data';
+import {
+  ENGINE_DEFAULT_MODELS,
+  effectiveEnabledModels,
+  listConnectionsForEngine,
+} from './engine-connections-data';
 
 /** Node subtypes name providers in canvas vocabulary ('gpt4'); connections
  *  store engine types in admin vocabulary ('openai'). Same mismatch
@@ -9,55 +12,83 @@ function engineTypeForSubtype(subType: string): string {
   return subType === 'gpt4' ? 'openai' : subType;
 }
 
-// Live-list cache per engine type — model pickers open constantly while
-// editing a graph; one provider fetch per ~10 minutes is plenty fresh.
-const liveCache = new Map<string, { models: string[]; fetchedAt: number }>();
-const LIVE_TTL_MS = 10 * 60 * 1000;
+export interface EngineModels {
+  /** What the picker offers. */
+  models: string[];
+  /** True when the node's saved model is no longer among the enabled ones —
+   *  it is still offered (so opening a node never silently blanks its
+   *  model) but the form warns about it. */
+  currentIsDisabled: boolean;
+  /** No active connection for this provider: the list is provider defaults
+   *  rather than anything an admin actually enabled. */
+  noConnection: boolean;
+}
+
+// One connection lookup per provider per ~2 minutes — pickers mount every
+// time the inspector opens, and this is a plain Salesforce read.
+const connCache = new Map<string, { models: string[]; noConnection: boolean; fetchedAt: number }>();
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
+/** Drop the cache so a just-changed enabled set shows up immediately. */
+export function invalidateEngineModelsCache(): void {
+  connCache.clear();
+}
 
 /**
- * Model list for a canvas node's provider, in strict preference order:
- *   1. The models EXPLICITLY enabled on the connection (AI Models page) —
- *      the admin's curated list always wins.
- *   2. The provider's LIVE model list, fetched via the connection's key —
- *      so with no curation saved, pickers still show real current models,
- *      never a hardcoded snapshot.
- *   3. The built-in list — only when the provider is unreachable or no
- *      active connection exists (offline last resort).
+ * The models a canvas node may choose from — exactly the ones enabled for
+ * that provider on the AI Models page, and nothing else.
+ *
+ * The provider's LIVE catalogue is deliberately not consulted here. It is
+ * still what the AI Models page lists for an admin to enable ("Refresh
+ * list"), but offering it on the canvas meant a builder could pick a model
+ * the admin had never turned on — and made the page's own "models enabled"
+ * count wrong about what the pickers showed.
+ *
+ * With several keys on one provider, the union of their enabled sets is
+ * offered: any of them can serve the node at runtime.
  */
-export function useEngineModels(nodeSubType: string): string[] {
-  const fallback = MODEL_OPTIONS[nodeSubType] ?? MODEL_OPTIONS.claude;
-  const [models, setModels] = useState<string[]>(fallback);
+export function useEngineModels(nodeSubType: string, currentModel?: string): EngineModels {
+  const engineType = engineTypeForSubtype(nodeSubType);
+  const fallback = ENGINE_DEFAULT_MODELS[engineType] ?? [];
+  const [state, setState] = useState<{ models: string[]; noConnection: boolean }>({
+    models: fallback,
+    noConnection: true,
+  });
 
   useEffect(() => {
     let cancelled = false;
-    const engineType = engineTypeForSubtype(nodeSubType);
-    setModels(MODEL_OPTIONS[nodeSubType] ?? MODEL_OPTIONS.claude);
+    const type = engineTypeForSubtype(nodeSubType);
+    const defaults = ENGINE_DEFAULT_MODELS[type] ?? [];
 
-    listConnectionsForEngine(engineType)
-      .then(async conns => {
+    const cached = connCache.get(type);
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      setState({ models: cached.models, noConnection: cached.noConnection });
+      return;
+    }
+    setState({ models: defaults, noConnection: true });
+
+    listConnectionsForEngine(type)
+      .then(conns => {
         if (cancelled) return;
-        const best = conns.find(c => c.isActive && c.isPreferred) ?? conns.find(c => c.isActive);
-        if (!best) return; // no active connection — keep offline fallback
-
-        const enabled = parseEnabledModels(best);
-        if (enabled && enabled.length > 0) {
-          setModels(enabled);
-          return;
+        // Inactive keys cannot serve a turn, so what they enable is not
+        // actually available to this node.
+        const active = conns.filter(c => c.isActive);
+        const union: string[] = [];
+        for (const c of active) {
+          for (const m of effectiveEnabledModels(c)) {
+            if (!union.includes(m)) union.push(m);
+          }
         }
-
-        const cached = liveCache.get(engineType);
-        if (cached && Date.now() - cached.fetchedAt < LIVE_TTL_MS) {
-          setModels(cached.models);
-          return;
-        }
-        const live = await fetchProviderModels({ recordId: best.id });
-        if (cancelled || live.length === 0) return;
-        const ids = live.map(m => m.id);
-        liveCache.set(engineType, { models: ids, fetchedAt: Date.now() });
-        setModels(ids);
+        // No usable connection yet: offer the provider defaults so the
+        // picker is never empty while an org is still being set up. The
+        // node still fails at runtime with the existing clear message.
+        const resolved = union.length > 0 ? union : defaults;
+        const noConnection = union.length === 0;
+        connCache.set(type, { models: resolved, noConnection, fetchedAt: Date.now() });
+        setState({ models: resolved, noConnection });
       })
       .catch(() => {
-        /* provider/offline failure → the built-in fallback already set */
+        /* offline / no access — the provider defaults are already set */
       });
 
     return () => {
@@ -65,5 +96,13 @@ export function useEngineModels(nodeSubType: string): string[] {
     };
   }, [nodeSubType]);
 
-  return models;
+  const saved = (currentModel ?? '').trim();
+  const currentIsDisabled = saved.length > 0 && !state.models.includes(saved);
+  return {
+    // Keep a now-disabled saved model selectable. Dropping it would render
+    // the select blank and quietly rewrite the node's model on next save.
+    models: currentIsDisabled ? [...state.models, saved] : state.models,
+    currentIsDisabled,
+    noConnection: state.noConnection,
+  };
 }

@@ -27,7 +27,7 @@ export interface AiRootFormProps {
  *  runtime reads generically, same pattern as `budgets`. */
 export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectionBound }: AiRootFormProps) {
   const cfg = node.config as AiNodeConfig;
-  const models = useEngineModels(node.nodeSubType);
+  const { models, currentIsDisabled, noConnection } = useEngineModels(node.nodeSubType, cfg?.model);
 
   return (
     <div className="space-y-[15px]">
@@ -65,7 +65,13 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
             ))}
           </SelectContent>
         </Select>
-        <Hint>Only models enabled on this provider's connection appear here.</Hint>
+        <Hint>
+          {currentIsDisabled
+            ? `${cfg?.model} is no longer enabled for this provider on the AI Models page. It still runs, but pick another model or re-enable it there.`
+            : noConnection
+              ? "No active key for this provider yet — these are its standard models. Add a key on the AI Models page to choose what's available here."
+              : 'Only models enabled on this provider on the AI Models page appear here.'}
+        </Hint>
       </div>
 
       <div>

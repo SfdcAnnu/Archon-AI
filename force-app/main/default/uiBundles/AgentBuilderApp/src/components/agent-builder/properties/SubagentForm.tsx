@@ -24,7 +24,7 @@ export interface SubagentFormProps {
  *  see, then its own model. */
 export function SubagentForm({ node, onConfigChange, onProviderChange }: SubagentFormProps) {
   const cfg = node.config as SubagentNodeConfig;
-  const models = useEngineModels(node.nodeSubType);
+  const { models, currentIsDisabled, noConnection } = useEngineModels(node.nodeSubType, cfg?.model);
   const mode = cfg?.mode ?? 'transfer';
 
   return (
@@ -126,8 +126,11 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
           </SelectContent>
         </Select>
         <Hint>
-          Runs its own model call on the org's active connection for this provider — no separate credential
-          needed.
+          {currentIsDisabled
+            ? `${cfg?.model} is no longer enabled for this provider on the AI Models page. It still runs, but pick another model or re-enable it there.`
+            : noConnection
+              ? "No active key for this provider yet — these are its standard models. Add a key on the AI Models page to choose what's available here."
+              : "Runs its own model call on the org's active connection for this provider — no separate credential needed. Only models enabled on the AI Models page appear here."}
         </Hint>
       </div>
 

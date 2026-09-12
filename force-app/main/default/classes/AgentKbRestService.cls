@@ -76,6 +76,16 @@ global with sharing class AgentKbRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(doc));
                 return;
             }
+            if (action == 'searchKb') {
+                // Returns the server's JSON verbatim — the UI renders the
+                // passages exactly as the agent would receive them.
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(AgentKbController.searchKb(
+                    (String) body.get('agentApiName'),
+                    (String) body.get('query')
+                ));
+                return;
+            }
             if (action == 'reindexDocument') {
                 AgentKbController.KbDocumentDto doc = AgentKbController.reindexDocument((String) body.get('documentId'));
                 res.statusCode = 200;

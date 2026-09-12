@@ -34,9 +34,11 @@ import {
   loadStorageConfig,
   reindexDocument,
   saveStorageConfig,
+  searchKb,
   testKbConnection,
   uploadDocument,
   type KbDocument,
+  type KbSearchResult,
   type StorageConfig,
 } from '@/lib/kb-data';
 
@@ -45,9 +47,7 @@ import {
  *  by agentApiName), so the left column lists the org's agents with their
  *  document counts; the right side shows the selected agent's indexing
  *  health, per-document source rows, the storage backend, and the
- *  retrieval-test panel. The retrieval panel is intentionally inert:
- *  AgentKbRestService exposes no search action yet, and the spec forbids
- *  fabricating results. */
+ *  retrieval-test panel, which runs the same retrieval a live turn runs. */
 
 type DocKind = 'ready' | 'indexing' | 'error' | 'other';
 
@@ -279,6 +279,77 @@ function AddSourceDialog({
 }
 
 /* ── storage backend strip ────────────────────────────────────────────── */
+
+
+/** Runs the SAME retrieval a live turn runs and shows the passages exactly
+ *  as the agent receives them. Worth its own panel: a knowledge base that
+ *  cannot be queried is one nobody can trust, and finding out that the
+ *  answer is missing — or that the wrong passage wins — should not cost a
+ *  real conversation. */
+function RetrievalTester({ agentApiName }: { agentApiName: string }) {
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState<KbSearchResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = () => {
+    const q = query.trim();
+    if (!q || busy) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    searchKb(agentApiName, q)
+      .then(setResult)
+      .catch(err => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <SpecCard title="Try a question" muted="see exactly what your agent would receive">
+      <div className="flex gap-2 px-3.5 py-3">
+        <Input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && run()}
+          placeholder="e.g. What is the enterprise renewal discount cap?"
+          className="h-8 flex-1 text-[12.5px]"
+        />
+        <Button size="sm" className="h-8 text-xs" onClick={run} disabled={busy || !query.trim()}>
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />} Search
+        </Button>
+      </div>
+
+      {error && <NoteBar>Couldn't run the search — {error}</NoteBar>}
+
+      {result && result.chunks.length === 0 && (
+        <NoteBar>
+          {result.note ?? 'Nothing matched. The agent would get no knowledge-base context for this question.'}
+        </NoteBar>
+      )}
+
+      {result && result.chunks.length > 0 && (
+        <div className="grid gap-2.5 px-3.5 pb-3.5 text-[11.5px]">
+          <div className="text-[10.5px] text-muted-foreground">
+            {result.chunks.length} passage{result.chunks.length === 1 ? '' : 's'} — this is what reaches the prompt
+          </div>
+          {result.chunks.map((c, i) => (
+            <div key={i} className="overflow-hidden rounded-lg border border-border">
+              <div className="flex items-center justify-between bg-secondary px-2.5 py-1.5 text-[10px]">
+                <span className="font-bold text-foreground">[{i + 1}] {c.documentTitle}</span>
+                {c.score != null && (
+                  <span className="font-mono text-muted-foreground">score {c.score.toFixed(3)}</span>
+                )}
+              </div>
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-[11px] leading-relaxed">
+                {c.content}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </SpecCard>
+  );
+}
 
 function StorageStrip() {
   const [config, setConfig] = useState<StorageConfig | null>(null);
@@ -593,19 +664,7 @@ export default function KnowledgePage() {
 
               <StorageStrip />
 
-              <SpecCard title="Try a question" muted="see exactly what your agent would receive">
-                <div className="flex gap-2 px-3.5 py-3">
-                  <Input
-                    placeholder="e.g. What is the enterprise renewal discount cap?"
-                    disabled
-                    className="h-8 flex-1 text-[12.5px]"
-                  />
-                  <Button size="sm" className="h-8 text-xs" disabled>
-                    <Search className="h-3 w-3" /> Search
-                  </Button>
-                </div>
-                <NoteBar>Retrieval testing arrives with the KB search endpoint.</NoteBar>
-              </SpecCard>
+              {selected && <RetrievalTester agentApiName={selected} />}
             </div>
           </div>
         )}

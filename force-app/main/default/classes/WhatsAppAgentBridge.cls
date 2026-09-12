@@ -90,11 +90,23 @@ public with sharing class WhatsAppAgentBridge {
         // contact's most recent Closed Lost Opportunity and anchor to THAT.
         if (oppId == null && contactId != null) {
             try {
+                // Deliberately NOT filtered to Closed Lost. That filter was
+                // self-defeating: the moment the agent did its job and moved
+                // a revived deal to Negotiation/Review, the customer's NEXT
+                // message could no longer find it — the session fell back to
+                // Contact-only, the record context went missing, and the
+                // agent started hunting for a quote it had been discussing
+                // minutes earlier (live-confirmed, CHAT-0158).
+                //
+                // Won deals are excluded because there is nothing left to
+                // revive; everything else — still lost, or lost and now back
+                // in play — is a conversation worth continuing. Most recently
+                // touched wins, which is the deal actually being worked.
                 List<OpportunityContactRole> roles = [
                     SELECT OpportunityId FROM OpportunityContactRole
-                    WHERE ContactId = :contactId AND Opportunity.StageName = 'Closed Lost'
+                    WHERE ContactId = :contactId AND Opportunity.IsWon = false
                     WITH USER_MODE
-                    ORDER BY Opportunity.CloseDate DESC, Opportunity.LastModifiedDate DESC
+                    ORDER BY Opportunity.LastModifiedDate DESC, Opportunity.CloseDate DESC
                     LIMIT 1
                 ];
                 if (!roles.isEmpty()) oppId = roles[0].OpportunityId;
@@ -170,7 +182,16 @@ public with sharing class WhatsAppAgentBridge {
             if (oppId != null)     ids.add('opportunityId: ' + oppId);
             if (messageId != null) ids.add('messageId: ' + messageId);
             if (ids.isEmpty()) return text;
-            String header = '[RECORD CONTEXT - not from the customer, use these ids for lookups and actions]';
+            // Reference only. This used to read "use these ids for lookups
+            // and actions", which arrived with every single message and read
+            // as a standing instruction to go look things up — measured at
+            // five identical tool calls per turn, each forcing another model
+            // call over the full prompt. The anchored record's values now
+            // reach the agent already loaded (chat/record-context.ts), so
+            // these ids are here to be USED in a write, not to trigger a
+            // fresh round of discovery.
+            String header = '[RECORD IDS - reference, not from the customer. ' +
+                'The record details are already provided to you; look something up only if it is not.]';
             return text + '\n\n' + header + '\n' + String.join(ids, '\n');
         }
 

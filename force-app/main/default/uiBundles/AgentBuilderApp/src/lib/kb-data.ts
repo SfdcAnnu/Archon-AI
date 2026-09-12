@@ -62,6 +62,31 @@ export async function reindexDocument(documentId: string): Promise<KbDocument> {
   });
 }
 
+export interface KbSearchChunk {
+  content: string;
+  documentTitle: string;
+  /** Backend-specific relevance signal (cosine similarity, SOSL rank…). */
+  score?: number;
+}
+
+export interface KbSearchResult {
+  chunks: KbSearchChunk[];
+  /** The passages exactly as the agent receives them in its prompt. */
+  formatted: string;
+  note?: string;
+}
+
+/** Runs the same retrieval a real turn runs — same embedding, backend and
+ *  top-k — so what comes back is literally what the agent would be handed
+ *  for this question, not an approximation. */
+export async function searchKb(agentApiName: string, query: string): Promise<KbSearchResult> {
+  return apexFetch<KbSearchResult>(
+    KB_BASE,
+    { method: 'POST', body: JSON.stringify({ action: 'searchKb', agentApiName, query }) },
+    60000
+  );
+}
+
 export async function deleteDocument(documentId: string): Promise<void> {
   await apexFetch<{ success: boolean }>(`${KB_BASE}?documentId=${encodeURIComponent(documentId)}`, {
     method: 'DELETE',

@@ -6,13 +6,26 @@
  */
 public with sharing class AgentKbController {
 
+    /**
+     * Business-rule failures ("Upload failed: ...", "Delete failed: ...").
+     *
+     * Deliberately NOT AuraHandledException. This controller is reached
+     * through Apex REST (AgentKbRestService) from the React UI Bundle, and
+     * merely THROWING AuraHandledException there detonates as an uncatchable
+     * "Can only throw this exception type from VisualForce or Aura context"
+     * LimitException: the REST service's catch never runs and the browser
+     * gets a bare 500 with no message. Same trap AgentChatController
+     * documents. Live-confirmed on a knowledge-base upload.
+     */
+    public class KbException extends Exception {}
+
     // ── Storage backend config ─────────────────────────────────────────
 
     @AuraEnabled
     public static StorageConfig getStorageConfig() {
         HttpResponse res = ArchonServerClient.callout('GET', '/api/kb/storage-config', null);
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException('Could not load storage config: ' + ArchonServerClient.extractServerError(res));
+            throw new KbException('Could not load storage config: ' + ArchonServerClient.extractServerError(res));
         }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
         StorageConfig cfg = new StorageConfig();
@@ -28,7 +41,7 @@ public with sharing class AgentKbController {
         if (String.isNotBlank(connectionUrl)) payload.put('connectionUrl', connectionUrl);
         HttpResponse res = ArchonServerClient.callout('POST', '/api/kb/storage-config', JSON.serialize(payload));
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException(ArchonServerClient.extractServerError(res));
+            throw new KbException(ArchonServerClient.extractServerError(res));
         }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
         StorageConfig cfg = new StorageConfig();
@@ -43,7 +56,7 @@ public with sharing class AgentKbController {
         HttpResponse res = ArchonServerClient.callout('POST', '/api/kb/test-connection',
             JSON.serialize(new Map<String, Object>{ 'connectionUrl' => connectionUrl }));
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException(ArchonServerClient.extractServerError(res));
+            throw new KbException(ArchonServerClient.extractServerError(res));
         }
     }
 
@@ -54,7 +67,7 @@ public with sharing class AgentKbController {
         HttpResponse res = ArchonServerClient.callout('GET',
             '/api/kb/documents?agentApiName=' + EncodingUtil.urlEncode(agentApiName, 'UTF-8'), null);
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException('Could not load documents: ' + ArchonServerClient.extractServerError(res));
+            throw new KbException('Could not load documents: ' + ArchonServerClient.extractServerError(res));
         }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
         List<KbDocumentDto> out = new List<KbDocumentDto>();
@@ -84,7 +97,7 @@ public with sharing class AgentKbController {
 
         HttpResponse res = ArchonServerClient.callout('POST', '/api/kb/documents', JSON.serialize(payload), 120000);
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException('Upload failed: ' + ArchonServerClient.extractServerError(res));
+            throw new KbException('Upload failed: ' + ArchonServerClient.extractServerError(res));
         }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
         return parseDocument((Map<String, Object>) body.get('document'));
@@ -100,7 +113,7 @@ public with sharing class AgentKbController {
             '/api/kb/documents/' + EncodingUtil.urlEncode(documentId, 'UTF-8') + '/reindex',
             JSON.serialize(payload), 120000);
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException('Reindex failed: ' + ArchonServerClient.extractServerError(res));
+            throw new KbException('Reindex failed: ' + ArchonServerClient.extractServerError(res));
         }
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
         return parseDocument((Map<String, Object>) body.get('document'));
@@ -111,13 +124,34 @@ public with sharing class AgentKbController {
         HttpResponse res = ArchonServerClient.callout('DELETE',
             '/api/kb/documents/' + EncodingUtil.urlEncode(documentId, 'UTF-8'), null);
         if (res.getStatusCode() >= 400) {
-            throw new AuraHandledException('Delete failed: ' + ArchonServerClient.extractServerError(res));
+            throw new KbException('Delete failed: ' + ArchonServerClient.extractServerError(res));
         }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
 
     /** Embeddings always go through OpenAI — reuse the org/user's own key when one is configured. */
+    /**
+     * Retrieval test — asks the server for exactly what a turn would be
+     * handed for this question (same embedding, backend and top-k), so the
+     * knowledge base can be checked without spending a live agent turn.
+     */
+    @AuraEnabled
+    public static String searchKb(String agentApiName, String query) {
+        Map<String, Object> payload = new Map<String, Object>{
+            'agentApiName' => agentApiName,
+            'query'        => query
+        };
+        Map<String, Object> engineOverride = buildEmbeddingEngineOverride();
+        if (engineOverride != null) payload.put('engineOverride', engineOverride);
+
+        HttpResponse res = ArchonServerClient.callout('POST', '/api/kb/search', JSON.serialize(payload), 60000);
+        if (res.getStatusCode() >= 400) {
+            throw new KbException('Search failed: ' + ArchonServerClient.extractServerError(res));
+        }
+        return res.getBody();
+    }
+
     private static Map<String, Object> buildEmbeddingEngineOverride() {
         AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime('openai', null);
         if (cred == null) return null;

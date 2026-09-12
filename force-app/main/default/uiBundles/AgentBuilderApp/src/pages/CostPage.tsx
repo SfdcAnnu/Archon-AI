@@ -3,13 +3,20 @@ import { useNavigate } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Bar, EmptyPanel, NoteBar, SpecCard, StatCard } from '@/components/spec/blocks';
-import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
+import { listMySessions, parseModelUsage, type SessionSummary } from '@/lib/conversations-data';
 
-/** Spec screen 13 "Cost" — answers "Where is the money going?". The
- *  platform does not record dollar spend yet, so this screen shows TOKEN
- *  usage as the cost proxy, clearly labeled as such. Every number comes
- *  from real session token counters (TokensIn__c/TokensOut__c) — the
- *  dollar card stays an honest dash until per-model pricing exists. */
+/** Spec screen 13 "Cost" — answers "Where is the usage going?".
+ *
+ *  Dollar spend is deliberately not shown: pricing is per-model and per-org
+ *  (negotiated rates differ), and inventing a number from list prices would
+ *  be worse than showing none. What this screen does report is exact —
+ *  tokens, split BY MODEL, plus response time.
+ *
+ *  Per-model is the part that has to be right. One turn can span the
+ *  router's model, a specialist subagent's, and cheap utility passes, so
+ *  the single ModelUsed__c column cannot attribute tokens correctly. These
+ *  numbers come from ChatSession__c.UsageByModelJson__c, the running
+ *  per-model totals the server reports for every turn. */
 
 const SESSION_LIMIT = 50;
 
@@ -21,6 +28,12 @@ function errMsg(e: unknown): string {
 
 function fmt(n: number): string {
   return n.toLocaleString('en-US');
+}
+
+function fmtMs(ms: number): string {
+  if (ms < 950) return `${Math.round(ms)}ms`;
+  const s = ms / 1000;
+  return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
 function inCurrentMonth(iso: string | null): boolean {
@@ -72,6 +85,35 @@ export default function CostPage() {
     .sort((a, b) => b.tokens - a.tokens);
   const maxAgentTokens = Math.max(1, ...agentRows.map(r => r.tokens));
 
+  // ── Per-model usage — the accurate split, not an approximation from
+  // whichever model happened to produce each reply.
+  const byModel = new Map<string, { tokensIn: number; tokensOut: number; cacheRead: number; calls: number }>();
+  for (const s of monthSessions) {
+    for (const u of parseModelUsage(s.usageByModelJson)) {
+      const acc = byModel.get(u.model) ?? { tokensIn: 0, tokensOut: 0, cacheRead: 0, calls: 0 };
+      acc.tokensIn += u.tokensIn;
+      acc.tokensOut += u.tokensOut;
+      acc.cacheRead += u.cacheRead;
+      acc.calls += u.calls;
+      byModel.set(u.model, acc);
+    }
+  }
+  const modelRows = [...byModel.entries()]
+    .map(([model, v]) => ({ model, ...v, total: v.tokensIn + v.tokensOut }))
+    .sort((a, b) => b.total - a.total);
+  const maxModelTokens = Math.max(1, ...modelRows.map(r => r.total));
+  // Sessions predating per-model tracking still count toward the token
+  // totals — say so rather than letting the two panels silently disagree.
+  const unattributed = Math.max(0, totalTokens - modelRows.reduce((n, r) => n + r.total, 0));
+
+  const totalCached = monthSessions.reduce((sum, s) => sum + (s.cachedTokens ?? 0), 0);
+  const cachedPct = totalIn > 0 ? Math.round((totalCached / totalIn) * 100) : 0;
+
+  const timedSessions = monthSessions.filter(s => (s.latencyMsTotal ?? 0) > 0 && (s.totalTurns ?? 0) > 0);
+  const totalMs = timedSessions.reduce((sum, s) => sum + (s.latencyMsTotal ?? 0), 0);
+  const totalTimedTurns = timedSessions.reduce((sum, s) => sum + (s.totalTurns ?? 0), 0);
+  const avgMs = totalTimedTurns > 0 ? totalMs / totalTimedTurns : null;
+
   const outPct = totalIn + totalOut > 0 ? Math.round((totalOut / (totalIn + totalOut)) * 100) : 0;
   const rwFinding =
     outPct >= 55 ? (
@@ -101,7 +143,9 @@ export default function CostPage() {
         ) : (
           <>
             <div className="mb-3 text-[11.5px] text-muted-foreground">
-              Dollar spend isn't recorded yet — token usage below is the cost proxy until per-model pricing lands.
+              Usage is tracked per model — one turn can span the lead agent, a specialist and utility
+              passes, each on its own model. Dollar amounts aren't shown because token prices differ per
+              model and per contract.
             </div>
 
             {/* ── Stat row ─────────────────────────────────────────── */}
@@ -122,10 +166,14 @@ export default function CostPage() {
                 sub={monthSessions.length > 0 ? 'average, this month' : 'no sessions this month'}
               />
               <StatCard
-                label="Dollar spend"
-                value="—"
-                valueClass="text-[var(--archon-faint)]"
-                sub="arrives with per-model pricing"
+                label="Avg response time"
+                value={avgMs != null ? fmtMs(avgMs) : '—'}
+                valueClass={avgMs == null ? 'text-[var(--archon-faint)]' : undefined}
+                sub={
+                  avgMs != null
+                    ? `per turn, across ${fmt(totalTimedTurns)} timed turn${totalTimedTurns === 1 ? '' : 's'}`
+                    : 'no turns with timing recorded yet'
+                }
               />
             </div>
 
@@ -139,6 +187,48 @@ export default function CostPage() {
               </EmptyPanel>
             ) : (
               <div className="grid items-start gap-3.5 lg:grid-cols-2">
+                {/* ── Usage by model ─────────────────────────────────── */}
+                <SpecCard title="Usage by model" muted="tokens, this month">
+                  {modelRows.length === 0 ? (
+                    <div className="p-3.5">
+                      <EmptyPanel>
+                        No per-model usage recorded yet — it's captured from the first turn of each new
+                        conversation.
+                      </EmptyPanel>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid gap-2.5 px-3.5 py-3 text-[11.5px]">
+                        {modelRows.map((r, i) => (
+                          <div key={r.model}>
+                            <div className="flex justify-between">
+                              <span className="min-w-0 truncate pr-2 font-semibold">{r.model}</span>
+                              <b className="font-mono">{fmt(r.total)}</b>
+                            </div>
+                            <Bar
+                              pct={(r.total / maxModelTokens) * 100}
+                              color={AGENT_BAR_COLORS[i % AGENT_BAR_COLORS.length]}
+                            />
+                            <div className="mt-0.5 flex justify-between text-[10.5px] text-muted-foreground">
+                              <span>
+                                {fmt(r.calls)} call{r.calls === 1 ? '' : 's'} · {fmt(r.tokensIn)} in ·{' '}
+                                {fmt(r.tokensOut)} out
+                              </span>
+                              {r.cacheRead > 0 && <span>{fmt(r.cacheRead)} cached</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {unattributed > 0 && (
+                        <NoteBar>
+                          {fmt(unattributed)} tokens aren't attributed to a model — they come from
+                          conversations that ran before per-model tracking.
+                        </NoteBar>
+                      )}
+                    </>
+                  )}
+                </SpecCard>
+
                 {/* ── Usage by agent ─────────────────────────────────── */}
                 <SpecCard title="Usage by agent" muted="tokens, this month">
                   {totalTokens === 0 ? (
@@ -198,6 +288,14 @@ export default function CostPage() {
                             </span>
                             <b className="font-mono">{fmt(totalOut)}</b>
                           </div>
+                          {totalCached > 0 && (
+                            <div className="flex justify-between py-0.5 text-muted-foreground">
+                              <span>of which served from cache</span>
+                              <b className="font-mono">
+                                {fmt(totalCached)} ({cachedPct}%)
+                              </b>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <NoteBar>{rwFinding}</NoteBar>

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   listMySessions,
   getSessionDetail,
+  parseModelUsage,
   type SessionSummary,
   type SessionDetail,
 } from '@/lib/conversations-data';
@@ -20,6 +21,12 @@ import { ChatApprovalCard } from '@/components/chat/ChatApprovalCard';
 
 function sessionTone(status: string): 'ok' | 'muted' {
   return status === 'Active' ? 'ok' : 'muted';
+}
+
+function fmtMs(ms: number): string {
+  if (ms < 950) return `${Math.round(ms)}ms`;
+  const s = ms / 1000;
+  return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
 function extractToolName(toolCallsJson: string | null): string {
@@ -77,6 +84,10 @@ function Transcript({ detail }: { detail: SessionDetail }) {
           );
         }
         const hasTokens = m.TokensIn__c != null || m.TokensOut__c != null;
+        // A turn can span several models; UsageJson__c is the real split,
+        // ModelUsed__c only names whichever one produced the reply.
+        const perModel = parseModelUsage(m.UsageJson__c);
+        const multiModel = perModel.length > 1;
         return (
           <div key={m.Id}>
             <div className="flex items-baseline gap-2">
@@ -92,7 +103,23 @@ function Transcript({ detail }: { detail: SessionDetail }) {
               <p className="mt-0.5 font-mono text-[10.5px] text-muted-foreground">
                 {m.ModelUsed__c ? `${m.ModelUsed__c} · ` : ''}
                 {m.TokensIn__c ?? 0} in / {m.TokensOut__c ?? 0} out
+                {(m.CachedTokens__c ?? 0) > 0 && ` · ${m.CachedTokens__c} cached`}
+                {m.LatencyMs__c != null && ` · ${fmtMs(m.LatencyMs__c)}`}
               </p>
+            )}
+            {multiModel && (
+              <div className="mt-1 border-l-2 border-border pl-2">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--archon-faint)]">
+                  Models used this turn
+                </p>
+                {perModel.map(u => (
+                  <p key={u.model} className="font-mono text-[10.5px] text-muted-foreground">
+                    {u.model} · {u.tokensIn} in / {u.tokensOut} out
+                    {u.cacheRead > 0 && ` · ${u.cacheRead} cached`}
+                    {u.stages?.length ? ` · ${u.stages.join(', ')}` : ''}
+                  </p>
+                ))}
+              </div>
             )}
             <MessageDebugToggle requestPayload={m.RequestPayload__c} responsePayload={m.ResponsePayload__c} />
           </div>
@@ -188,6 +215,11 @@ export default function ConversationsPage() {
                   <>
                     <span className="font-mono text-[10.5px] text-muted-foreground">
                       {detail.session.TokensIn__c ?? 0} in / {detail.session.TokensOut__c ?? 0} out
+                      {(detail.session.CachedTokens__c ?? 0) > 0 &&
+                        ` · ${detail.session.CachedTokens__c} cached`}
+                      {(detail.session.LatencyMsTotal__c ?? 0) > 0 &&
+                        (detail.session.TotalTurns__c ?? 0) > 0 &&
+                        ` · ${fmtMs(detail.session.LatencyMsTotal__c! / detail.session.TotalTurns__c!)}/turn`}
                     </span>
                     <StatusBadge tone={sessionTone(detail.session.Status__c)}>
                       {detail.session.Status__c}

@@ -98,7 +98,8 @@ public with sharing class AgentChatController {
                 SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                        User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                        LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                       TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+                       TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                       PendingApprovalToken__c, ActiveTopic__c
                 FROM ChatSession__c WHERE Id = :existing[0].Id WITH USER_MODE LIMIT 1
             ];
         } else {
@@ -118,7 +119,8 @@ public with sharing class AgentChatController {
                 SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                        User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                        LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                       TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+                       TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                       PendingApprovalToken__c, ActiveTopic__c
                 FROM ChatSession__c WHERE Id = :session.Id WITH USER_MODE LIMIT 1
             ];
         }
@@ -151,7 +153,8 @@ public with sharing class AgentChatController {
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                    User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+                   TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                   PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c
             WHERE AgentDefinition__c = :agent.Id
               AND RecordContextId__c = :recordContextId
@@ -179,7 +182,8 @@ public with sharing class AgentChatController {
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                    User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+                   TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                   PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c WHERE Id = :session.Id WITH USER_MODE LIMIT 1
         ];
     }
@@ -206,7 +210,8 @@ public with sharing class AgentChatController {
         List<ChatSession__c> rows = [
             SELECT Id, Name, AgentDefinition__r.Name, AgentDefinition__r.ApiName__c,
                    Title__c, Status__c, LastActivityAt__c, ExpiresAt__c, TotalTurns__c,
-                   RecordContextId__c, TokensIn__c, TokensOut__c
+                   RecordContextId__c, TokensIn__c, TokensOut__c, CachedTokens__c,
+                   LatencyMsTotal__c, UsageByModelJson__c
             FROM ChatSession__c
             WHERE User__c = :userId
             WITH USER_MODE
@@ -228,6 +233,9 @@ public with sharing class AgentChatController {
             o.recordContextId = s.RecordContextId__c;
             o.tokensIn        = (Integer) (s.TokensIn__c  == null ? 0 : s.TokensIn__c);
             o.tokensOut       = (Integer) (s.TokensOut__c == null ? 0 : s.TokensOut__c);
+            o.cachedTokens    = (Integer) (s.CachedTokens__c == null ? 0 : s.CachedTokens__c);
+            o.latencyMsTotal  = (Integer) (s.LatencyMsTotal__c == null ? 0 : s.LatencyMsTotal__c);
+            o.usageByModelJson = s.UsageByModelJson__c;
             out.add(o);
         }
         return out;
@@ -544,7 +552,8 @@ public with sharing class AgentChatController {
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                    User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+                   TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                   PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
         ];
         if (rows.isEmpty()) throw new ChatException('Session not found.');
@@ -565,7 +574,8 @@ public with sharing class AgentChatController {
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                    User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
-                   TokensIn__c, TokensOut__c, PendingApprovalToken__c, ActiveTopic__c
+                   TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                   PendingApprovalToken__c, ActiveTopic__c
             FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
         ];
         if (rows.isEmpty()) throw new ChatException('Session not found.');
@@ -624,7 +634,8 @@ public with sharing class AgentChatController {
     private static List<ChatMessage__c> loadMessages(Id sessionId) {
         return [
             SELECT Id, Name, Role__c, Content__c, ToolCallsJson__c, ToolResultsJson__c,
-                   ModelUsed__c, TokensIn__c, TokensOut__c, SequenceNumber__c,
+                   ModelUsed__c, TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMs__c, UsageJson__c,
+                   SequenceNumber__c,
                    Sensitive__c, RequiredApproval__c, ApprovedAt__c, ApprovalStatus__c,
                    AttachedContentDocumentIds__c, RequestPayload__c, ResponsePayload__c,
                    Feedback__c, CreatedDate
@@ -702,6 +713,81 @@ public with sharing class AgentChatController {
         };
     }
 
+    /** Cache hits across every model in the turn. Already inside TokensIn__c
+     *  — tracked separately because cache reads bill far cheaper, so the raw
+     *  token count alone overstates what a cached turn actually costs. */
+    @TestVisible
+    private static Integer sumCachedTokens(List<Object> usage) {
+        if (usage == null) return 0;
+        Integer total = 0;
+        for (Object u : usage) {
+            Map<String, Object> row = (Map<String, Object>) u;
+            Object c = row.get('cacheRead');
+            if (c != null) total += Integer.valueOf(c);
+        }
+        return total;
+    }
+
+    /**
+     * Fold this turn's per-model usage into the session's running totals.
+     *
+     * Keyed by model name, so a session that routes on one model and hands
+     * off to another accumulates both independently rather than blending
+     * them into a single meaningless figure. Stage lists are deliberately
+     * NOT carried up: they describe one turn's shape, and merging them
+     * across a whole session would say nothing useful.
+     */
+    @TestVisible
+    private static String mergeUsageByModel(String existingJson, List<Object> usage) {
+        // Nothing new to fold in — leave the stored value byte-for-byte
+        // alone rather than round-tripping it through deserialize/serialize
+        // (which rewrites the field and reorders keys for no gain).
+        if (usage == null || usage.isEmpty()) return existingJson;
+
+        Map<String, Map<String, Object>> byModel = new Map<String, Map<String, Object>>();
+
+        if (String.isNotBlank(existingJson)) {
+            try {
+                for (Object o : (List<Object>) JSON.deserializeUntyped(existingJson)) {
+                    Map<String, Object> row = (Map<String, Object>) o;
+                    String m = String.valueOf(row.get('model'));
+                    if (String.isNotBlank(m)) byModel.put(m, row);
+                }
+            } catch (Exception e) {
+                // A corrupt blob must never cost us this turn's accounting —
+                // start clean rather than throwing away the whole update.
+                byModel.clear();
+            }
+        }
+
+        for (Object u : usage) {
+            Map<String, Object> row = (Map<String, Object>) u;
+            String model = String.valueOf(row.get('model'));
+            // Tokens with no model name were still spent — bucket them
+            // rather than dropping them out of the totals.
+            if (String.isBlank(model) || model == 'null') model = 'unknown';
+            Map<String, Object> acc = byModel.get(model);
+            if (acc == null) {
+                acc = new Map<String, Object>{
+                    'model' => model, 'calls' => 0,
+                    'tokensIn' => 0, 'tokensOut' => 0, 'cacheRead' => 0
+                };
+                byModel.put(model, acc);
+            }
+            acc.put('calls',     intOf(acc.get('calls'))     + intOf(row.get('calls')));
+            acc.put('tokensIn',  intOf(acc.get('tokensIn'))  + intOf(row.get('tokensIn')));
+            acc.put('tokensOut', intOf(acc.get('tokensOut')) + intOf(row.get('tokensOut')));
+            acc.put('cacheRead', intOf(acc.get('cacheRead')) + intOf(row.get('cacheRead')));
+        }
+
+        if (byModel.isEmpty()) return existingJson;
+        return truncateForField(JSON.serialize(byModel.values()), 32768);
+    }
+
+    private static Integer intOf(Object v) {
+        return v == null ? 0 : Integer.valueOf(v);
+    }
+
     /**
      * Serialize one tool call for ToolCallsJson__c.
      *
@@ -747,6 +833,13 @@ public with sharing class AgentChatController {
         String modelUsed = (String) body.get('modelUsed');
         Integer tokensIn  = body.get('tokensIn')  == null ? 0 : Integer.valueOf(body.get('tokensIn'));
         Integer tokensOut = body.get('tokensOut') == null ? 0 : Integer.valueOf(body.get('tokensOut'));
+        Integer latencyMs = body.get('latencyMs') == null ? null : Integer.valueOf(body.get('latencyMs'));
+        // Per-model breakdown of the SAME totals — a turn can span the
+        // router's model, a specialist's, and utility passes, so modelUsed
+        // alone cannot attribute tokens correctly (see ModelUsage on the
+        // server's ChatTurnResult).
+        List<Object> usage = (List<Object>) body.get('usage');
+        Integer cachedTokens = sumCachedTokens(usage);
 
         List<ChatMessage__c> inserts = new List<ChatMessage__c>();
         Integer seq = baseSeq;
@@ -775,6 +868,9 @@ public with sharing class AgentChatController {
             ModelUsed__c      = modelUsed,
             TokensIn__c       = tokensIn,
             TokensOut__c      = tokensOut,
+            CachedTokens__c   = cachedTokens,
+            LatencyMs__c      = latencyMs,
+            UsageJson__c      = usage == null ? null : truncateForField(JSON.serialize(usage), 32768),
             SequenceNumber__c = seq++,
             ApprovalStatus__c = 'NotRequired'
         );
@@ -793,6 +889,13 @@ public with sharing class AgentChatController {
         session.ExpiresAt__c      = System.now().addHours(EXPIRY_HOURS);
         session.TokensIn__c       = (session.TokensIn__c  == null ? 0 : session.TokensIn__c)  + tokensIn;
         session.TokensOut__c      = (session.TokensOut__c == null ? 0 : session.TokensOut__c) + tokensOut;
+        session.CachedTokens__c   = (session.CachedTokens__c == null ? 0 : session.CachedTokens__c) + cachedTokens;
+        if (latencyMs != null) {
+            session.LatencyMsTotal__c = (session.LatencyMsTotal__c == null ? 0 : session.LatencyMsTotal__c) + latencyMs;
+        }
+        // Running per-model totals, so usage-by-model reporting reads the
+        // session list instead of scanning every message in the org.
+        session.UsageByModelJson__c = mergeUsageByModel(session.UsageByModelJson__c, usage);
         session.PendingApprovalToken__c = null;
         // Topics — persisted so next turn's classifier biases toward staying put
         // instead of re-deciding cold. Node only ever sets this when the agent
@@ -896,6 +999,13 @@ public with sharing class AgentChatController {
         @AuraEnabled public String   recordContextId;
         @AuraEnabled public Integer  tokensIn;
         @AuraEnabled public Integer  tokensOut;
+        /** Prompt-cache hits, already inside tokensIn. */
+        @AuraEnabled public Integer  cachedTokens;
+        /** Summed server-side turn latency; ÷ totalTurns = average response time. */
+        @AuraEnabled public Integer  latencyMsTotal;
+        /** Running per-model totals — the accurate basis for usage-by-model
+         *  reporting, since one turn can span several models. */
+        @AuraEnabled public String   usageByModelJson;
     }
 
     public class SessionWithMessages {

@@ -200,4 +200,90 @@ private class AgentChatControllerTest {
         Test.stopTest();
         System.assertEquals(true, threw);
     }
+
+    // ── Per-model usage accounting ───────────────────────────────────
+    // A turn can span the router's model, a specialist's, and utility
+    // passes. These cover the arithmetic that keeps those attributed
+    // separately instead of collapsed onto one ModelUsed__c.
+
+    private static List<Object> usageOf(String model, Integer calls, Integer tIn, Integer tOut, Integer cached) {
+        return new List<Object>{ new Map<String, Object>{
+            'model' => model, 'calls' => calls,
+            'tokensIn' => tIn, 'tokensOut' => tOut, 'cacheRead' => cached
+        } };
+    }
+
+    // Not named `json` — Apex identifiers are case-insensitive, so that
+    // would shadow the System.JSON class on the next line.
+    private static Map<String, Map<String, Object>> indexByModel(String raw) {
+        Map<String, Map<String, Object>> out = new Map<String, Map<String, Object>>();
+        for (Object o : (List<Object>) JSON.deserializeUntyped(raw)) {
+            Map<String, Object> row = (Map<String, Object>) o;
+            out.put(String.valueOf(row.get('model')), row);
+        }
+        return out;
+    }
+
+    @IsTest
+    static void mergeUsage_accumulates_same_model_across_turns() {
+        String after1 = AgentChatController.mergeUsageByModel(null, usageOf('gpt-5.5', 2, 1000, 100, 40));
+        String after2 = AgentChatController.mergeUsageByModel(after1, usageOf('gpt-5.5', 1, 500, 50, 10));
+        Map<String, Object> row = indexByModel(after2).get('gpt-5.5');
+        System.assertEquals(3,    Integer.valueOf(row.get('calls')),     'calls should accumulate');
+        System.assertEquals(1500, Integer.valueOf(row.get('tokensIn')),  'tokensIn should accumulate');
+        System.assertEquals(150,  Integer.valueOf(row.get('tokensOut')), 'tokensOut should accumulate');
+        System.assertEquals(50,   Integer.valueOf(row.get('cacheRead')), 'cacheRead should accumulate');
+    }
+
+    @IsTest
+    static void mergeUsage_keeps_models_separate() {
+        String after1 = AgentChatController.mergeUsageByModel(null, usageOf('gpt-5.5', 1, 900, 90, 0));
+        String after2 = AgentChatController.mergeUsageByModel(after1, usageOf('claude-haiku-4-5', 1, 300, 30, 0));
+        Map<String, Map<String, Object>> byModel = indexByModel(after2);
+        System.assertEquals(2, byModel.size(), 'each model keeps its own row');
+        System.assertEquals(900, Integer.valueOf(byModel.get('gpt-5.5').get('tokensIn')));
+        System.assertEquals(300, Integer.valueOf(byModel.get('claude-haiku-4-5').get('tokensIn')));
+    }
+
+    @IsTest
+    static void mergeUsage_survives_a_corrupt_blob() {
+        // Must never throw away the turn being recorded.
+        String merged = AgentChatController.mergeUsageByModel('{not json at all', usageOf('gpt-5.5', 1, 10, 2, 0));
+        System.assertEquals(10, Integer.valueOf(indexByModel(merged).get('gpt-5.5').get('tokensIn')));
+    }
+
+    @IsTest
+    static void mergeUsage_buckets_a_missing_model_name() {
+        List<Object> nameless = new List<Object>{ new Map<String, Object>{
+            'calls' => 1, 'tokensIn' => 25, 'tokensOut' => 5, 'cacheRead' => 0
+        } };
+        String merged = AgentChatController.mergeUsageByModel(null, nameless);
+        System.assertEquals(25, Integer.valueOf(indexByModel(merged).get('unknown').get('tokensIn')),
+            'tokens with no model name must still be counted, not dropped');
+    }
+
+    @IsTest
+    static void mergeUsage_null_usage_leaves_totals_untouched() {
+        String before = AgentChatController.mergeUsageByModel(null, usageOf('gpt-5.5', 1, 100, 10, 0));
+        // Nothing to fold in must not rewrite the stored value at all.
+        System.assertEquals(before, AgentChatController.mergeUsageByModel(before, null));
+        System.assertEquals(before, AgentChatController.mergeUsageByModel(before, new List<Object>()));
+        // And the totals must survive regardless of how they are serialized.
+        Map<String, Object> row = indexByModel(
+            AgentChatController.mergeUsageByModel(before, null)
+        ).get('gpt-5.5');
+        System.assertEquals(100, Integer.valueOf(row.get('tokensIn')));
+        System.assertEquals(10,  Integer.valueOf(row.get('tokensOut')));
+    }
+
+    @IsTest
+    static void sumCachedTokens_adds_across_models() {
+        List<Object> two = new List<Object>{
+            new Map<String, Object>{ 'model' => 'a', 'cacheRead' => 120 },
+            new Map<String, Object>{ 'model' => 'b', 'cacheRead' => 80 },
+            new Map<String, Object>{ 'model' => 'c' }
+        };
+        System.assertEquals(200, AgentChatController.sumCachedTokens(two));
+        System.assertEquals(0, AgentChatController.sumCachedTokens(null));
+    }
 }

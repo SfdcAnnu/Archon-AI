@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>LatencyMs__c</fullName>
+    <label>Latency (ms)</label>
+    <description>Server-side wall-clock time for the whole turn, in milliseconds — every model call, tool call and guardrail pass it contained. Measured by the agent server and returned with the turn, so it excludes Salesforce callout overhead.</description>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

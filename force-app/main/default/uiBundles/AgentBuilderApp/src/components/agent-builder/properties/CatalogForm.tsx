@@ -34,6 +34,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
   const [tools, setTools] = useState<RemoteTool[] | null>(null);
   const [toolsState, setToolsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [toolsWaking, setToolsWaking] = useState(false);
+  const [toolsError, setToolsError] = useState<string | null>(null);
   const [refreshSeq, setRefreshSeq] = useState(0);
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
       .catch(err => {
         if (cancelled) return;
         console.error('Failed to load catalog tools:', err);
+        setToolsError(err instanceof Error ? err.message : String(err));
         setToolsState('error');
         setToolsWaking(false);
       });
@@ -157,7 +159,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
         )}
         {provider && toolsState === 'error' && (
           <div className="rounded-md border border-border px-3 py-2.5 text-[11px] text-muted-foreground">
-            Couldn't reach the MCP server.{' '}
+            {toolsError ?? "Couldn't reach the MCP server."}{' '}
             <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setRefreshSeq(s => s + 1)}>
               Retry
             </button>

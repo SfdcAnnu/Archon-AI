@@ -24,8 +24,42 @@ export interface DirectoryEntry {
   isCustom: boolean | null;
 }
 
+/** A cold Archon server can sit past the default 15s before it answers at
+ *  all; this call is a proxy hop, not plain CRUD. */
+const DIRECTORY_TIMEOUT_MS = 40000;
+
 export async function loadConnectorDirectory(): Promise<DirectoryEntry[]> {
-  return apexFetch<DirectoryEntry[]>(CONNECTORS_BASE, { method: 'GET' });
+  return apexFetch<DirectoryEntry[]>(CONNECTORS_BASE, { method: 'GET' }, DIRECTORY_TIMEOUT_MS);
+}
+
+/**
+ * Is this failure worth retrying while an idle service wakes?
+ *
+ * Two things mean "still waking", not "broken":
+ *
+ *  - SERVER_WAKING — Apex recognised the host's cold-start response and
+ *    said so, quickly.
+ *  - A CLIENT-SIDE TIMEOUT — Apex is still waiting on the callout and we
+ *    gave up first. This is the common case and it used to be treated as
+ *    fatal: the request chain crosses TWO free-tier services (Archon, then
+ *    the provider's MCP server), each of which can take ~50s to wake, so
+ *    the browser's own timer fires long before either answers. The retry
+ *    loop then quit instantly and the panel said "Couldn't reach the MCP
+ *    server" — while the backend was perfectly healthy and merely asleep.
+ *    Pressing Retry just started one more doomed single attempt.
+ */
+function isWakingError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.message.includes('SERVER_WAKING') || /timed out after \d+ms/.test(err.message);
+}
+
+/** What to tell the user when every attempt was spent waiting. */
+const WAKE_EXHAUSTED =
+  'The server is still starting up and did not answer in time. It sleeps when idle, so the first ' +
+  'request after a quiet spell can take a minute or two — wait a moment and press Retry.';
+
+function wakeFailure(err: unknown): Error {
+  return isWakingError(err) ? new Error(WAKE_EXHAUSTED) : (err instanceof Error ? err : new Error(String(err)));
 }
 
 /** The directory endpoint returns a retryable SERVER_WAKING error while the
@@ -43,8 +77,7 @@ export async function loadConnectorDirectoryWithRetry(
     try {
       return await loadConnectorDirectory();
     } catch (err) {
-      const waking = err instanceof Error && err.message.includes('SERVER_WAKING');
-      if (!waking || i >= attempts - 1) throw err;
+      if (!isWakingError(err) || i >= attempts - 1) throw wakeFailure(err);
       onWaking?.();
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
@@ -91,8 +124,10 @@ export async function loadMcpToolsWithRetry(
     try {
       return await loadMcpTools(providerKey, connectorId);
     } catch (err) {
-      const waking = err instanceof Error && err.message.includes('SERVER_WAKING');
-      if (!waking || i >= attempts - 1) throw err;
+      if (!isWakingError(err) || i >= attempts - 1) throw wakeFailure(err);
+      // Say so from the FIRST slow attempt — this chain crosses two
+      // services that sleep, so "waking up" is the usual explanation for a
+      // long wait, not a rare one.
       onWaking?.();
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }

@@ -203,6 +203,37 @@ public with sharing class AgentChatController {
         return r;
     }
 
+    /**
+     * Throw away a session that never carried a message.
+     *
+     * The chat panel has to create a session the moment it opens — the turn
+     * endpoint and the websocket are both keyed on a session id. Testing an
+     * agent and closing the window without typing therefore left a real
+     * ChatSession__c behind with nothing in it.
+     *
+     * Deleted rather than ended: a session with zero messages holds no
+     * information to keep, and merely ending it would be worse than doing
+     * nothing — startSession only reuses an ACTIVE session, so every
+     * open/close cycle would strand another dead row instead of reusing one.
+     *
+     * Deliberately narrow: the running user's own session, and only when it
+     * genuinely has no messages. Anything with content is left untouched.
+     *
+     * @return true when a row was removed.
+     */
+    @AuraEnabled
+    public static Boolean discardSessionIfEmpty(String sessionId) {
+        if (String.isBlank(sessionId)) return false;
+        List<ChatSession__c> rows = [
+            SELECT Id, User__c FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
+        ];
+        if (rows.isEmpty()) return false;
+        if (rows[0].User__c != UserInfo.getUserId()) return false;
+        if ([SELECT COUNT() FROM ChatMessage__c WHERE ChatSession__c = :sessionId] > 0) return false;
+        delete rows[0];
+        return true;
+    }
+
     @AuraEnabled
     public static List<SessionSummary> listMySessions(Integer limitN) {
         Integer lim = (limitN == null || limitN <= 0) ? 20 : Math.min(limitN, 100);
@@ -214,6 +245,14 @@ public with sharing class AgentChatController {
                    LatencyMsTotal__c, UsageByModelJson__c
             FROM ChatSession__c
             WHERE User__c = :userId
+              // Only conversations that actually happened. Opening the chat
+              // creates a session immediately (the turn endpoint and the
+              // websocket both need an id), so testing an agent and closing
+              // without typing used to leave an empty row that showed up here
+              // as a conversation. Sessions are discarded on close when they
+              // are empty; this filter is what guarantees it regardless —
+              // a killed tab or a crashed browser runs no close handler.
+              AND Id IN (SELECT ChatSession__c FROM ChatMessage__c)
             WITH USER_MODE
             ORDER BY LastActivityAt__c DESC NULLS LAST, CreatedDate DESC
             LIMIT :lim

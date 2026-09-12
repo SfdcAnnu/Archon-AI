@@ -181,11 +181,63 @@ private class AgentChatControllerTest {
 
     @IsTest
     static void listMySessions_returns_user_sessions() {
+        AgentChatController.SessionWithMessages sess = AgentChatController.startSession('TestChatAgent', null, null);
+        insert new ChatMessage__c(
+            ChatSession__c = sess.session.Id, Role__c = 'User',
+            Content__c = 'hello', SequenceNumber__c = 1
+        );
+        Test.startTest();
+        List<AgentChatController.SessionSummary> mine = AgentChatController.listMySessions(50);
+        Test.stopTest();
+        System.assert(mine.size() >= 1, 'a session with messages must be listed');
+    }
+
+    // ── Empty test-chat sessions ─────────────────────────────────────
+    // Opening the chat has to create a session (the turn endpoint and the
+    // websocket are keyed on its id), so testing an agent and closing
+    // without typing used to leave an empty conversation behind.
+
+    @IsTest
+    static void listMySessions_hides_sessions_with_no_messages() {
         AgentChatController.startSession('TestChatAgent', null, null);
         Test.startTest();
         List<AgentChatController.SessionSummary> mine = AgentChatController.listMySessions(50);
         Test.stopTest();
-        System.assert(mine.size() >= 1);
+        System.assertEquals(0, mine.size(), 'a session nobody spoke in is not a conversation');
+    }
+
+    @IsTest
+    static void discardSessionIfEmpty_removes_an_unused_session() {
+        AgentChatController.SessionWithMessages sess = AgentChatController.startSession('TestChatAgent', null, null);
+        Id sessionId = sess.session.Id;
+        Test.startTest();
+        Boolean discarded = AgentChatController.discardSessionIfEmpty(sessionId);
+        Test.stopTest();
+        System.assertEquals(true, discarded);
+        System.assertEquals(0, [SELECT COUNT() FROM ChatSession__c WHERE Id = :sessionId]);
+    }
+
+    @IsTest
+    static void discardSessionIfEmpty_keeps_a_session_that_has_messages() {
+        AgentChatController.SessionWithMessages sess = AgentChatController.startSession('TestChatAgent', null, null);
+        Id sessionId = sess.session.Id;
+        insert new ChatMessage__c(
+            ChatSession__c = sessionId, Role__c = 'User',
+            Content__c = 'real conversation', SequenceNumber__c = 1
+        );
+        Test.startTest();
+        Boolean discarded = AgentChatController.discardSessionIfEmpty(sessionId);
+        Test.stopTest();
+        System.assertEquals(false, discarded, 'anything with content must survive');
+        System.assertEquals(1, [SELECT COUNT() FROM ChatSession__c WHERE Id = :sessionId]);
+    }
+
+    @IsTest
+    static void discardSessionIfEmpty_ignores_blank_and_unknown_ids() {
+        Test.startTest();
+        System.assertEquals(false, AgentChatController.discardSessionIfEmpty(null));
+        System.assertEquals(false, AgentChatController.discardSessionIfEmpty(''));
+        Test.stopTest();
     }
 
     @IsTest

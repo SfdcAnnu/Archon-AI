@@ -76,6 +76,14 @@ global with sharing class AgentChatRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
                 return;
             }
+            if (action == 'discardIfEmpty') {
+                // Closing a chat that never carried a message — drop the row
+                // instead of leaving an empty conversation behind.
+                Boolean discarded = AgentChatController.discardSessionIfEmpty((String) body.get('sessionId'));
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'discarded' => discarded }));
+                return;
+            }
             if (action == 'uploadChatFile') {
                 AgentChatAttachmentController.UploadResult upload = AgentChatAttachmentController.uploadChatFile(
                     (String) body.get('sessionId'),

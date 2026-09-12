@@ -115,6 +115,20 @@ export async function endChatSession(sessionId: string): Promise<void> {
   });
 }
 
+/** Closing a chat that never carried a message throws the session away — a
+ *  session has to exist from the moment the panel opens (the turn endpoint
+ *  and the websocket are keyed on its id), so testing an agent and closing
+ *  without typing would otherwise leave an empty conversation behind.
+ *  Server-side it is a no-op unless the session is the caller's own and
+ *  genuinely has no messages. */
+export async function discardChatSessionIfEmpty(sessionId: string): Promise<boolean> {
+  const result = await apexFetch<{ discarded: boolean }>(CHAT_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'discardIfEmpty', sessionId }),
+  });
+  return result.discarded;
+}
+
 export async function uploadChatFile(
   sessionId: string,
   fileName: string,

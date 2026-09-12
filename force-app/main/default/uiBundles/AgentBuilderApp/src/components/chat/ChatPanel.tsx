@@ -13,6 +13,7 @@ import {
   startMyConnection,
   uploadChatFile,
   endChatSession,
+  discardChatSessionIfEmpty,
   sendMessageFeedback,
   type RawChatMessage,
   type RawChatSession,
@@ -117,10 +118,35 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
   // the first user message survived because every subsequent turn
   // triggered a silent remount-style reset).
   const bootstrappedForRef = useRef<string | null>(null);
+  // Read by the unmount cleanup, which must see the CURRENT session and
+  // whether anything was ever said — a closure would capture mount-time
+  // values and discard a session that has since filled up.
+  const sessionRef = useRef<RawChatSession | null>(null);
+  const hasContentRef = useRef(false);
   // Tracks the last session id we told the parent about, so we only
   // call onSessionChange when it actually changes rather than on
   // every completed turn.
   const lastReportedSessionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  useEffect(() => {
+    // Sticky: once a conversation has content it is never discardable, even
+    // if the transcript is cleared from view afterwards.
+    if (messages.length > 0 || historyRef.current.length > 0) hasContentRef.current = true;
+  }, [messages]);
+
+  /** Drop the session if the chat is being closed without a single message.
+   *  Safe to call blind — the server ignores anything that has content. */
+  const discardIfNeverUsed = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current || hasContentRef.current) return;
+    sessionRef.current = null;
+    discardChatSessionIfEmpty(current.Id).catch(() => {
+      /* best effort — listMySessions filters empty sessions out regardless */
+    });
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -339,6 +365,9 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
       cancelled = true;
       socketRef.current?.close();
       socketRef.current = null;
+      // Navigating away or switching agents counts as closing: a session
+      // nobody ever spoke in leaves nothing worth keeping.
+      discardIfNeverUsed();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentApiName, initialSessionId]);
@@ -525,6 +554,17 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     [handleSend]
   );
 
+  /** The X. An unused session is thrown away rather than left behind as an
+   *  empty conversation; one with content is simply left open, exactly as
+   *  before — closing the window is not the same as ending the chat. */
+  const handleClose = useCallback(() => {
+    if (sessionRef.current && !hasContentRef.current) {
+      discardIfNeverUsed();
+      reportSessionChange({ sessionId: null, ended: true });
+    }
+    onClose();
+  }, [discardIfNeverUsed, reportSessionChange, onClose]);
+
   const handleEnd = useCallback(async () => {
     if (!session) return;
     const ok = await confirmDialog({
@@ -587,7 +627,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
               End chat
             </button>
           )}
-          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-muted">
+          <button type="button" onClick={handleClose} className="rounded-md p-1 hover:bg-muted">
             <X className="h-4 w-4" />
           </button>
         </div>

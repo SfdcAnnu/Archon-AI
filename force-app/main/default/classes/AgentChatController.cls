@@ -702,6 +702,37 @@ public with sharing class AgentChatController {
         };
     }
 
+    /**
+     * Serialize one tool call for ToolCallsJson__c.
+     *
+     * The id matters: this field used to hard-code 'id' => null, which left
+     * the server unable to rebuild real tool-call / tool-result pairs when
+     * replaying a session's history. It fell back to folding results into
+     * the assistant's own prose, and the agent kept re-running queries it
+     * had already answered (live-diagnosed on session CHAT-0149). See
+     * lc/graph-runtime.ts toLangchainMessages.
+     *
+     * Oversized arguments are dropped rather than truncated: a clipped JSON
+     * string parses as nothing at all, which would cost the id and name too
+     * and put us straight back on the prose path.
+     */
+    private static String serializeToolCall(Map<String, Object> tc) {
+        Map<String, Object> meta = new Map<String, Object>{
+            'id'   => tc.get('id'),
+            'name' => tc.get('name'),
+            'args' => tc.get('input')
+        };
+        // Not named `json` — Apex identifiers are case-insensitive, so that
+        // would shadow the System.JSON class on the next line.
+        String payload = JSON.serialize(meta);
+        if (payload.length() > 32768) {
+            meta.put('args', new Map<String, Object>());
+            meta.put('argsOmitted', true);
+            payload = JSON.serialize(meta);
+        }
+        return payload;
+    }
+
     private static String extractToolCallIdForTool(ChatMessage__c m) {
         if (m.Role__c != 'Tool' || String.isBlank(m.ToolCallsJson__c)) return null;
         try {
@@ -728,7 +759,7 @@ public with sharing class AgentChatController {
                     ChatSession__c    = session.Id,
                     Role__c           = 'Tool',
                     Content__c        = JSON.serialize(tc.get('output')).left(131072),
-                    ToolCallsJson__c  = JSON.serialize(new Map<String, Object>{ 'id' => null, 'name' => tc.get('name'), 'args' => tc.get('input') }),
+                    ToolCallsJson__c  = serializeToolCall(tc),
                     ToolResultsJson__c = JSON.serialize(tc).left(32768),
                     SequenceNumber__c = seq++,
                     ApprovalStatus__c = 'NotRequired'

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, CheckSquare, Loader2, MessageSquare, X } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -242,7 +243,7 @@ export default function ApprovalsPage() {
 
   return (
     <AppShell title="Approvals" onRefresh={load}>
-      <div className="mx-auto w-full max-w-4xl p-5">
+      <PageBody width="wide">
         {loadState === 'loading' && (
           <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
@@ -322,7 +323,7 @@ export default function ApprovalsPage() {
             )}
           </div>
         )}
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

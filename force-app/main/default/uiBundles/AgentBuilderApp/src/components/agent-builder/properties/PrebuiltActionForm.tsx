@@ -232,7 +232,7 @@ export function PrebuiltActionForm({
                         isOn ? 'border-primary bg-primary' : 'border-border'
                       )}>{isOn ? '✓' : ''}</span>
                       <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-foreground">{f.label}</span>
-                      {f.required && <span className="text-[8.5px] font-bold tracking-wide text-[var(--archon-warning,#B45309)]">REQUIRED</span>}
+                      {f.required && <span className="text-[8.5px] font-bold tracking-wide text-[var(--archon-warning,var(--archon-warning))]">REQUIRED</span>}
                       {isBound && <span className="rounded-full bg-[var(--archon-success)]/10 px-1.5 text-[9px] font-bold text-[var(--archon-success)]">AUTO-BOUND</span>}
                       <span className="rounded-full bg-secondary px-1.5 text-[9.5px] text-muted-foreground">{f.type}</span>
                     </button>

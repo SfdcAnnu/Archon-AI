@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -13,7 +14,7 @@ import { loadAccessStatus, type AccessStatus } from '@/lib/access-data';
 function accessPillStyle(status: string) {
   const s = status.toLowerCase();
   if (s === 'connected') return { backgroundColor: 'var(--archon-success-tint)', color: 'var(--archon-success)' };
-  if (s === 'error' || s === 'failed') return { backgroundColor: 'var(--archon-danger-tint, #fde8e8)', color: 'var(--archon-danger, #dc2626)' };
+  if (s === 'error' || s === 'failed') return { backgroundColor: 'var(--archon-danger-tint, var(--archon-error-tint))', color: 'var(--archon-danger, var(--archon-error))' };
   return { backgroundColor: 'var(--node-gray-tint)', color: 'var(--node-gray)' };
 }
 
@@ -34,7 +35,7 @@ function UsageBar({ used, cap, label }: { used: number; cap: number | null; labe
             className="h-full rounded-full transition-all"
             style={{
               width: `${pct}%`,
-              backgroundColor: over ? 'var(--archon-danger, #dc2626)' : 'var(--node-blue)',
+              backgroundColor: over ? 'var(--archon-danger, var(--archon-error))' : 'var(--node-blue)',
             }}
           />
         </div>
@@ -123,7 +124,7 @@ export default function SettingsPage() {
           <span className="text-[14px] font-bold text-foreground">Settings</span>
         </header>
 
-        <div className="mx-auto w-full max-w-2xl flex-1 space-y-5 p-6">
+        <PageBody width="read" className="flex-1 space-y-5">
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -285,7 +286,7 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </PageBody>
       </div>
     </AppShell>
   );

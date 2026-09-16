@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, MicOff, Paperclip, Send, Settings2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Loader2, Mic, MicOff, Paperclip, Send, Settings2, ThumbsDown, ThumbsUp, Volume1, Volume2, VolumeX, X } from 'lucide-react';
+import {
+  speak, speakable, stopSpeaking, getSoundPref, setSoundPref, nextSoundPref, SOUND_LABEL,
+  getVoicePref, setVoicePref, useSpeaking, type SoundPref,
+} from '@/lib/voice';
+import { VoiceStrip, PhaseRing, type VoicePhase } from './VoiceStrip';
+import type { ChatActivity, ChatActivityInput } from '@/lib/chat-activity';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
@@ -79,9 +85,13 @@ export interface ChatPanelProps {
   /** Fired after each successful turn and on end — lets a parent sidebar
    *  refresh its session list, mirroring the old LWC's `sessionchange`. */
   onSessionChange?: (info: { sessionId: string | null; ended: boolean }) => void;
+  /** Narration of each turn as it happens — what the full-page console
+   *  reads. Optional: the side-panel variant has no console and passes
+   *  nothing. */
+  onActivity?: (e: ChatActivity) => void;
 }
 
-export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange }: ChatPanelProps) {
+export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity }: ChatPanelProps) {
   const isFull = variant === 'full';
   const [session, setSession] = useState<RawChatSession | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -92,6 +102,25 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'error'>('connecting');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  // ── Voice: answer in kind ─────────────────────────────────────────
+  // No modes. Whether THIS turn came in by voice is remembered per turn
+  // and decides whether the reply is read aloud; the sound preference can
+  // override either way. Refs, because the WebSocket handler is created
+  // once at bootstrap and must always see the current values.
+  const [sound, setSound] = useState<SoundPref>(getSoundPref);
+  const soundRef = useRef<SoundPref>(sound);
+  useEffect(() => { soundRef.current = sound; }, [sound]);
+  const speaking = useSpeaking();
+  const lastInputVoiceRef = useRef(false);
+  const turnVoiceRef = useRef(false);
+  const sendRef = useRef<() => void>(() => {});
+  const autoSendTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onActivityRef = useRef(onActivity);
+  useEffect(() => { onActivityRef.current = onActivity; }, [onActivity]);
+  const emit = useCallback((e: ChatActivityInput) => {
+    onActivityRef.current?.({ ...e, at: Date.now() } as ChatActivity);
+  }, []);
+  const turnStartRef = useRef(0);
   const [voiceSupported] = useState(
     () => typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
   );
@@ -261,8 +290,37 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
             createdDate: new Date().toISOString(),
           },
         ]);
+        // Answer in kind: aloud if this turn was spoken, unless the sound
+        // preference says otherwise. When the reply finishes, the mic re-arms
+        // if voice is on, so a spoken conversation keeps flowing.
+        const spoke = turnVoiceRef.current;
+        const aloud = soundRef.current === 'always' || (soundRef.current === 'auto' && spoke);
+        for (const tc of result.toolCalls ?? []) {
+          const output = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output ?? '');
+          emit({
+            kind: 'tool',
+            name: tc.name,
+            note: tc.isError ? 'failed' : output.includes('PENDING_APPROVAL') ? 'waiting for approval' : `${output.length} chars back`,
+          });
+        }
+        emit({
+          kind: 'reply',
+          text: result.assistantText,
+          aloud,
+          tokensIn: result.tokensIn,
+          tokensOut: result.tokensOut,
+          model: result.modelUsed,
+          latencyMs: turnStartRef.current ? Date.now() - turnStartRef.current : undefined,
+        });
+        const rearm = () => {
+          if (!getVoicePref()) return;
+          try { recognitionRef.current?.start(); } catch { /* not allowed, or already on */ }
+        };
+        if (aloud) void speak(speakable(result.assistantText)).then(rearm);
+        else if (spoke) rearm();
       } else {
         const errText = result.message ?? result.error ?? 'Unknown error';
+        emit({ kind: 'error', text: errText });
         setMessages(list => [
           ...list,
           {
@@ -282,12 +340,13 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
         return output.includes('PENDING_APPROVAL');
       });
       if (suspended && session) refreshApprovals(session.Id);
+      if (suspended) emit({ kind: 'approval' });
       setSending(false);
       scrollToBottom();
       if (session) reportSessionChange({ sessionId: session.Id, ended: false });
       console.log('[ChatPanel] handleTurnResult done', { sessionId: session?.Id });
     },
-    [session, reportSessionChange, scrollToBottom, refreshApprovals]
+    [session, reportSessionChange, scrollToBottom, refreshApprovals, emit]
   );
 
   // ── Bootstrap: load/start session, open WS ──────────────────────
@@ -339,6 +398,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
           ws.onopen = () => {
             console.log('[ChatPanel] websocket open');
             setWsStatus('open');
+            emit({ kind: 'sys', text: `Connected to ${agentName}.` });
           };
           ws.onerror = e => {
             console.log('[ChatPanel] websocket error', e);
@@ -386,14 +446,31 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
       setIsRecording(true);
     };
     recognition.onresult = event => {
+      // Hearing anything interrupts the agent, the way it would a person.
+      stopSpeaking();
       let transcript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+      let sawFinal = false;
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+        if (event.results[i].isFinal) sawFinal = true;
+      }
+      lastInputVoiceRef.current = true;
       setInput((baseText + (baseText && !baseText.endsWith(' ') ? ' ' : '') + transcript).trimStart());
+      // Send when the person pauses, so talking feels like talking rather
+      // than dictating into a box and then hunting for the button.
+      if (autoSendTimer.current) clearTimeout(autoSendTimer.current);
+      if (sawFinal) {
+        autoSendTimer.current = setTimeout(() => {
+          try { recognition.stop(); } catch { /* already stopped */ }
+          sendRef.current();
+        }, 1200);
+      }
     };
     recognition.onerror = () => setIsRecording(false);
     recognition.onend = () => setIsRecording(false);
     recognitionRef.current = recognition;
     return () => {
+      stopSpeaking();
       try {
         recognition.stop();
       } catch {
@@ -407,12 +484,15 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     const r = recognitionRef.current;
     if (!r) return;
     if (isRecording) {
+      setVoicePref(false);
       try {
         r.stop();
       } catch {
         /* ignore */
       }
     } else {
+      stopSpeaking();
+      setVoicePref(true);
       try {
         r.start();
       } catch {
@@ -420,6 +500,14 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
       }
     }
   }, [isRecording]);
+
+  // Voice on by default, once chosen: arm the mic as soon as the panel is
+  // ready. Browsers refuse to listen without a gesture on a fresh page, so
+  // this can be declined — the strip then reads Ready and waits for a tap.
+  useEffect(() => {
+    if (wsStatus !== 'open' || !session || !getVoicePref()) return;
+    try { recognitionRef.current?.start(); } catch { /* declined — tap the mic */ }
+  }, [wsStatus, session]);
 
   // ── Attachments ──────────────────────────────────────────────────
   const handleFilesPicked = useCallback(
@@ -507,6 +595,12 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     const attachedThisTurn = pendingAttachments;
     setPendingAttachments([]);
     setSending(true);
+    turnVoiceRef.current = lastInputVoiceRef.current;
+    lastInputVoiceRef.current = false;
+    turnStartRef.current = Date.now();
+    emit({ kind: 'user', text: text || `(${attachments.length} attachment${attachments.length === 1 ? '' : 's'})`, how: turnVoiceRef.current ? 'talk' : 'type' });
+    emit({ kind: 'thinking' });
+    if (autoSendTimer.current) { clearTimeout(autoSendTimer.current); autoSendTimer.current = null; }
 
     setMessages(list => {
       const next = [
@@ -543,6 +637,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
     }
   }, [sendDisabled, input, pendingAttachments, scrollToBottom]);
+  useEffect(() => { sendRef.current = handleSend; }, [handleSend]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -605,6 +700,8 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
   );
 
   const needsConnection = gate.accessMode === 'PerUser' && !gate.connected;
+  const phase: VoicePhase = speaking ? 'speak' : sending ? 'think' : isRecording ? 'listen' : 'ready';
+  useEffect(() => { emit({ kind: 'phase', phase }); }, [phase, emit]);
 
   return (
     <div
@@ -615,13 +712,25 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
       }
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center">
+          <PhaseRing phase={phase} />
+          <div className="min-w-0">
           <div className="truncate text-[13.5px] font-bold text-foreground">{agentName}</div>
           <div className="text-[10.5px] text-muted-foreground">
             {wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : 'Connection error'}
           </div>
         </div>
+        </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { const n = nextSoundPref(sound); setSoundPref(n); setSound(n); if (n === 'off') stopSpeaking(); }}
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            title={SOUND_LABEL[sound]}
+            aria-label={SOUND_LABEL[sound]}
+          >
+            {sound === 'off' ? <VolumeX className="h-4 w-4" /> : sound === 'always' ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
+          </button>
           {session && (
             <button type="button" onClick={handleEnd} className="text-[11px] text-muted-foreground hover:text-destructive">
               End chat
@@ -761,7 +870,8 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
               ))}
             </div>
           )}
-          <div className="flex items-end gap-1.5">
+          <VoiceStrip phase={phase} voiceSupported={voiceSupported} />
+          <div className="mt-2 flex items-end gap-1.5">
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesPicked} />
             <button
               type="button"
@@ -777,7 +887,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
                 type="button"
                 onClick={handleMicClick}
                 disabled={sending}
-                className={`shrink-0 rounded-md p-2 hover:bg-muted disabled:opacity-40 ${isRecording ? 'text-destructive' : 'text-muted-foreground'}`}
+                className={`shrink-0 rounded-md p-2 hover:bg-muted disabled:opacity-40 ${isRecording ? 'chat-mic-on' : 'text-muted-foreground'}`}
                 aria-label="Voice input"
               >
                 {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -785,9 +895,9 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
             )}
             <textarea
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => { lastInputVoiceRef.current = false; stopSpeaking(); setInput(e.target.value); }}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message…"
+              placeholder={voiceSupported ? 'Type here, or just talk…' : 'Type a message…'}
               rows={1}
               className="flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-[12.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />

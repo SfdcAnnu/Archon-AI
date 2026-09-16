@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Cloud, KeyRound, Loader2, ShieldCheck, Sliders, Users } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { AttnRow, EmptyPanel, IconSquare, NoteBar, SpecCard, StatusBadge } from '@/components/spec/blocks';
 import { Button } from '@/components/ui/button';
 import { toast as notify } from '@/components/ui/sonner';
@@ -114,7 +115,7 @@ export default function SetupPage() {
 
   return (
     <AppShell title="Setup">
-      <div className="mx-auto w-full max-w-3xl space-y-3.5 p-5">
+      <PageBody width="read" className="space-y-3.5">
         {toast && (
           <div
             className="rounded-lg border px-3 py-2 text-[12.5px]"
@@ -283,7 +284,7 @@ export default function SetupPage() {
             </Button>
           </AttnRow>
         </SpecCard>
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

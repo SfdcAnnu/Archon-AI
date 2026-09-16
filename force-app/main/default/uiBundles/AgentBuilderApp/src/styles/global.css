@@ -196,3 +196,215 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/*
+ * ── HUD theme ────────────────────────────────────────────────────────
+ * The dark console look from the approved Archon HUD mock, expressed as a
+ * second set of values for the SAME tokens. Activated by data-theme="hud"
+ * on <html> (see lib/theme.ts). Nothing below introduces a new token name:
+ * a component that uses the tokens gets both looks for free, and a
+ * component that hardcodes a colour breaks in one of them — which is why
+ * the codebase carries none.
+ *
+ * Semantic colours (success, warning, error) keep their meaning and shift
+ * only in luminance so they read on a dark ground. The accent moves from
+ * Lightning blue to the HUD cyan; that is the one deliberate identity
+ * change, not a brightness adjustment.
+ */
+:root {
+  /* tokens that only the HUD theme needed, given light values too so the
+     light theme never references something undefined */
+  --primary-hover: #0b5cab;
+  --sidebar-nav: #c8cdd6;
+  --sidebar-ok: #7ee2a8;
+  --brand-openai: #10A37F;  --brand-openai-tint: #E6FAF5;
+  --brand-gemini: #4285F4;  --brand-gemini-tint: #EAF2FE;
+  --hud-glow: transparent;
+}
+
+[data-theme="hud"] {
+  --background: #070B12;
+  --foreground: #DCE6F2;
+  --card: #0C1320;
+  --card-foreground: #DCE6F2;
+  --popover: #101A2B;
+  --popover-foreground: #DCE6F2;
+  --primary: #35D6F0;
+  --primary-foreground: #04141A;
+  --primary-hover: #5FE0F5;
+  --secondary: #101A2B;
+  --secondary-foreground: #DCE6F2;
+  --muted: #101A2B;
+  --muted-foreground: #8FA3BF;
+  --accent: #12303C;
+  --accent-foreground: #35D6F0;
+  --destructive: #FF6B6B;
+  --border: #1B2A40;
+  --input: #25395A;
+  --ring: #35D6F0;
+  --chart-1: #35D6F0;
+  --chart-2: #A78BFA;
+  --chart-3: #2DD4BF;
+  --chart-4: #F2B04B;
+  --chart-5: #FF6B6B;
+
+  --sidebar: #060910;
+  --sidebar-foreground: #DCE6F2;
+  --sidebar-primary: #35D6F0;
+  --sidebar-primary-foreground: #04141A;
+  --sidebar-accent: #101A2B;
+  --sidebar-accent-foreground: #DCE6F2;
+  --sidebar-border: #1B2A40;
+  --sidebar-muted: #5B6E8A;
+  --sidebar-nav: #8FA3BF;
+  --sidebar-ok: #4ADE80;
+  --sidebar-ring: #35D6F0;
+
+  --archon-success: #4ADE80;
+  --archon-success-tint: #0F2A1C;
+  --archon-warning: #F2B04B;
+  --archon-warning-tint: #2E2414;
+  --archon-error: #FF6B6B;
+  --archon-error-tint: #33171A;
+  --archon-faint: #5B6E8A;
+  --archon-apex-tint: #2E2414;
+  --archon-apex-text: #F2B04B;
+  --archon-flow-tint: #0F2A1C;
+  --archon-accent-rgb: 53, 214, 240;
+  --archon-dot: rgba(53, 214, 240, .16);
+
+  --node-blue: #35D6F0;    --node-blue-tint: #0F2A36;
+  --node-purple: #A78BFA;  --node-purple-tint: #22193A;
+  --node-amber: #F2B04B;   --node-amber-tint: #2E2414;
+  --node-green: #4ADE80;   --node-green-tint: #0F2A1C;
+  --node-gray: #8FA3BF;    --node-gray-tint: #161E2C;
+  --node-teal: #2DD4BF;    --node-teal-tint: #0F2A28;
+
+  --brand-openai: #3fd6ac;  --brand-openai-tint: #0e2a24;
+  --brand-gemini: #7ba7f7;  --brand-gemini-tint: #16233d;
+  --hud-glow: rgba(53, 214, 240, .28);
+}
+
+/* HUD-only presentation: the glow and the ground. Light theme never sees
+   these because --hud-glow is transparent there and the gradient is
+   scoped to the attribute. */
+[data-theme="hud"] body {
+  background-image: radial-gradient(ellipse at 50% -10%, rgba(53, 214, 240, .08), transparent 55%);
+}
+[data-theme="hud"] .bg-primary {
+  box-shadow: 0 0 14px var(--hud-glow);
+}
+[data-theme="hud"] .font-mono {
+  letter-spacing: .02em;
+}
+
+/*
+ * ── Chat voice readout ───────────────────────────────────────────────
+ * The status strip, waveform and phase ring in the chat panel. Phase is
+ * carried as data-phase so one attribute drives label colour, waveform
+ * colour, and whether the ring spins. Semantic, not decorative: green is
+ * "the mic is open", amber is "the agent is talking", and both are the
+ * same hues the rest of the app uses for those meanings.
+ */
+.chat-vstrip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px; border-top: 1px solid var(--border);
+  background: var(--secondary);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.chat-vstrip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--archon-faint); flex: none; }
+.chat-vstrip-label { font-weight: 600; }
+.chat-vstrip-hint { font-family: var(--font-sans); font-size: 10.5px; letter-spacing: 0; text-transform: none; color: var(--archon-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chat-vstrip[data-phase="listen"] { color: var(--archon-success); }
+.chat-vstrip[data-phase="listen"] .chat-vstrip-dot { background: var(--archon-success); box-shadow: 0 0 8px var(--archon-success); animation: chat-pulse 1.2s ease-in-out infinite; }
+.chat-vstrip[data-phase="think"] { color: var(--primary); }
+.chat-vstrip[data-phase="think"] .chat-vstrip-dot { background: var(--primary); }
+.chat-vstrip[data-phase="speak"] { color: var(--archon-warning); }
+.chat-vstrip[data-phase="speak"] .chat-vstrip-dot { background: var(--archon-warning); box-shadow: 0 0 8px var(--archon-warning); }
+
+.chat-wave { margin-left: auto; display: flex; align-items: flex-end; gap: 2px; height: 16px; width: 64px; flex: none; }
+.chat-wave i { flex: 1; border-radius: 1px; height: 12%; background: var(--archon-faint); opacity: .35; }
+.chat-vstrip[data-phase="listen"] .chat-wave i,
+.chat-vstrip[data-phase="speak"] .chat-wave i { opacity: .9; animation: chat-wave 1.1s ease-in-out infinite; }
+.chat-vstrip[data-phase="listen"] .chat-wave i { background: var(--archon-success); }
+.chat-vstrip[data-phase="speak"] .chat-wave i { background: var(--archon-warning); }
+.chat-wave i:nth-child(2n) { animation-delay: .15s; }
+.chat-wave i:nth-child(3n) { animation-delay: .3s; }
+.chat-wave i:nth-child(5n) { animation-delay: .45s; }
+
+.chat-mic-on { color: var(--archon-success); box-shadow: 0 0 0 3px var(--archon-success-tint); animation: chat-pulse 1.3s ease-in-out infinite; }
+
+.chat-ring { position: relative; width: 26px; height: 26px; flex: none; display: inline-block; margin-right: 8px; }
+.chat-ring svg { width: 100%; height: 100%; overflow: visible; }
+.chat-ring circle { fill: none; stroke: var(--archon-faint); stroke-width: 2; transform-origin: 50% 50%; opacity: .5; }
+.chat-ring .chat-ring-a { stroke-dasharray: 40 80; }
+.chat-ring .chat-ring-b { stroke-dasharray: 20 60; opacity: .35; }
+.chat-ring[data-phase="listen"] circle { stroke: var(--archon-success); opacity: .9; }
+.chat-ring[data-phase="think"] circle { stroke: var(--primary); opacity: .9; }
+.chat-ring[data-phase="speak"] circle { stroke: var(--archon-warning); opacity: .9; }
+.chat-ring[data-phase="think"] .chat-ring-a { animation: chat-spin 1.6s linear infinite; }
+.chat-ring[data-phase="think"] .chat-ring-b { animation: chat-spin 2.6s linear infinite reverse; }
+.chat-ring[data-phase="speak"] .chat-ring-a { animation: chat-spin 3s linear infinite; }
+.chat-ring[data-phase="listen"] .chat-ring-a { animation: chat-spin 8s linear infinite; }
+
+@keyframes chat-spin { to { transform: rotate(360deg); } }
+@keyframes chat-wave { 0%, 100% { height: 15%; } 50% { height: 100%; } }
+@keyframes chat-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  .chat-ring circle, .chat-wave i, .chat-vstrip-dot, .chat-mic-on { animation: none !important; }
+}
+
+/*
+ * ── Chat console rail ────────────────────────────────────────────────
+ * The HUD core, telemetry and activity log beside the full-page chat.
+ * Token-driven throughout, so it reads as a clean side panel in the light
+ * theme and as the console in the HUD theme without a second stylesheet.
+ */
+.con-rail { display: flex; flex-direction: column; gap: 10px; width: 320px; flex: none; padding: 12px; overflow-y: auto; border-left: 1px solid var(--border); background: var(--background); }
+.con-panel { background: var(--card); border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+.con-grow { flex: 1; display: flex; flex-direction: column; min-height: 220px; }
+.con-hd { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.con-eyebrow { font: 600 10.5px/1 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted-foreground); }
+.con-sub { font-size: 11px; color: var(--archon-faint); }
+
+.con-core { display: grid; place-items: center; padding: 14px 12px 10px; }
+.con-ring { position: relative; width: 150px; height: 150px; }
+.con-ring svg { position: absolute; inset: 0; overflow: visible; }
+.con-arc { fill: none; stroke: var(--primary); stroke-width: 1.4; opacity: .75; transform-origin: 50% 50%; }
+.con-arc.a1 { stroke-dasharray: 140 300; animation: con-spin 9s linear infinite; }
+.con-arc.a2 { stroke-dasharray: 60 220; animation: con-spin 14s linear infinite reverse; opacity: .5; }
+.con-arc.a3 { stroke: var(--archon-warning); stroke-dasharray: 50 400; animation: con-spin 6s linear infinite; opacity: .6; }
+.con-disc { position: absolute; inset: 26px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, var(--accent) 0%, var(--secondary) 70%); box-shadow: 0 0 30px var(--hud-glow), inset 0 0 26px rgba(0, 0, 0, .12); display: grid; place-items: center; text-align: center; }
+.con-disc b { font: 600 11px var(--font-mono); letter-spacing: .2em; color: var(--primary); }
+.con-disc span { display: block; font: 10px/1.4 var(--font-mono); color: var(--muted-foreground); margin-top: 4px; letter-spacing: .04em; }
+.con-ring[data-phase="ready"] .con-arc { animation-play-state: paused; opacity: .3; }
+.con-ring[data-phase="listen"] .con-arc.a1, .con-ring[data-phase="listen"] .con-arc.a2 { stroke: var(--archon-success); }
+.con-ring[data-phase="listen"] .con-disc b { color: var(--archon-success); }
+.con-ring[data-phase="think"] .con-arc.a1 { animation-duration: 2.4s; }
+.con-ring[data-phase="speak"] .con-arc.a1, .con-ring[data-phase="speak"] .con-arc.a2 { stroke: var(--archon-warning); animation-duration: 3s; }
+.con-ring[data-phase="speak"] .con-disc b { color: var(--archon-warning); }
+@keyframes con-spin { to { transform: rotate(360deg); } }
+
+.con-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 12px 12px; }
+.con-tile { background: var(--secondary); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+.con-tile .k { font: 10px var(--font-mono); letter-spacing: .12em; color: var(--muted-foreground); text-transform: uppercase; }
+.con-tile .v { font: 600 13px var(--font-mono); color: var(--foreground); margin-top: 3px; word-break: break-all; }
+.con-tile .v.c { color: var(--primary); } .con-tile .v.a { color: var(--archon-warning); } .con-tile .v.g { color: var(--archon-success); }
+
+.con-steps { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.con-step { border: 1px solid var(--border); border-radius: 5px; background: var(--secondary); padding: 8px 10px; opacity: .35; transition: opacity .3s, border-color .3s; }
+.con-step.on { opacity: 1; border-color: var(--input); }
+.con-step.done { opacity: 1; border-color: var(--archon-success); }
+.con-step .t { display: flex; align-items: center; gap: 8px; font: 600 12px var(--font-sans); color: var(--foreground); }
+.con-step .dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--muted-foreground); display: grid; place-items: center; font-size: 9px; flex: none; }
+.con-step.on .dot { border-color: var(--primary); box-shadow: 0 0 8px var(--hud-glow); }
+.con-step.done .dot { border-color: var(--archon-success); background: var(--archon-success-tint); color: var(--archon-success); }
+.con-step pre { margin: 6px 0 0; font: 11px/1.55 var(--font-mono); color: var(--muted-foreground); white-space: pre-wrap; }
+
+.con-log { flex: 1; min-height: 160px; overflow: auto; padding: 10px 12px; font: 11px/1.7 var(--font-mono); }
+.con-log div { color: var(--muted-foreground); white-space: pre-wrap; word-break: break-word; }
+.con-log .sys { color: var(--archon-warning); } .con-log .you { color: var(--foreground); } .con-log .ai { color: var(--primary); } .con-log .ok { color: var(--archon-success); } .con-log .err { color: var(--archon-error); }
+
+@media (max-width: 1280px) { .con-rail { display: none; } }
+@media (prefers-reduced-motion: reduce) { .con-arc { animation: none !important; } }

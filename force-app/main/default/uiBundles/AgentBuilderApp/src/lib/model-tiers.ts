@@ -27,7 +27,7 @@ export const TIER_META: Record<ModelTier, { label: string; hint: string; badgeCl
   fast: {
     label: 'Fast',
     hint: 'Lowest latency & cost — routing, extraction, high-volume simple replies',
-    badgeClass: 'bg-[var(--archon-success-tint,#E7F6EE)] text-[var(--archon-success,#1F9D61)]',
+    badgeClass: 'bg-[var(--archon-success-tint,var(--archon-success-tint))] text-[var(--archon-success,var(--archon-success))]',
   },
   balanced: {
     label: 'Balanced',

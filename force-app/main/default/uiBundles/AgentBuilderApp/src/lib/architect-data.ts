@@ -9,6 +9,12 @@ export interface BuildStep {
   label: string;
   state: BuildStepState;
   detail?: string;
+  /** What this stage cost and took on its own — shown per row so the
+   *  expensive one is visible instead of inferred from a single total. */
+  costUsd?: number;
+  ms?: number;
+  /** Restored from an earlier run's checkpoint: done, and free. */
+  reused?: boolean;
 }
 
 export interface BuildPrerequisite {
@@ -38,10 +44,17 @@ export interface BuildResult {
 
 export interface BuildJobView {
   jobId: string;
-  status: 'queued' | 'running' | 'done' | 'failed';
+  /** `paused` is a budget stop, not a failure — every finished stage is
+   *  saved and `resume` continues from there without re-charging for them. */
+  status: 'queued' | 'running' | 'paused' | 'done' | 'failed';
   steps: BuildStep[];
+  /** Total across the whole resume chain — what this build has actually
+   *  cost, which is what the ceiling governs. */
   costUsd: number;
+  thisRunCostUsd?: number;
   maxCostUsd: number;
+  resumedFrom?: string;
+  resumable?: boolean;
   elapsedMs: number;
   result?: BuildResult;
   error?: string;
@@ -55,6 +68,55 @@ export async function startArchitectBuild(input: {
 }): Promise<string> {
   const res = await apexFetch<{ jobId: string }>(BASE, { method: 'POST', body: JSON.stringify(input) }, 60000);
   return res.jobId;
+}
+
+/**
+ * Continue a build that stopped at its ceiling. Returns the NEW job id to
+ * poll — the stages already paid for are restored from the paused build's
+ * checkpoint rather than run again, so only the unfinished ones cost
+ * anything.
+ */
+export async function resumeArchitectBuild(jobId: string, maxCostUsd?: number): Promise<string> {
+  const res = await apexFetch<{ jobId: string }>(
+    BASE,
+    { method: 'POST', body: JSON.stringify({ resumeJobId: jobId, ...(maxCostUsd ? { maxCostUsd } : {}) }) },
+    60000,
+  );
+  return res.jobId;
+}
+
+/** A build that stopped early but kept everything it produced. */
+export interface ResumableBuild {
+  jobId: string;
+  requirement: string;
+  costUsd: number;
+  maxCostUsd: number;
+  stagesDone: number;
+  stagesTotal: number;
+  startedAt: string;
+  /** Checkpointed by an older pipeline — resuming replays a design made
+   *  under rules that have since changed. */
+  stale?: boolean;
+}
+
+/**
+ * Builds this org can still finish. Without this the only route back to a
+ * checkpoint is the build page the user happened to leave open, which would
+ * strand work they have already paid for.
+ */
+export async function listResumableBuilds(): Promise<ResumableBuild[]> {
+  const res = await apexFetch<{ builds: ResumableBuild[] }>(`${BASE}?resumable=true`, { method: 'GET' }, 30000);
+  return res.builds ?? [];
+}
+
+/** Forget a build and its saved progress. The checkpoint lives on the
+ *  server, not in Salesforce, so deleting the agent never removes it. */
+export async function discardArchitectBuild(jobId: string): Promise<void> {
+  await apexFetch<{ deleted: boolean }>(
+    `${BASE}?jobId=${encodeURIComponent(jobId)}`,
+    { method: 'DELETE' },
+    30000,
+  );
 }
 
 export async function getArchitectBuild(jobId: string): Promise<BuildJobView> {

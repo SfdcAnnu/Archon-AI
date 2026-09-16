@@ -14,15 +14,20 @@ import {
   X,
 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
 import { NoteBar, SpecCard, StatusBadge } from '@/components/spec/blocks';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import {
   startArchitectBuild,
+  resumeArchitectBuild,
+  listResumableBuilds,
+  discardArchitectBuild,
   getArchitectBuild,
   ASSIGNEE_LABEL,
   type BuildJobView,
+  type ResumableBuild,
 } from '@/lib/architect-data';
 
 /**
@@ -54,6 +59,9 @@ export default function NewAgentPage() {
   const [listening, setListening] = useState(false);
   const [job, setJob] = useState<BuildJobView | null>(null);
   const [starting, setStarting] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const [resumable, setResumable] = useState<ResumableBuild[]>([]);
+  const [discarding, setDiscarding] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<InstanceType<NonNullable<Window['SpeechRecognition']>> | null>(null);
@@ -68,6 +76,16 @@ export default function NewAgentPage() {
     },
     [],
   );
+
+  // Unfinished work is the first thing worth knowing on this screen — a
+  // fresh page otherwise invites paying to rebuild what is already saved.
+  // A failure here is silent: not being offered a resume is a missing
+  // convenience, not a reason to block creating an agent.
+  useEffect(() => {
+    listResumableBuilds()
+      .then(setResumable)
+      .catch(() => setResumable([]));
+  }, []);
 
   // ── Voice dictation — appends to whatever is typed ─────────────────
   const toggleVoice = useCallback(() => {
@@ -121,7 +139,9 @@ export default function NewAgentPage() {
           setPhase('review');
           return;
         }
-        if (view.status === 'failed') return;
+        // `paused` is a resting state with a button, not a step on the way
+        // somewhere — polling it forever would just burn requests.
+        if (view.status === 'failed' || view.status === 'paused') return;
         pollRef.current = setTimeout(() => poll(jobId), 2500);
       })
       .catch(() => {
@@ -151,15 +171,115 @@ export default function NewAgentPage() {
       .finally(() => setStarting(false));
   }, [text, attachment, poll]);
 
+  /**
+   * Continue a build that stopped early. The server restores every finished
+   * stage from its checkpoint, so this pays only for the stages that never
+   * ran — the new ceiling is what has already been spent plus $2 of
+   * headroom, so resuming can never cost more than starting fresh would.
+   */
+  const resumeById = useCallback(
+    (jobId: string, alreadySpent: number) => {
+      setResuming(true);
+      resumeArchitectBuild(jobId, Number((alreadySpent + 2).toFixed(2)))
+        .then(newJobId => {
+          setPhase('building');
+          setJob(null);
+          poll(newJobId);
+        })
+        .catch(err => {
+          toast.error("Couldn't resume the build", {
+            description: err instanceof Error ? err.message : undefined,
+          });
+        })
+        .finally(() => setResuming(false));
+    },
+    [poll],
+  );
+
+  const resume = useCallback(() => {
+    if (job) resumeById(job.jobId, job.costUsd);
+  }, [job, resumeById]);
+
+  /** Forget a saved build. Removed from the list immediately — the row is
+   *  gone either way, and leaving it on screen after the user asked for it
+   *  to go reads as the button not working. */
+  const discard = useCallback((jobId: string) => {
+    setDiscarding(jobId);
+    discardArchitectBuild(jobId)
+      .then(() => setResumable(list => list.filter(b => b.jobId !== jobId)))
+      .catch(err => {
+        toast.error("Couldn't discard that build", {
+          description: err instanceof Error ? err.message : undefined,
+        });
+      })
+      .finally(() => setDiscarding(null));
+  }, []);
+
   // ── Choose ─────────────────────────────────────────────────────────
   if (phase === 'choose') {
     return (
       <AppShell title="New agent">
-        <div className="mx-auto w-full max-w-[780px] p-10">
+        <PageBody width="read">
           <h1 className="text-[26px] font-bold tracking-tight text-foreground">How do you want to build this?</h1>
           <p className="mb-6 mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
             Either way works, and you can switch at any point. Most people start by describing it.
           </p>
+
+          {/* Work already paid for, still finishable. Offered before the two
+              build options on purpose: starting over is the expensive
+              mistake, and it is the one a fresh page invites. */}
+          {resumable.length > 0 && (
+            <div className="mb-6 rounded-xl border border-[var(--archon-warning)] bg-[var(--archon-warning-tint)] p-4">
+              <div className="text-[14px] font-bold text-foreground">
+                You have {resumable.length === 1 ? 'a build' : `${resumable.length} builds`} you can finish
+              </div>
+              <p className="mb-3 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                Everything {resumable.length === 1 ? 'it' : 'they'} finished is saved. Picking up where it
+                stopped costs only the stages that never ran.
+              </p>
+              <div className="flex flex-col gap-2">
+                {resumable.map(b => (
+                  <div
+                    key={b.jobId}
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                  >
+                    <div className="min-w-[12rem] flex-1">
+                      <div className="truncate text-[12.5px] font-medium text-foreground">{b.requirement}</div>
+                      <div className="mt-0.5 font-mono text-[11px] text-[var(--archon-faint)]">
+                        {b.stagesDone}/{b.stagesTotal} stages done · ${b.costUsd.toFixed(2)} already spent
+                      </div>
+                      {/* A saved design is only as good as the rules it was
+                          built under. Resuming an old one rebuilds the agent
+                          those rules produced, which is rarely what someone
+                          coming back to it wants. */}
+                      {b.stale && (
+                        <div className="mt-1 text-[11px] leading-snug text-[var(--archon-warning)]">
+                          Built before the latest improvements — finishing it rebuilds the older design.
+                          Starting fresh is usually better.
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={b.stale ? 'outline' : 'default'}
+                      onClick={() => resumeById(b.jobId, b.costUsd)}
+                      disabled={resuming || discarding === b.jobId}
+                    >
+                      {resuming ? 'Resuming…' : 'Finish this'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => discard(b.jobId)}
+                      disabled={discarding === b.jobId}
+                    >
+                      {discarding === b.jobId ? 'Discarding…' : 'Discard'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col rounded-xl border border-primary bg-card p-5 shadow-[0_0_0_2px_var(--node-blue-tint)]">
@@ -217,7 +337,7 @@ export default function NewAgentPage() {
               check whether your org supports something. Describing first doesn't lock you out of the canvas either.
             </p>
           </div>
-        </div>
+        </PageBody>
       </AppShell>
     );
   }
@@ -226,7 +346,7 @@ export default function NewAgentPage() {
   if (phase === 'describe') {
     return (
       <AppShell title="Describe it">
-        <div className="mx-auto w-full max-w-[780px] p-10">
+        <PageBody width="read">
           <button
             type="button"
             onClick={() => setPhase('choose')}
@@ -240,7 +360,7 @@ export default function NewAgentPage() {
             already do and build the rest.
           </p>
 
-          <div className="rounded-xl border border-[#c9ccd3] bg-card p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
@@ -320,30 +440,46 @@ export default function NewAgentPage() {
                 key={e}
                 type="button"
                 onClick={() => setText(e)}
-                className="rounded-full border border-[#c9ccd3] bg-card px-3.5 py-1.5 text-[12.5px] text-muted-foreground hover:border-primary hover:bg-[var(--node-blue-tint)] hover:text-primary"
+                className="rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] text-muted-foreground hover:border-primary hover:bg-[var(--node-blue-tint)] hover:text-primary"
               >
                 {e}
               </button>
             ))}
           </div>
-        </div>
+        </PageBody>
       </AppShell>
     );
   }
 
   // ── Building ───────────────────────────────────────────────────────
   if (phase === 'building') {
+    // A failure the server can still continue from — it kept the design, and
+    // the repair for a late-gate rejection ships in code rather than in the
+    // model's next attempt. Re-buying the survey and the design to pick that
+    // up would be the same waste the checkpoint exists to end.
+    const recoverable = job?.resumable === true;
     const failed = job?.status === 'failed';
+    const paused = job?.status === 'paused';
+    const canResume = paused || (failed && recoverable);
+    const doneStages = (job?.steps ?? []).filter(s => s.state === 'done' || s.state === 'warn').length;
     return (
       <AppShell title="Building">
-        <div className="mx-auto w-full max-w-[780px] p-10">
+        <PageBody width="read">
           <h1 className="text-[26px] font-bold tracking-tight text-foreground">
-            {failed ? "I couldn't finish this one" : 'Building your agent'}
+            {paused
+              ? 'Paused at your cost ceiling'
+              : failed
+                ? recoverable
+                  ? 'Stopped at the last step'
+                  : "I couldn't finish this one"
+                : 'Building your agent'}
           </h1>
           <p className="mb-6 mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
-            {failed
-              ? 'Nothing was saved. Here is what happened, in full.'
-              : 'This takes a couple of minutes and runs in the background — you can leave this page and come back.'}
+            {canResume
+              ? `The ${doneStages} stage${doneStages === 1 ? '' : 's'} below are finished and saved. Resuming picks up from there — you won't be charged for them again. If you close this tab, it is waiting for you under New agent.`
+              : failed
+                ? 'Here is what happened, in full.'
+                : 'This takes a couple of minutes and runs in the background — you can leave this page and come back.'}
           </p>
 
           <SpecCard>
@@ -370,6 +506,17 @@ export default function NewAgentPage() {
                   )}
                 </span>
                 <span className="flex-1 text-[13.5px]">{s.label}</span>
+                {/* What this stage cost, so the expensive one is visible
+                    rather than inferred from a single total. A reused stage
+                    says so instead — it is the whole point of resuming. */}
+                {s.reused ? (
+                  <span className="font-mono text-[11px] text-[var(--archon-success)]">already paid</span>
+                ) : s.costUsd != null && s.costUsd > 0 ? (
+                  <span className="font-mono text-[11px] tabular-nums text-[var(--archon-faint)]">
+                    ${s.costUsd.toFixed(3)}
+                    {s.ms != null && s.ms > 1000 ? ` · ${Math.round(s.ms / 1000)}s` : ''}
+                  </span>
+                ) : null}
                 {s.detail && (
                   <StatusBadge tone={s.state === 'warn' ? 'warn' : 'muted'}>{s.detail}</StatusBadge>
                 )}
@@ -380,7 +527,7 @@ export default function NewAgentPage() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting…
               </div>
             )}
-            <div className="flex gap-7 border-t border-border bg-[#fafafa] px-4 py-3.5">
+            <div className="flex gap-7 border-t border-border bg-secondary px-4 py-3.5">
               <div>
                 <div className="text-[11px] text-[var(--archon-faint)]">So far</div>
                 <div className="font-mono text-[19px] font-semibold">
@@ -396,10 +543,23 @@ export default function NewAgentPage() {
                 <div className="font-mono text-[19px] font-semibold">${(job?.maxCostUsd ?? 2).toFixed(2)}</div>
               </div>
             </div>
-            {failed && job?.error && <NoteBar tone="error">{job.error}</NoteBar>}
+            {(failed || paused) && job?.error && (
+              <NoteBar tone={canResume ? 'warn' : 'error'}>{job.error}</NoteBar>
+            )}
           </SpecCard>
 
-          {failed && (
+          {canResume && (
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
+              <Button onClick={resume} disabled={resuming}>
+                {resuming ? 'Resuming…' : `Resume · up to $${((job?.costUsd ?? 0) + 2).toFixed(2)} total`}
+              </Button>
+              <Button variant="outline" onClick={() => setPhase('describe')}>
+                Start over with a different description
+              </Button>
+            </div>
+          )}
+
+          {failed && !recoverable && (
             <div className="mt-4 flex gap-2.5">
               <Button onClick={() => setPhase('describe')}>Change what I asked for</Button>
               <Button variant="outline" onClick={build}>
@@ -407,7 +567,7 @@ export default function NewAgentPage() {
               </Button>
             </div>
           )}
-        </div>
+        </PageBody>
       </AppShell>
     );
   }
@@ -418,7 +578,7 @@ export default function NewAgentPage() {
   const blocking = r.prerequisites.filter(p => p.blocking);
   return (
     <AppShell title="Review">
-      <div className="mx-auto w-full max-w-[780px] p-10">
+      <PageBody width="read">
         <h1 className="text-[26px] font-bold tracking-tight text-foreground">Here's what I built</h1>
         <p className="mb-6 mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
           Read it in plain English. If anything's wrong, tell me and I'll change it — you don't need to edit
@@ -443,7 +603,7 @@ export default function NewAgentPage() {
               <span className="text-[13.5px] leading-relaxed">{s}</span>
             </div>
           ))}
-          <div className="flex gap-7 border-t border-border bg-[#fafafa] px-4 py-3.5">
+          <div className="flex gap-7 border-t border-border bg-secondary px-4 py-3.5">
             <div>
               <div className="text-[11px] text-[var(--archon-faint)]">Per conversation</div>
               <div className="font-mono text-[19px] font-semibold">${r.estimate.costPerRunUsd.toFixed(3)}</div>
@@ -522,7 +682,7 @@ export default function NewAgentPage() {
             Change something
           </Button>
         </div>
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

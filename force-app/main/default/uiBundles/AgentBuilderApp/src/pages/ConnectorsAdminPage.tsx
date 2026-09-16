@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Loader2, Plug, Plus, Server, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
@@ -57,7 +58,7 @@ function SegTabs({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => void
     ['det', 'Tool details'],
   ];
   return (
-    <div className="mb-3.5 inline-flex gap-0.5 rounded-md bg-[#eef0f3] p-0.5">
+    <div className="mb-3.5 inline-flex gap-0.5 rounded-md bg-secondary p-0.5">
       {TABS.map(([key, label]) => (
         <button
           key={key}
@@ -411,7 +412,7 @@ export default function ConnectorsAdminPage() {
 
   return (
     <AppShell title="Connectors" onRefresh={refreshAll}>
-      <div className="mx-auto w-full max-w-[1180px] p-5">
+      <PageBody width="standard">
         {/* ── Shared stat row ─────────────────────────────────────── */}
         <div className="mb-3.5 grid grid-cols-4 gap-3">
           <StatCard
@@ -474,7 +475,7 @@ export default function ConnectorsAdminPage() {
                     return (
                       <div
                         key={entry.providerKey}
-                        className="flex items-start gap-3 border-b border-r border-[#eceef1] p-3.5 [&:nth-child(3n)]:border-r-0"
+                        className="flex items-start gap-3 border-b border-r border-border p-3.5 [&:nth-child(3n)]:border-r-0"
                       >
                         <IconSquare bg={entry.brandColor ?? 'var(--node-gray)'}>
                           <Plug className="h-4 w-4" />
@@ -669,7 +670,7 @@ export default function ConnectorsAdminPage() {
                               <tr>
                                 <td
                                   colSpan={3}
-                                  className="border-b border-[#eceef1] bg-[#f7f8f9] px-3 py-1.5 text-[10.5px] font-bold text-muted-foreground"
+                                  className="border-b border-border bg-secondary px-3 py-1.5 text-[10.5px] font-bold text-muted-foreground"
                                 >
                                   {group.displayName}{' '}
                                   <span className="font-normal">
@@ -764,7 +765,7 @@ export default function ConnectorsAdminPage() {
                     if (q && tools.length === 0) return null;
                     return (
                       <Fragment key={group.providerKey}>
-                        <div className="flex items-center gap-1.5 border-y border-border bg-[#f7f8f9] px-3 py-[7px] text-[10.5px] font-bold text-muted-foreground">
+                        <div className="flex items-center gap-1.5 border-y border-border bg-secondary px-3 py-[7px] text-[10.5px] font-bold text-muted-foreground">
                           <span className="truncate">{group.displayName}</span>
                           <span className="ml-auto font-mono font-normal text-[var(--archon-faint)]">{group.tools.length}</span>
                         </div>
@@ -779,8 +780,8 @@ export default function ConnectorsAdminPage() {
                               type="button"
                               onClick={() => setSelected({ providerKey: group.providerKey, name: tool.name })}
                               className={cn(
-                                'flex w-full items-center border-b border-[#f2f3f5] px-3 py-1.5 text-left font-mono text-[11px] text-primary hover:bg-[#f8fafc]',
-                                on && 'bg-[#f4f9fe] font-semibold shadow-[inset_3px_0_0_var(--primary)]'
+                                'flex w-full items-center border-b border-border px-3 py-1.5 text-left font-mono text-[11px] text-primary hover:bg-secondary',
+                                on && 'bg-accent font-semibold shadow-[inset_3px_0_0_var(--primary)]'
                               )}
                             >
                               <span className="truncate">{tool.name}</span>
@@ -792,7 +793,7 @@ export default function ConnectorsAdminPage() {
                     );
                   })}
                   {erroredGroups.map(group => (
-                    <div key={group.providerKey} className="flex items-center gap-1.5 border-y border-border bg-[#f7f8f9] px-3 py-[7px] text-[10.5px] font-bold text-muted-foreground opacity-60">
+                    <div key={group.providerKey} className="flex items-center gap-1.5 border-y border-border bg-secondary px-3 py-[7px] text-[10.5px] font-bold text-muted-foreground opacity-60">
                       <span className="truncate">{group.displayName}</span>
                       <StatusBadge tone="muted" className="ml-auto">Offline</StatusBadge>
                     </div>
@@ -844,12 +845,12 @@ export default function ConnectorsAdminPage() {
                             </div>
                           </div>
                           {args.length === 0 ? (
-                            <div className="border-t border-[#eceef1] px-3.5 py-2.5 text-[11.5px] text-muted-foreground">
+                            <div className="border-t border-border px-3.5 py-2.5 text-[11.5px] text-muted-foreground">
                               This tool takes no arguments.
                             </div>
                           ) : (
                             args.map(arg => (
-                              <div key={arg.name} className="flex items-center gap-2.5 border-t border-[#eceef1] px-3.5 py-2 text-[11.5px]">
+                              <div key={arg.name} className="flex items-center gap-2.5 border-t border-border px-3.5 py-2 text-[11.5px]">
                                 <span style={{ color: arg.required ? 'var(--archon-error)' : 'var(--archon-faint)' }}>●</span>
                                 <b className="w-[140px] shrink-0 truncate font-mono text-foreground">{arg.name}</b>
                                 <span className="min-w-0 flex-1 truncate text-muted-foreground">
@@ -881,7 +882,7 @@ export default function ConnectorsAdminPage() {
             )}
           </>
         )}
-      </div>
+      </PageBody>
 
       <CustomMcpDialog
         open={dialog.open}

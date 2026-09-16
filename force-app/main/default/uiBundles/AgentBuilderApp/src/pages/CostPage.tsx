@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Bar, EmptyPanel, NoteBar, SpecCard, StatCard } from '@/components/spec/blocks';
 import { listMySessions, parseModelUsage, type SessionSummary } from '@/lib/conversations-data';
 
@@ -20,7 +21,7 @@ import { listMySessions, parseModelUsage, type SessionSummary } from '@/lib/conv
 
 const SESSION_LIMIT = 50;
 
-const AGENT_BAR_COLORS = ['#0176d3', '#9050e9', '#06a59a', '#dd7a01', '#6b7280'];
+const AGENT_BAR_COLORS = ['var(--primary)', 'var(--node-purple)', 'var(--node-teal)', 'var(--node-amber)', 'var(--node-gray)'];
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -133,7 +134,7 @@ export default function CostPage() {
 
   return (
     <AppShell title="Cost" onRefresh={load}>
-      <div className="mx-auto w-full max-w-[1180px] p-5">
+      <PageBody width="wide">
         {loading && sessions == null && !error ? (
           <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
@@ -271,20 +272,20 @@ export default function CostPage() {
                         <div className="flex h-4 overflow-hidden rounded-full">
                           <i
                             className="block h-full"
-                            style={{ width: `${100 - outPct}%`, background: '#0176d3' }}
+                            style={{ width: `${100 - outPct}%`, background: 'var(--primary)' }}
                           />
-                          <i className="block h-full" style={{ width: `${outPct}%`, background: '#9050e9' }} />
+                          <i className="block h-full" style={{ width: `${outPct}%`, background: 'var(--node-purple)' }} />
                         </div>
                         <div className="mt-3 text-[11.5px]">
                           <div className="flex justify-between py-0.5">
                             <span>
-                              <span className="text-[#0176d3]">●</span> Reading — tokens in
+                              <span className="text-primary">●</span> Reading — tokens in
                             </span>
                             <b className="font-mono">{fmt(totalIn)}</b>
                           </div>
                           <div className="flex justify-between py-0.5">
                             <span>
-                              <span className="text-[#9050e9]">●</span> Writing — tokens out
+                              <span className="text-[var(--node-purple)]">●</span> Writing — tokens out
                             </span>
                             <b className="font-mono">{fmt(totalOut)}</b>
                           </div>
@@ -306,7 +307,7 @@ export default function CostPage() {
             )}
           </>
         )}
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

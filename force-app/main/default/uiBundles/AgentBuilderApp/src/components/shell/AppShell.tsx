@@ -13,11 +13,13 @@ import {
   Plug,
   Search,
   Sun,
+  Palette,
   CircleDollarSign,
   ChevronsLeft,
   RotateCw,
   Plus,
 } from 'lucide-react';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { loadPendingApprovals } from '@/lib/approvals-data';
 import { listChatApprovals } from '@/lib/chat-approvals-data';
@@ -62,7 +64,7 @@ function NavSection({ title, items }: { title?: string; items: NavItem[] }) {
   return (
     <div className="px-3">
       {title && (
-        <div className="px-2 pb-1 pt-4 text-[9.5px] font-bold uppercase tracking-[.09em] text-[#6b7280]">
+        <div className="px-2 pb-1 pt-4 text-[9.5px] font-bold uppercase tracking-[.09em] text-[var(--node-gray)]">
           {title}
         </div>
       )}
@@ -80,7 +82,7 @@ function NavSection({ title, items }: { title?: string; items: NavItem[] }) {
               'flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[12.5px] font-medium transition-colors',
               active
                 ? 'bg-[var(--sidebar-accent)] text-white'
-                : 'text-[#c8cdd6] hover:bg-[#1d222d] hover:text-white'
+                : 'text-[var(--sidebar-nav)] hover:bg-[var(--sidebar-accent)] hover:text-white'
             )}
           >
             <Icon className={cn('h-[15px] w-[15px] shrink-0', active ? 'opacity-100' : 'opacity-75')} />
@@ -122,6 +124,7 @@ export function AppShell({
   onRefresh?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [theme, setTheme] = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const approvals = usePendingApprovals();
@@ -162,8 +165,8 @@ export function AppShell({
             {!collapsed && (
               <div className="min-w-0 flex-1 text-left">
                 <div className="truncate text-[13px] font-bold leading-tight text-white">Archon AI</div>
-                <div className="flex items-center gap-1 text-[9.5px] text-[#7ee2a8]">
-                  <span className="h-[5px] w-[5px] rounded-full bg-[#4bce7f]" /> Production
+                <div className="flex items-center gap-1 text-[9.5px] text-[var(--sidebar-ok)]">
+                  <span className="h-[5px] w-[5px] rounded-full bg-[var(--sidebar-ok)]" /> Production
                 </div>
               </div>
             )}
@@ -174,7 +177,7 @@ export function AppShell({
 
         {!collapsed && (
           <div className="px-3 pb-1">
-            <div className="flex items-center gap-2 rounded-md bg-[#1d222d] px-2.5 py-1.5">
+            <div className="flex items-center gap-2 rounded-md bg-[var(--sidebar-accent)] px-2.5 py-1.5">
               <Search className="h-3.5 w-3.5 shrink-0 text-[var(--sidebar-muted)]" />
               <span className="flex-1 text-[11.5px] text-[var(--sidebar-muted)]">Search</span>
               <kbd className="rounded border border-[var(--sidebar-border)] px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[var(--sidebar-muted)]">
@@ -200,7 +203,7 @@ export function AppShell({
                       'relative flex h-9 w-9 items-center justify-center rounded-md',
                       active
                         ? 'bg-[var(--sidebar-accent)] text-white'
-                        : 'text-[var(--sidebar-muted)] hover:bg-[#1d222d]'
+                        : 'text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-accent)]'
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -234,6 +237,15 @@ export function AppShell({
                 </div>
                 <button
                   type="button"
+                  onClick={() => setTheme(theme === 'hud' ? 'light' : 'hud')}
+                  title={theme === 'hud' ? 'Switch to the Salesforce look' : 'Switch to the HUD look'}
+                  aria-label="Switch theme"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-accent)] hover:text-white"
+                >
+                  <Palette className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => setCollapsed(true)}
                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-accent)] hover:text-white"
                   aria-label="Collapse sidebar"
@@ -265,7 +277,7 @@ export function AppShell({
               type="button"
               onClick={() => navigate('/environments')}
               title="Environment — click to manage"
-              className="flex items-center gap-1.5 rounded-[5px] border-[1.5px] border-[#f3b0b6] bg-card px-2.5 py-[5px] text-[11px] font-bold text-[var(--archon-error)]"
+              className="flex items-center gap-1.5 rounded-[5px] border-[1.5px] border-[var(--archon-error)] bg-card px-2.5 py-[5px] text-[11px] font-bold text-[var(--archon-error)]"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--archon-error)]" /> Production
               <span className="opacity-60">›</span>
@@ -280,7 +292,7 @@ export function AppShell({
             <button
               type="button"
               onClick={() => navigate('/new-agent')}
-              className="flex items-center gap-1 rounded-[5px] bg-primary px-2.5 py-[6px] text-[11.5px] font-semibold text-primary-foreground hover:bg-[#0b5cab]"
+              className="flex items-center gap-1 rounded-[5px] bg-primary px-2.5 py-[6px] text-[11.5px] font-semibold text-primary-foreground hover:bg-[var(--primary-hover)]"
             >
               <Plus className="h-3 w-3" /> New agent
             </button>

@@ -15,12 +15,12 @@ function prettyToolName(name: string): string {
 }
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  Pending: { label: 'Needs approval', bg: 'var(--node-amber-tint, #FDF3E1)', fg: 'var(--node-amber, #B7791F)' },
-  Approved: { label: 'Approved — running', bg: 'var(--archon-success-tint, #E7F6EE)', fg: 'var(--archon-success, #1F9D61)' },
-  Executed: { label: 'Approved & done', bg: 'var(--archon-success-tint, #E7F6EE)', fg: 'var(--archon-success, #1F9D61)' },
-  Rejected: { label: 'Rejected', bg: 'var(--node-gray-tint, #EEF0F3)', fg: 'var(--node-gray, #64748B)' },
-  Failed: { label: 'Approved, but failed', bg: 'var(--node-gray-tint, #EEF0F3)', fg: 'var(--destructive, #DC2626)' },
-  Expired: { label: 'Expired', bg: 'var(--node-gray-tint, #EEF0F3)', fg: 'var(--node-gray, #64748B)' },
+  Pending: { label: 'Needs approval', bg: 'var(--node-amber-tint, var(--archon-warning-tint))', fg: 'var(--node-amber, var(--node-amber))' },
+  Approved: { label: 'Approved — running', bg: 'var(--archon-success-tint, var(--archon-success-tint))', fg: 'var(--archon-success, var(--archon-success))' },
+  Executed: { label: 'Approved & done', bg: 'var(--archon-success-tint, var(--archon-success-tint))', fg: 'var(--archon-success, var(--archon-success))' },
+  Rejected: { label: 'Rejected', bg: 'var(--node-gray-tint, var(--secondary))', fg: 'var(--node-gray, var(--node-gray))' },
+  Failed: { label: 'Approved, but failed', bg: 'var(--node-gray-tint, var(--secondary))', fg: 'var(--destructive, var(--archon-error))' },
+  Expired: { label: 'Expired', bg: 'var(--node-gray-tint, var(--secondary))', fg: 'var(--node-gray, var(--node-gray))' },
 };
 
 export interface ChatApprovalCardProps {

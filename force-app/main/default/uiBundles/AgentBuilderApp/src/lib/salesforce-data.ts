@@ -50,11 +50,29 @@ interface RawAgentWithNodes {
 }
 
 interface RawCanvasConnection {
-  id: string;
+  /** Absent on graphs the Architect compiled — see `connectionId`. */
+  id?: string;
   fromIndex: number;
   fromPort: string;
   toIndex: number;
   toPort: string;
+}
+
+/**
+ * A stable id for a connection that was saved without one.
+ *
+ * React Flow keys every edge by id and silently collapses duplicates, so a
+ * graph whose connections all carried `undefined` rendered as ONE edge —
+ * the whole agent looked unwired on the canvas while its CanvasJson__c was
+ * perfectly correct. The hand-built canvas has always written ids; the
+ * Architect's compiler did not, so only generated agents showed the fault.
+ *
+ * Derived from the endpoints rather than randomly, so it survives a reload
+ * and a re-render: a regenerated id would make React Flow treat every edge
+ * as new on every pass, losing selection and re-animating the graph.
+ */
+function connectionId(c: RawCanvasConnection): string {
+  return `e${c.fromIndex}:${c.fromPort}-${c.toIndex}:${c.toPort}`;
 }
 
 function parseSetupChecklist(json: string | null): ChecklistItem[] {
@@ -90,7 +108,7 @@ function fromRaw(raw: RawAgentWithNodes): AgentGraph {
   const connections: AgentConnection[] = rawConnections
     .filter(c => nodes[c.fromIndex] && nodes[c.toIndex])
     .map(c => ({
-      id: c.id,
+      id: c.id ?? connectionId(c),
       fromNodeId: nodes[c.fromIndex].id,
       fromPort: c.fromPort as PortName,
       toNodeId: nodes[c.toIndex].id,

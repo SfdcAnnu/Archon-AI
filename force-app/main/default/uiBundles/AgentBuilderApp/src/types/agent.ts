@@ -27,6 +27,19 @@ export type EngineSubType = 'claude' | 'gpt4' | 'gemini';
 /** Config shapes per node type — matches the ConfigJson__c contract for
  *  subagent/tool nodes, and the existing catalog/ai node shapes already
  *  used by agentCanvas.js. */
+
+/** A worked exchange shown to the model as an illustration of style and
+ *  shape. Held per node so a specialist demonstrates its own narrow job
+ *  rather than inheriting the lead agent's conversational manner.
+ *  Rendered into the cacheable part of the prompt, so examples cost the
+ *  cached rate on every turn after the first. */
+export interface FewShotExample {
+  input: string;
+  output: string;
+  /** Optional aside the model sees in parentheses, e.g. "keep it this short". */
+  note?: string;
+}
+
 export interface AiNodeConfig {
   model?: string;
   systemPrompt?: string;
@@ -39,6 +52,7 @@ export interface AiNodeConfig {
   answerStyle?: 'precise' | 'balanced' | 'exploratory';
   thinkingEffort?: 'off' | 'standard' | 'deep';
   maxReplyTokens?: number;
+  fewShotExamples?: FewShotExample[];
 }
 
 export interface SubagentNodeConfig {
@@ -53,6 +67,7 @@ export interface SubagentNodeConfig {
   /** call mode only — what the specialist sees: 'isolated' (its task only;
    *  cheapest, default), 'windowed' (recent turns), 'full' (everything). */
   contextPolicy?: 'isolated' | 'windowed' | 'full';
+  fewShotExamples?: FewShotExample[];
 }
 
 /** One field ticked for a Prebuilt Salesforce action — metadata captured

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ChevronDown, ChevronRight, Loader2, MessageSquare, Settings2, ShieldAlert } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { IconSquare, SpecCard, StatusBadge, T } from '@/components/spec/blocks';
 import { cn } from '@/lib/utils';
 import {
@@ -189,7 +190,7 @@ export default function ConversationsPage() {
   if (selectedId) {
     return (
       <AppShell title="Conversations">
-        <div className="mx-auto w-full max-w-3xl p-5">
+        <PageBody width="wide">
           <button
             type="button"
             onClick={() => setSelectedId(null)}
@@ -247,14 +248,14 @@ export default function ConversationsPage() {
               )}
             </>
           )}
-        </div>
+        </PageBody>
       </AppShell>
     );
   }
 
   return (
     <AppShell title="Conversations">
-      <div className="mx-auto w-full max-w-5xl p-5">
+      <PageBody width="wide">
         {loadState === 'loading' && (
           <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
@@ -328,7 +329,7 @@ export default function ConversationsPage() {
             )}
           </SpecCard>
         )}
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

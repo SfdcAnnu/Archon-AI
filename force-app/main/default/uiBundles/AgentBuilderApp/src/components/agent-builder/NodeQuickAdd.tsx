@@ -51,7 +51,7 @@ const TOOL_PRESETS: PaletteItem[] = [
     nodeSubType: 'tool',
     label: 'Apex Tool',
     sub: 'Call an invocable Apex method',
-    iconClass: 'bg-[var(--archon-warning-tint,#FEF3E0)] text-[var(--archon-warning,#B45309)]',
+    iconClass: 'bg-[var(--archon-warning-tint,var(--archon-warning-tint))] text-[var(--archon-warning,var(--archon-warning))]',
     defaultConfig: { description: '', actionType: 'Apex', toolName: '', connectorId: '', requiresApproval: false } satisfies ToolNodeConfig,
   },
   {
@@ -59,7 +59,7 @@ const TOOL_PRESETS: PaletteItem[] = [
     nodeSubType: 'tool',
     label: 'Flow Tool',
     sub: 'Run an autolaunched Flow',
-    iconClass: 'bg-[var(--archon-success-tint,#E7F6EE)] text-[var(--archon-success,#1F9D61)]',
+    iconClass: 'bg-[var(--archon-success-tint,var(--archon-success-tint))] text-[var(--archon-success,var(--archon-success))]',
     defaultConfig: { description: '', actionType: 'Flow', toolName: '', connectorId: '', requiresApproval: false } satisfies ToolNodeConfig,
   },
   // 'Custom Tool (blank)' removed at the user's request — the blank-MCP
@@ -289,7 +289,7 @@ export function NodeQuickAdd({ anchor, onClose, onAddNode, onAddConnector, onAdd
             className={cn(
               'shrink-0 rounded-full px-2 py-0.5 text-[8.5px] font-bold',
               connected
-                ? 'bg-[var(--archon-success-tint,#E7F6EE)] text-[var(--archon-success,#1F9D61)]'
+                ? 'bg-[var(--archon-success-tint,var(--archon-success-tint))] text-[var(--archon-success,var(--archon-success))]'
                 : 'bg-secondary text-muted-foreground'
             )}
           >
@@ -341,7 +341,7 @@ export function NodeQuickAdd({ anchor, onClose, onAddNode, onAddConnector, onAdd
                   className="group flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-secondary"
                 >
                   <code className="shrink-0 font-mono text-[10.5px] font-semibold text-foreground">{t.name}</code>
-                  {isWriteTool(t.name) && <PenLine className="h-2.5 w-2.5 shrink-0 text-[var(--archon-warning,#B45309)]" />}
+                  {isWriteTool(t.name) && <PenLine className="h-2.5 w-2.5 shrink-0 text-[var(--archon-warning,var(--archon-warning))]" />}
                   <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">{t.description ?? ''}</span>
                   <span className="shrink-0 text-[12px] font-bold text-primary opacity-0 group-hover:opacity-100">+</span>
                 </div>

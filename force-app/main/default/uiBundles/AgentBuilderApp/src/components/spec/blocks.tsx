@@ -40,7 +40,7 @@ export function StatCard({
 /** Thin progress bar (spec: 5px, pill). Pass a token color. */
 export function Bar({ pct, color, className }: { pct: number; color: string; className?: string }) {
   return (
-    <div className={cn('mt-2 h-[5px] overflow-hidden rounded-full bg-[#edeef1]', className)}>
+    <div className={cn('mt-2 h-[5px] overflow-hidden rounded-full bg-secondary', className)}>
       <div
         className="h-full rounded-full"
         style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }}
@@ -78,15 +78,17 @@ export function SpecCard({
 }
 
 /** Grey caption strip at the bottom of a card — the spec states each
- *  chart/table's finding in words here. `tone="error"` for red findings. */
-export function NoteBar({ tone, children }: { tone?: 'error'; children: ReactNode }) {
+ *  chart/table's finding in words here. `tone="error"` for red findings;
+ *  `tone="warn"` for a state that stopped short but lost nothing, which
+ *  red would misrepresent as damage. */
+export function NoteBar({ tone, children }: { tone?: 'error' | 'warn'; children: ReactNode }) {
   return (
     <div
       className={cn(
         'rounded-b-lg border-t border-border px-3.5 py-2 text-[11.5px]',
-        tone === 'error'
-          ? 'bg-[var(--archon-error-tint)] text-[var(--archon-error)]'
-          : 'bg-[#f7f8f9] text-muted-foreground'
+        tone === 'error' && 'bg-[var(--archon-error-tint)] text-[var(--archon-error)]',
+        tone === 'warn' && 'bg-[var(--archon-warning-tint)] text-[var(--archon-warning)]',
+        !tone && 'bg-secondary text-muted-foreground',
       )}
     >
       {children}
@@ -162,8 +164,8 @@ export function AttnRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 border-b border-[#eceef1] px-3.5 py-2.5 last:border-b-0',
-        onClick && 'cursor-pointer hover:bg-[#f8fafc]'
+        'flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-b-0',
+        onClick && 'cursor-pointer hover:bg-secondary'
       )}
       onClick={onClick}
     >
@@ -180,9 +182,9 @@ export function AttnRow({
 /** Standard table classes — use with plain <table>. */
 export const T = {
   table: 'w-full border-collapse text-[12.5px]',
-  th: 'bg-[#f7f8f9] border-b border-border px-3 py-2 text-left text-[10.5px] font-bold text-muted-foreground',
-  td: 'border-b border-[#eceef1] px-3 py-2 align-middle',
-  trClick: 'cursor-pointer hover:bg-[#f8fafc]',
+  th: 'bg-secondary border-b border-border px-3 py-2 text-left text-[10.5px] font-bold text-muted-foreground',
+  td: 'border-b border-border px-3 py-2 align-middle',
+  trClick: 'cursor-pointer hover:bg-secondary',
 };
 
 /** Honest empty state — shown wherever the platform does not yet track the

@@ -3,12 +3,21 @@ import { Loader2, MessageSquarePlus, Search } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Input } from '@/components/ui/input';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { ConsoleRail } from '@/components/chat/ConsoleRail';
+import type { ChatActivity } from '@/lib/chat-activity';
 import { listChatEnabledAgents, type ChatAgentSummary } from '@/lib/chat-data';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 
-/** Standalone chat surface — mirrors the old synapseChat tab: a left rail
- *  of recent sessions + a "New chat" agent picker, ChatPanel on the
- *  right for whichever session is active. Starts with no active session. */
+/**
+ * The full-page chat: recent sessions on the left, the conversation in the
+ * middle, and the console on the right — the core ring, what this turn is
+ * doing, and the activity log.
+ *
+ * The console is a reading of events the ChatPanel emits, nothing more.
+ * The panel is the same component the canvas test-chat uses; giving it a
+ * narrator here rather than a second implementation is what keeps the
+ * two surfaces from drifting apart.
+ */
 export default function ChatPage() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -18,6 +27,7 @@ export default function ChatPage() {
   const [agentsLoading, setAgentsLoading] = useState(false);
 
   const [active, setActive] = useState<{ sessionId: string | null; agentApiName: string; agentName: string } | null>(null);
+  const [events, setEvents] = useState<ChatActivity[]>([]);
 
   const refreshSessions = useCallback(() => {
     setSessionsLoading(true);
@@ -62,10 +72,12 @@ export default function ChatPage() {
 
   const handlePickAgent = useCallback((agent: ChatAgentSummary) => {
     setShowPicker(false);
+    setEvents([]);
     setActive({ sessionId: null, agentApiName: agent.apiName, agentName: agent.name });
   }, []);
 
   const handlePickSession = useCallback((s: SessionSummary) => {
+    setEvents([]);
     setActive({ sessionId: s.id, agentApiName: s.agentApiName, agentName: s.agentName });
   }, []);
 
@@ -73,16 +85,23 @@ export default function ChatPage() {
     (info: { sessionId: string | null; ended: boolean }) => {
       if (info.ended) {
         setActive(null);
+        setEvents([]);
       }
       refreshSessions();
     },
     [refreshSessions]
   );
 
+  // The log is a window, not an archive: the last 200 events are plenty to
+  // read a conversation back, and the transcript is the record.
+  const handleActivity = useCallback((e: ChatActivity) => {
+    setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e]));
+  }, []);
+
   return (
     <AppShell>
       <div className="relative flex h-full w-full">
-        <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-card">
+        <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
             <span className="text-[13.5px] font-bold text-foreground">Chat</span>
             <button
@@ -126,7 +145,7 @@ export default function ChatPage() {
         <div className="min-w-0 flex-1">
           {!active ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <p className="text-[13px] text-muted-foreground">Pick a conversation or start a new one.</p>
+              <p className="text-[13px] text-muted-foreground">Pick a conversation or start a new one — then type, or just talk.</p>
               <button
                 type="button"
                 onClick={openPicker}
@@ -144,9 +163,12 @@ export default function ChatPage() {
               initialSessionId={active.sessionId}
               onClose={() => setActive(null)}
               onSessionChange={handleSessionChange}
+              onActivity={handleActivity}
             />
           )}
         </div>
+
+        {active && <ConsoleRail events={events} agentName={active.agentName} />}
 
         {showPicker && (
           <>

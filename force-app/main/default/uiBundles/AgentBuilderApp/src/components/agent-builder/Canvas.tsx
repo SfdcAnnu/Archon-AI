@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BaseEdge,
   Background,
@@ -21,6 +21,7 @@ import {
   type OnNodeDrag,
   type ReactFlowInstance,
 } from '@xyflow/react';
+import { useThemeToken } from '@/lib/theme';
 import { HelpCircle, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import type { AgentConnection, AgentNode } from '@/types/agent';
@@ -176,21 +177,6 @@ function toFlowEdges(
   });
 }
 
-/** React Flow's <Background> resolves `color` through an SVG attribute
- *  path that does not reliably read CSS custom properties (var(...)) in
- *  every browser — pass a literal value instead.
- *
- *  Deliberately checks the ACTUAL rendered theme (the .dark class on
- *  <html>), not the OS's prefers-color-scheme — this app doesn't wire up
- *  a dark-mode toggle yet, so it always renders the light palette
- *  regardless of OS setting. Reading prefers-color-scheme directly was a
- *  real bug: on a browser/OS set to dark mode, it picked the light-
- *  colored dot (meant for a dark background) and rendered it against the
- *  actual light background, which is close to invisible. */
-function dotColor(): string {
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  return isDark ? 'rgba(147, 163, 255, 0.35)' : 'rgba(56, 84, 224, 0.35)';
-}
 
 export interface CanvasProps {
   nodes: AgentNode[];
@@ -302,7 +288,9 @@ export function Canvas({
     return () => cancelAnimationFrame(raf);
   }, [nodes]);
 
-  const backgroundColor = useMemo(() => dotColor(), []);
+  // React Flow pushes this through an SVG attribute, which does not reliably
+  // read var(); hand it the computed token and re-read when the theme flips.
+  const backgroundColor = useThemeToken('--archon-dot', 'rgba(1, 118, 211, .14)');
 
   const handleNodeDragStop = useCallback<OnNodeDrag>(
     (_, node) => {

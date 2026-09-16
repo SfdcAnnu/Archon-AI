@@ -152,7 +152,7 @@ export function ArchonCopilot({ graph, onApplyOperations, onClose }: ArchonCopil
               <div className="min-w-0 flex-1">
                 <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground">{t.content}</p>
                 {t.operations && t.operations.length > 0 && (
-                  <div className="mt-2 rounded-lg border border-border bg-[#fafafa] p-2.5">
+                  <div className="mt-2 rounded-lg border border-border bg-secondary p-2.5">
                     <div className="mb-1.5 text-[11px] font-bold text-foreground">
                       {t.applied ? 'Applied to the canvas' : `${t.operations.length} proposed change${t.operations.length === 1 ? '' : 's'}`}
                     </div>

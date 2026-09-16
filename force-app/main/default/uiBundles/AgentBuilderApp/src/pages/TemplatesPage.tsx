@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { IconSquare } from '@/components/spec/blocks';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
@@ -76,7 +77,7 @@ export default function TemplatesPage() {
 
   return (
     <AppShell title="Templates">
-      <div className="mx-auto w-full max-w-5xl p-5">
+      <PageBody width="standard">
         <div className="grid grid-cols-3 gap-3.5">
           {TEMPLATES.map(t => (
             <div key={t.key} className="rounded-lg border border-border bg-card p-4">
@@ -104,7 +105,7 @@ export default function TemplatesPage() {
           Today each template creates a named starter agent (one AI node + a read-only Salesforce
           tool) in its department and opens the canvas — the template-specific graph is built there.
         </p>
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

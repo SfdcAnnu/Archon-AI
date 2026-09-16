@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vite",
     "dev:design": "vite --mode design",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-colours.mjs && tsc -b && vite build",
+    "check:colours": "node scripts/check-colours.mjs",
     "build:e2e": "npm run build && node scripts/rewrite-e2e-assets.mjs",
     "lint": "eslint .",
     "preview": "vite preview",

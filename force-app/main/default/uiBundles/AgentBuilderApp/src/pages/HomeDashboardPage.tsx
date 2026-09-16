@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { AlertTriangle, Bot, CheckCircle2, CheckSquare, Loader2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import {
   AttnRow,
   Bar,
@@ -105,30 +106,30 @@ function ActivityChart({ buckets }: { buckets: HourBucket[] }) {
     .join(' ')} L568 120 L40 120 Z`;
   return (
     <svg viewBox="0 0 600 150" className="h-[170px] w-full">
-      <g stroke="#eceef1">
+      <g stroke="var(--border)">
         <line x1={30} y1={10} x2={600} y2={10} />
         <line x1={30} y1={65} x2={600} y2={65} />
         <line x1={30} y1={120} x2={600} y2={120} />
       </g>
-      <text x={24} y={14} fontSize={9} fill="#8a919e" textAnchor="end" className="font-mono">
+      <text x={24} y={14} fontSize={9} fill="var(--archon-faint)" textAnchor="end" className="font-mono">
         {maxV}
       </text>
-      <text x={24} y={69} fontSize={9} fill="#8a919e" textAnchor="end" className="font-mono">
+      <text x={24} y={69} fontSize={9} fill="var(--archon-faint)" textAnchor="end" className="font-mono">
         {Math.round(maxV / 2)}
       </text>
-      <text x={24} y={124} fontSize={9} fill="#8a919e" textAnchor="end" className="font-mono">
+      <text x={24} y={124} fontSize={9} fill="var(--archon-faint)" textAnchor="end" className="font-mono">
         0
       </text>
-      <path d={area} fill="#0176d3" opacity={0.12} />
-      <polyline points={line} fill="none" stroke="#0176d3" strokeWidth={2} />
-      <g fill="#ba0517">
+      <path d={area} fill="var(--primary)" opacity={0.12} />
+      <polyline points={line} fill="none" stroke="var(--primary)" strokeWidth={2} />
+      <g fill="var(--archon-error)">
         {buckets.map((b, i) => {
           if (b.fails === 0) return null;
           const h = Math.max(3, (b.fails / maxV) * 110);
           return <rect key={i} x={xs[i] - 4} y={120 - h} width={9} height={h} rx={1} />;
         })}
       </g>
-      <g fontSize={9} fill="#8a919e" className="font-mono">
+      <g fontSize={9} fill="var(--archon-faint)" className="font-mono">
         <text x={40} y={140}>00</text>
         <text x={184} y={140}>06</text>
         <text x={328} y={140}>12</text>
@@ -138,7 +139,7 @@ function ActivityChart({ buckets }: { buckets: HourBucket[] }) {
   );
 }
 
-const DONUT_COLORS = ['#0176d3', '#9050e9', '#06a59a', '#dd7a01', '#6b7280'];
+const DONUT_COLORS = ['var(--primary)', 'var(--node-purple)', 'var(--node-teal)', 'var(--node-amber)', 'var(--node-gray)'];
 
 interface AgentSlice {
   name: string;
@@ -170,10 +171,10 @@ function SessionsDonut({ groups, total }: { groups: AgentSlice[]; total: number 
           );
         })}
       </g>
-      <text x={60} y={58} textAnchor="middle" fontSize={17} fontWeight={600} fill="#16181d" className="font-mono">
+      <text x={60} y={58} textAnchor="middle" fontSize={17} fontWeight={600} fill="var(--foreground)" className="font-mono">
         {total}
       </text>
-      <text x={60} y={72} textAnchor="middle" fontSize={8.5} fill="#8a919e">
+      <text x={60} y={72} textAnchor="middle" fontSize={8.5} fill="var(--archon-faint)">
         sessions
       </text>
     </svg>
@@ -352,7 +353,7 @@ export default function HomeDashboardPage() {
 
   return (
     <AppShell title="Home" onRefresh={load}>
-      <div className="mx-auto w-full max-w-[1180px] p-5">
+      <PageBody width="wide">
         {loading && !data ? (
           <div className="flex items-center gap-2 py-8 text-[12.5px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
@@ -372,7 +373,7 @@ export default function HomeDashboardPage() {
                     : 'unavailable'
                 }
               >
-                {todayRuns.length > 0 && <MiniSpark values={buckets.map(b => b.runs)} stroke="#0176d3" />}
+                {todayRuns.length > 0 && <MiniSpark values={buckets.map(b => b.runs)} stroke="var(--primary)" />}
               </StatCard>
               <StatCard
                 label="Failed"
@@ -387,7 +388,7 @@ export default function HomeDashboardPage() {
                 }
                 subClass={todayFails.length > 0 ? 'text-[var(--archon-error)]' : 'text-[var(--archon-success)]'}
               >
-                {todayFails.length > 0 && <MiniSpark values={buckets.map(b => b.fails)} stroke="#ba0517" />}
+                {todayFails.length > 0 && <MiniSpark values={buckets.map(b => b.fails)} stroke="var(--archon-error)" />}
               </StatCard>
               <StatCard
                 label="Active conversations"
@@ -496,14 +497,14 @@ export default function HomeDashboardPage() {
                 />
               )}
               {attnErrors.length > 0 && (
-                <div className="border-t border-[#eceef1] px-3.5 py-2 text-[11px] text-muted-foreground">
+                <div className="border-t border-border px-3.5 py-2 text-[11px] text-muted-foreground">
                   Couldn't check everything — {attnErrors.join(', ')} failed to load.
                 </div>
               )}
             </SpecCard>
           </>
         )}
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

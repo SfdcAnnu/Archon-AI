@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Cloud, Database, KeyRound, Loader2, Plug, RefreshCw, Server } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { cn } from '@/lib/utils';
 import { loadAccessStatus, type AccessStatus } from '@/lib/access-data';
 import { loadConnectorDirectoryWithRetry, type DirectoryEntry } from '@/lib/connectors-data';
@@ -21,7 +22,7 @@ function StateDot({ ok, warn }: { ok: boolean; warn?: boolean }) {
     <span
       className={cn(
         'inline-block h-2 w-2 shrink-0 rounded-full',
-        ok ? 'bg-[var(--archon-success)]' : warn ? 'bg-[var(--archon-warning,#B45309)]' : 'bg-destructive'
+        ok ? 'bg-[var(--archon-success)]' : warn ? 'bg-[var(--archon-warning,var(--archon-warning))]' : 'bg-destructive'
       )}
     />
   );
@@ -131,7 +132,7 @@ export default function EnvironmentsPage() {
           </button>
         </header>
 
-        <div className="mx-auto w-full max-w-5xl flex-1 space-y-4 p-6">
+        <PageBody width="standard" className="flex-1 space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Salesforce org */}
             <SectionCard
@@ -283,7 +284,7 @@ export default function EnvironmentsPage() {
               cause of "no connection configured" chat errors.
             </p>
           </SectionCard>
-        </div>
+        </PageBody>
       </div>
     </AppShell>
   );

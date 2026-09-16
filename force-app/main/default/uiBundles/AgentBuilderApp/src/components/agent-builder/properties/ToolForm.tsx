@@ -53,7 +53,7 @@ function ParamList({ title, icon: Icon, params }: { title: string; icon: typeof 
               <span className="font-mono font-semibold text-foreground">{p.name}</span>
               {p.type && <span className="text-muted-foreground">{p.type}</span>}
               {p.required && (
-                <span className="rounded-full bg-[var(--archon-warning-tint,#FEF3E0)] px-1.5 text-[8.5px] font-bold text-[var(--archon-warning,#B45309)]">
+                <span className="rounded-full bg-[var(--archon-warning-tint,var(--archon-warning-tint))] px-1.5 text-[8.5px] font-bold text-[var(--archon-warning,var(--archon-warning))]">
                   required
                 </span>
               )}
@@ -364,7 +364,7 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
                         <span className="min-w-0">
                           <span className="block font-mono text-[10.5px] font-semibold text-foreground">{t.name}</span>
                           {t.description && (
-                            <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,#b45309)]' : 'text-muted-foreground')}>
+                            <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,var(--archon-warning))]' : 'text-muted-foreground')}>
                               {isWriteTool(t.name) && <PenLine className="mr-1 inline h-2.5 w-2.5" />}
                               {t.description}
                             </span>

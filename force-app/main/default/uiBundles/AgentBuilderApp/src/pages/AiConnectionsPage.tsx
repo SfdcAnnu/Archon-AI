@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, RotateCw, Star, TestTube2, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
@@ -57,14 +58,14 @@ const PROVIDERS: ProviderMeta[] = [
 function connDotColor(status: string | null): string {
   if (status === 'Success') return 'var(--archon-success)';
   if (status === 'Failed') return 'var(--archon-error)';
-  return '#c9cdd4';
+  return 'var(--border)';
 }
 
 function providerDotColor(pRows: ConnectionSummary[]): string | null {
   if (pRows.length === 0) return null;
   if (pRows.some(r => r.validationStatus === 'Failed')) return 'var(--archon-error)';
   if (pRows.some(r => r.validationStatus === 'Success' || r.isActive)) return 'var(--archon-success)';
-  return '#c9cdd4';
+  return 'var(--border)';
 }
 
 function KeyStatusBadge({ status }: { status: string | null }) {
@@ -373,7 +374,7 @@ export default function AiConnectionsPage() {
 
   return (
     <AppShell title="AI Models" onRefresh={load}>
-      <div className="mx-auto w-full max-w-5xl p-5">
+      <PageBody width="standard">
         {/* ── Stat strip ── */}
         <div className="mb-3.5 grid grid-cols-4 gap-3">
           <StatCard
@@ -414,10 +415,10 @@ export default function AiConnectionsPage() {
                   type="button"
                   onClick={() => setSelected(p.key)}
                   className={cn(
-                    'grid w-full grid-cols-[1fr_auto] items-center border-b border-[#eceef1] px-3.5 py-2.5 text-left last:border-b-0',
+                    'grid w-full grid-cols-[1fr_auto] items-center border-b border-border px-3.5 py-2.5 text-left last:border-b-0',
                     selected === p.key
-                      ? 'bg-[#f4f9fe] shadow-[inset_3px_0_0_var(--primary)]'
-                      : 'hover:bg-[#f8fafc]'
+                      ? 'bg-accent shadow-[inset_3px_0_0_var(--primary)]'
+                      : 'hover:bg-secondary'
                   )}
                 >
                   <b className={cn('text-[12px]', none ? 'text-[var(--archon-faint)]' : 'text-foreground')}>
@@ -496,7 +497,7 @@ export default function AiConnectionsPage() {
                         onClick={() => setSelectedConnId(r.id)}
                         className={cn(
                           'cursor-pointer rounded-lg border px-[13px] py-[11px]',
-                          failed ? 'border-[#f3b0b6] bg-[#fff7f7]' : 'border-border bg-card',
+                          failed ? 'border-[var(--archon-error)] bg-[var(--archon-error-tint)]' : 'border-border bg-card',
                           isSel && 'ring-1 ring-[var(--primary)]'
                         )}
                       >
@@ -593,7 +594,7 @@ export default function AiConnectionsPage() {
               {ROUTE_ROWS.map(route => (
                 <div
                   key={route.title}
-                  className="flex items-center gap-3 border-b border-[#eceef1] px-3.5 py-2.5 last:border-b-0"
+                  className="flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-b-0"
                 >
                   <IconSquare bg={route.bg} color={route.color}>
                     {route.glyph}
@@ -621,7 +622,7 @@ export default function AiConnectionsPage() {
             <EmptyPanel>Per-model spend arrives with usage metering.</EmptyPanel>
           </div>
         </div>
-      </div>
+      </PageBody>
 
       <EngineConnectionFormDialog
         open={dialogOpen}

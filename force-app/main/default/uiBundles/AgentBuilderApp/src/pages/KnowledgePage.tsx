@@ -11,6 +11,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Bar, EmptyPanel, IconSquare, NoteBar, SpecCard, StatCard, StatusBadge } from '@/components/spec/blocks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,7 +104,7 @@ function DocRow({
           ? 'indexing failed'
           : doc.status;
   return (
-    <div className="flex items-center gap-3 border-b border-[#eceef1] px-3.5 py-2.5 last:border-b-0">
+    <div className="flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-b-0">
       <IconSquare bg="var(--node-teal-tint)" color="var(--node-teal)">
         <FileText className="h-3.5 w-3.5" />
       </IconSquare>
@@ -547,7 +548,7 @@ export default function KnowledgePage() {
 
   return (
     <AppShell title="Knowledge">
-      <div className="mx-auto w-full max-w-[1180px] p-5">
+      <PageBody width="standard">
         {agentsFailed ? (
           <EmptyPanel>Couldn't load agents — retry with Refresh once the server is reachable.</EmptyPanel>
         ) : !agents ? (
@@ -569,8 +570,8 @@ export default function KnowledgePage() {
                     type="button"
                     onClick={() => setSelected(a.apiName)}
                     className={cn(
-                      'block w-full border-b border-[#eceef1] px-3 py-2 text-left last:border-b-0 hover:bg-[#f8fafc]',
-                      on && 'bg-[#f4f9fe] shadow-[inset_3px_0_0_var(--primary)]'
+                      'block w-full border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-secondary',
+                      on && 'bg-accent shadow-[inset_3px_0_0_var(--primary)]'
                     )}
                   >
                     <div className="truncate text-[12px] font-bold text-foreground">{a.name}</div>
@@ -635,7 +636,7 @@ export default function KnowledgePage() {
                   <>
                     {grouped.map(g => (
                       <div key={g.key}>
-                        <div className="border-b border-border bg-[#f7f8f9] px-3.5 py-1.5 text-[10.5px] font-bold text-muted-foreground">
+                        <div className="border-b border-border bg-secondary px-3.5 py-1.5 text-[10.5px] font-bold text-muted-foreground">
                           {g.label}{' '}
                           <span className="font-normal">
                             — {g.docs.length} document{g.docs.length === 1 ? '' : 's'}
@@ -668,7 +669,7 @@ export default function KnowledgePage() {
             </div>
           </div>
         )}
-      </div>
+      </PageBody>
 
       {selected && (
         <AddSourceDialog

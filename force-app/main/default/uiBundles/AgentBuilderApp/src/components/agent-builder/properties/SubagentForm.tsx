@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEngineModels } from '@/lib/use-engine-models';
 import { FieldLabel, Hint, Segmented } from './controls';
 import { PromptAssist } from './PromptAssist';
+import { FewShotExamples } from './FewShotExamples';
 import type { AgentNode, SubagentNodeConfig } from '@/types/agent';
 
 const PROVIDERS = [
@@ -154,6 +155,12 @@ export function SubagentForm({ node, onConfigChange, onProviderChange }: Subagen
           className="min-h-28 font-mono text-[11.5px] leading-relaxed"
         />
       </div>
+
+      <FewShotExamples
+        subjectLabel="this specialist"
+        value={cfg?.fewShotExamples}
+        onChange={next => onConfigChange({ fewShotExamples: next })}
+      />
     </div>
   );
 }

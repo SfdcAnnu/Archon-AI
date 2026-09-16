@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
@@ -86,10 +87,10 @@ function healthOf(stats: AgentRunStats | undefined, status: string): { tone: Hea
 }
 
 const RING_COLORS: Record<HealthTone, [string, string]> = {
-  ok: ['#2e844a', '#d9efe0'],
-  warn: ['#dd7a01', '#fcf1e0'],
-  error: ['#ba0517', '#f0d3d6'],
-  muted: ['#8a919e', '#e0e2e7'],
+  ok: ['var(--archon-success)', 'var(--archon-success-tint)'],
+  warn: ['var(--node-amber)', 'var(--archon-warning-tint)'],
+  error: ['var(--archon-error)', 'var(--archon-error-tint)'],
+  muted: ['var(--archon-faint)', 'var(--border)'],
 };
 
 /** 28px success ring — dasharray is rate·75.4 per the spec. A null rate
@@ -132,7 +133,7 @@ function ActivityBars({ buckets }: { buckets: number[] }) {
             width="6"
             height={h}
             rx="1"
-            fill={count > 0 ? 'var(--primary)' : '#e0e2e7'}
+            fill={count > 0 ? 'var(--primary)' : 'var(--border)'}
           />
         );
       })}
@@ -284,7 +285,7 @@ export default function HomePage() {
   return (
     <AppShell title="Agents" onRefresh={refresh}>
 
-      <div className="mx-auto w-full max-w-5xl p-5">
+      <PageBody width="standard">
         <div className="grid grid-cols-3 gap-3.5">
           <StatCard
             label="Live in production"
@@ -433,7 +434,7 @@ export default function HomePage() {
             </NoteBar>
           )}
         </SpecCard>
-      </div>
+      </PageBody>
 
       <Dialog open={showNewAgent} onOpenChange={setShowNewAgent}>
         <DialogContent>

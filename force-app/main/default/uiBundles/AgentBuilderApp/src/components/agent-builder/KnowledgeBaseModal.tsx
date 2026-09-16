@@ -27,8 +27,8 @@ export interface KnowledgeBaseModalProps {
 
 function statusBadgeStyle(status: string) {
   if (status === 'Ready') return { backgroundColor: 'var(--archon-success-tint)', color: 'var(--archon-success)' };
-  if (status === 'Error') return { backgroundColor: 'var(--archon-danger-tint, #fde8e8)', color: 'var(--archon-danger, #dc2626)' };
-  return { backgroundColor: 'var(--archon-warning-tint, #fef3e0)', color: 'var(--archon-warning, #b45309)' };
+  if (status === 'Error') return { backgroundColor: 'var(--archon-danger-tint, var(--archon-error-tint))', color: 'var(--archon-danger, var(--archon-error))' };
+  return { backgroundColor: 'var(--archon-warning-tint, var(--archon-warning-tint))', color: 'var(--archon-warning, var(--archon-warning))' };
 }
 
 const BACKEND_OPTIONS = [

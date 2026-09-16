@@ -18,8 +18,8 @@ export interface PaletteCategory {
 
 const PROVIDER_ICON_CLASS: Record<string, string> = {
   claude: 'bg-[color-mix(in_oklab,var(--primary)_12%,transparent)] text-primary',
-  gpt4: 'bg-[#E6FAF5] text-[#10A37F] dark:bg-[#0e2a24] dark:text-[#3fd6ac]',
-  gemini: 'bg-[#EAF2FE] text-[#4285F4] dark:bg-[#16233d] dark:text-[#7ba7f7]',
+  gpt4: 'bg-[var(--brand-openai-tint)] text-[var(--brand-openai)]',
+  gemini: 'bg-[var(--brand-gemini-tint)] text-[var(--brand-gemini)]',
 };
 
 /** Mirrors agentCanvas.js's NODE_PALETTE — same categories, same node

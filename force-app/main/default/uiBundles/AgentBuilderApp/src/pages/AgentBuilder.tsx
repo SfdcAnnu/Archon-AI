@@ -540,7 +540,7 @@ export default function AgentBuilder() {
                 className="relative flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
               >
                 <ListChecks className="h-3.5 w-3.5" />
-                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--archon-warning,#b45309)] px-0.5 text-[8.5px] font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--archon-warning,var(--archon-warning))] px-0.5 text-[8.5px] font-bold text-white">
                   {graph.agent.setupChecklist.length}
                 </span>
               </button>

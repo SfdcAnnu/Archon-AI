@@ -45,7 +45,7 @@ export function Segmented<V extends string>({
           className={cn(
             'rounded-full border px-3 py-[5px] text-[11px] font-semibold transition-colors',
             o.value === value
-              ? 'border-[#9ecdf0] bg-[var(--node-blue-tint)] text-primary'
+              ? 'border-primary bg-[var(--node-blue-tint)] text-primary'
               : 'border-border bg-card text-muted-foreground hover:bg-secondary/60',
             disabled && 'cursor-not-allowed opacity-50'
           )}

@@ -210,8 +210,8 @@ export function Palette() {
                       <span
                         className="mt-0.5 inline-block rounded-full px-1.5 py-px text-[9px] font-bold"
                         style={connected
-                          ? { backgroundColor: 'var(--archon-success-tint,#E7F6EE)', color: 'var(--archon-success,#1F9D61)' }
-                          : { backgroundColor: 'var(--muted,#F1F2F6)', color: 'var(--muted-foreground)' }}
+                          ? { backgroundColor: 'var(--archon-success-tint,var(--archon-success-tint))', color: 'var(--archon-success,var(--archon-success))' }
+                          : { backgroundColor: 'var(--muted,var(--secondary))', color: 'var(--muted-foreground)' }}
                       >
                         {connected ? 'Connected' : 'Not configured'}
                       </span>

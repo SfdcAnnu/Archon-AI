@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -120,7 +121,7 @@ function inputKeys(json: string | null): string[] {
 
 /** Icon square by node type, matching the builder's node accent colors. */
 function stepIcon(sub: string, failed: boolean): { bg: string; color: string; glyph: string } {
-  if (failed) return { bg: '#ffffff', color: 'var(--archon-error)', glyph: '⚠' };
+  if (failed) return { bg: 'var(--card)', color: 'var(--archon-error)', glyph: '⚠' };
   const s = (sub || '').toLowerCase();
   if (s === 'claude' || s === 'gpt4' || s === 'gemini' || s.includes('agent') || s.includes('llm'))
     return { bg: 'var(--node-purple-tint)', color: 'var(--node-purple)', glyph: '♟' };
@@ -188,7 +189,7 @@ function toCsv(rows: RawAgentExecution[]): string {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#eceef1] px-3.5 py-[7px] text-[11.5px] last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b border-border px-3.5 py-[7px] text-[11.5px] last:border-b-0">
       <span className="shrink-0 text-muted-foreground">{label}</span>
       <span className="min-w-0 break-words text-right text-foreground">{children}</span>
     </div>
@@ -292,7 +293,7 @@ export default function ExecutionLogsPage() {
 
   return (
     <AppShell title="Runs">
-      <div className="mx-auto w-full max-w-[1180px] p-5">
+      <PageBody width="wide">
         <div className="grid items-start gap-3.5 md:grid-cols-[240px_1fr]">
           {/* ── Left: runs list ─────────────────────────────── */}
           <SpecCard
@@ -325,7 +326,7 @@ export default function ExecutionLogsPage() {
                     'rounded px-1.5 py-0.5 text-[9.5px] font-bold',
                     status === s
                       ? 'bg-primary text-white'
-                      : 'bg-[var(--node-gray-tint)] text-muted-foreground hover:bg-[#e4e7ec]'
+                      : 'bg-[var(--node-gray-tint)] text-muted-foreground hover:bg-secondary'
                   )}
                 >
                   {s === 'all' ? 'All' : STATUS_LABELS[s] ?? s}
@@ -353,8 +354,8 @@ export default function ExecutionLogsPage() {
                     type="button"
                     onClick={() => setSelectedId(r.Id)}
                     className={cn(
-                      'flex w-full items-center gap-2 border-b border-[#eceef1] px-3 py-2 text-left last:border-b-0',
-                      sel ? 'bg-[#f4f9fe] shadow-[inset_3px_0_0_var(--primary)]' : 'hover:bg-[#f8fafc]'
+                      'flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left last:border-b-0',
+                      sel ? 'bg-accent shadow-[inset_3px_0_0_var(--primary)]' : 'hover:bg-secondary'
                     )}
                   >
                     <div className="min-w-0 flex-1">
@@ -467,7 +468,7 @@ export default function ExecutionLogsPage() {
                 {timeline && (
                   <div className="px-3.5 pb-2 pt-3.5">
                     {timeline.rows.map((row, i) => (
-                      <div key={`${row.step.nodeId}-${i}`} className="relative my-[5px] h-[18px] rounded bg-[#f4f5f7]">
+                      <div key={`${row.step.nodeId}-${i}`} className="relative my-[5px] h-[18px] rounded bg-secondary">
                         <span
                           className={cn(
                             'absolute left-2 top-[2px] z-[2] truncate text-[9.5px] font-bold',
@@ -484,7 +485,7 @@ export default function ExecutionLogsPage() {
                           style={{
                             left: `${row.leftPct}%`,
                             width: `${row.widthPct}%`,
-                            background: row.step.success ? '#0176d3' : 'var(--archon-error)',
+                            background: row.step.success ? 'var(--primary)' : 'var(--archon-error)',
                             opacity: row.step.success ? 0.85 : 1,
                           }}
                         />
@@ -508,7 +509,7 @@ export default function ExecutionLogsPage() {
                       return (
                         <div
                           key={`${s.nodeId}-${i}`}
-                          className="flex items-center gap-3 border-b border-[#eceef1] px-3.5 py-2.5 last:border-b-0"
+                          className="flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-b-0"
                           style={failed ? { background: 'var(--archon-error-tint)' } : undefined}
                         >
                           <IconSquare bg={icon.bg} color={icon.color} size={20}>
@@ -555,7 +556,7 @@ export default function ExecutionLogsPage() {
               {runFailed && failStep && (
                 <SpecCard title="Why it failed" muted="what the failing step received">
                   <div className="grid gap-3 p-3.5 sm:grid-cols-2">
-                    <div className="overflow-hidden rounded-[7px] border border-[#cfe8d6]">
+                    <div className="overflow-hidden rounded-[7px] border border-[var(--archon-success)]">
                       <div className="bg-[var(--archon-success-tint)] px-3 py-[7px] text-[11px] font-bold text-[var(--archon-success)]">
                         The failing step received
                       </div>
@@ -563,13 +564,13 @@ export default function ExecutionLogsPage() {
                         inputKeys(failStep.inputJson).map(k => (
                           <div
                             key={k}
-                            className="border-t border-[#eef0f3] px-3 py-[7px] font-mono text-[11px] text-[var(--archon-success)]"
+                            className="border-t border-border px-3 py-[7px] font-mono text-[11px] text-[var(--archon-success)]"
                           >
                             ✓ {k}
                           </div>
                         ))
                       ) : (
-                        <div className="border-t border-[#eef0f3] px-3 py-[7px] text-[11.5px] text-muted-foreground">
+                        <div className="border-t border-border px-3 py-[7px] text-[11.5px] text-muted-foreground">
                           No input was recorded for this step.
                         </div>
                       )}
@@ -602,13 +603,13 @@ export default function ExecutionLogsPage() {
                 </Field>
                 <Field label="Date">{new Date(selected.CreatedDate).toLocaleString()}</Field>
                 {selected.AgentReason__c && (
-                  <div className="border-t border-[#eceef1] px-3.5 py-3">
+                  <div className="border-t border-border px-3.5 py-3">
                     <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Reasoning</div>
                     <p className="text-[12px] leading-relaxed text-muted-foreground">{selected.AgentReason__c}</p>
                   </div>
                 )}
                 {selected.OutputPayload__c && (
-                  <div className="border-t border-[#eceef1] px-3.5 py-3">
+                  <div className="border-t border-border px-3.5 py-3">
                     <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Output payload</div>
                     <pre className="max-h-56 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-[10.5px]">
                       {selected.OutputPayload__c}
@@ -619,7 +620,7 @@ export default function ExecutionLogsPage() {
             </div>
           )}
         </div>
-      </div>
+      </PageBody>
     </AppShell>
   );
 }

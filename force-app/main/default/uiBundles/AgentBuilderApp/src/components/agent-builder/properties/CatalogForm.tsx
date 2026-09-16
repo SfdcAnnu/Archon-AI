@@ -200,7 +200,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
                     <span className="min-w-0">
                       <span className="block font-mono text-[10.5px] font-semibold text-foreground">{t.name}</span>
                       {t.description && (
-                        <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,#b45309)]' : 'text-muted-foreground')}>
+                        <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,var(--archon-warning))]' : 'text-muted-foreground')}>
                           {isWriteTool(t.name) && <PenLine className="mr-1 inline h-2.5 w-2.5" />}
                           {t.description.slice(0, 140)}
                         </span>
@@ -213,7 +213,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
           </div>
         )}
         {staleSelected.length > 0 && (
-          <div className="rounded-md border border-[var(--archon-warning,#B45309)]/40 bg-[var(--archon-warning-tint,#FEF3E0)]/50 px-2.5 py-2 text-[10px] text-[var(--archon-warning,#B45309)]">
+          <div className="rounded-md border border-[var(--archon-warning,var(--archon-warning))]/40 bg-[var(--archon-warning-tint,var(--archon-warning-tint))]/50 px-2.5 py-2 text-[10px] text-[var(--archon-warning,var(--archon-warning))]">
             Selected but no longer on the server: {staleSelected.join(', ')}{' '}
             <button
               type="button"

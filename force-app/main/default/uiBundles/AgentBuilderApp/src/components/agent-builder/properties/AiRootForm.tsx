@@ -5,6 +5,7 @@ import { useEngineModels } from '@/lib/use-engine-models';
 import { AiEngineConnectionPicker } from './AiEngineConnectionPicker';
 import { FieldLabel, Hint, Segmented } from './controls';
 import { PromptAssist } from './PromptAssist';
+import { FewShotExamples } from './FewShotExamples';
 import type { AgentNode, AiNodeConfig } from '@/types/agent';
 
 const PROVIDERS = [
@@ -170,6 +171,12 @@ export function AiRootForm({ node, onConfigChange, onProviderChange, onConnectio
           className="min-h-32 font-mono text-[11.5px] leading-relaxed"
         />
       </div>
+
+      <FewShotExamples
+        subjectLabel="the agent"
+        value={cfg?.fewShotExamples}
+        onChange={next => onConfigChange({ fewShotExamples: next })}
+      />
     </div>
   );
 }

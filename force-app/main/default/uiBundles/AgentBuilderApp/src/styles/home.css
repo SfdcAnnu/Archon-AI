@@ -149,26 +149,32 @@
 .home-status[data-phase="think"] .dot{background:var(--archon-warning);box-shadow:0 0 10px var(--archon-warning)}
 .home-status[data-phase="speak"] .dot{background:var(--archon-success);box-shadow:0 0 10px var(--archon-success)}
 
-/* ── focus: the chat takes the screen ───────────────────────── */
-/* Stacking: everything here stays BELOW 50. The app's dialogs (confirm
-   boxes such as "End this chat?") and menus portal to <body> at z-50; a
-   focus overlay above them swallowed the End-chat confirm invisibly. */
-.home[data-focus="1"] .home-col{opacity:0;filter:blur(6px);transform:scale(.97);pointer-events:none}
-.home[data-focus="1"] .home-field{filter:blur(5px);opacity:.5}
-.home[data-focus="1"] .home-ask{opacity:0;pointer-events:none}
-.home-focus{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;background:color-mix(in srgb,var(--background) 80%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:home-fade .25s ease-out}
-@keyframes home-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.home-focus-head{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--card);flex-wrap:wrap}
-.home-focus-head .ft b{display:block;font-size:13px;font-weight:600} .home-focus-head .ft span{font-size:12px;color:var(--muted-foreground)}
-.home-count{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--archon-warning);margin-left:auto}
-.home-count + .home-btn,.home-count ~ .home-btn{margin-left:0}
-.home-btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:8px;border:0;background:var(--primary);color:var(--primary-foreground);font:500 12.5px inherit;font-family:inherit;cursor:pointer;margin-left:auto}
-.home-btn.ghost{background:transparent;border:1px solid var(--border);color:var(--muted-foreground);margin-left:0}
-.home-btn.ghost:hover{border-color:var(--primary);color:var(--foreground)}
-.home-btn svg{width:15px;height:15px}
-.home-focus-body{display:flex;flex:1;min-height:0}
-.home-focus-chat{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
-.home-focus-chat>*{flex:1;min-height:0}
+/* ── focus: the chat fades in over the dashboard ────────────── */
+/* Nothing travels. The cards and the orbit fade out where they stand,
+   the chat fades in over the same area, and Archon's core stays exactly
+   where it was — dimmed and still — behind the transcript. The console
+   (listening state, this turn, activity log) takes the left column; the
+   chat takes everything to its right. Closing runs the same fade back.
+   Stacking stays BELOW 50: the app's confirm boxes portal to <body> at
+   z-50, and a taller overlay once swallowed "End this chat?" invisibly. */
+.home{--home-T:1600ms;--home-ease:cubic-bezier(.4,0,.2,1)}
+.home[data-overlay="1"]{height:100%;overflow:hidden}
+.home[data-overlay="1"] .home-col,.home[data-overlay="1"] .home-ask{transition:opacity var(--home-T) var(--home-ease)}
+.home[data-overlay="1"] .home-tab{transition:opacity var(--home-T) var(--home-ease)}
+.home[data-focus="1"] .home-col,.home[data-focus="1"] .home-ask{opacity:0;pointer-events:none}
+.home-orbit.dim .home-tab{opacity:0;pointer-events:none}
+.home-core{transition:opacity var(--home-T) var(--home-ease),filter var(--home-T) var(--home-ease)}
+.home[data-focus="1"] .home-core{opacity:.22;filter:blur(1.5px) saturate(.6)}
+.home[data-focus="1"] .home-core .arc,.home[data-focus="1"] .home-core .sat,.home[data-focus="1"] .home-core-disc{animation-play-state:paused}
+.home[data-focus="1"] .home-core-disc{box-shadow:none}
+.home[data-focus="1"] .home-glow{opacity:0;animation:none}
+.home-focus{position:absolute;inset:0;z-index:40;display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;padding:14px 16px 24px;min-height:0;
+  opacity:0;pointer-events:none;transition:opacity var(--home-T) var(--home-ease);animation:home-fade-in var(--home-T) var(--home-ease)}
+.home[data-focus="1"] .home-focus{opacity:1;pointer-events:auto}
+@keyframes home-fade-in{from{opacity:0}to{opacity:1}}
+.home-focus .con-rail{width:auto;height:100%;min-height:0;padding:0 14px 0 0;border-left:0;border-right:1px solid var(--border);background:transparent}
+.home-focus-chat{min-width:0;min-height:0;display:flex;flex-direction:column}
+.home-focus .home-focus-chat>*{flex:1;min-height:0;background:transparent}
 body.home-lock{overflow:hidden}
 
 /* ── choosing the agent ─────────────────────────────────────── */
@@ -181,6 +187,7 @@ body.home-lock{overflow:hidden}
 .home-picker-list .n{font-weight:500} .home-picker-list .q{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground)}
 
 /* ── responsive ─────────────────────────────────────────────── */
+@media (max-width:1280px){ .home-focus{grid-template-columns:1fr} }
 @media (max-width:1240px){
   .home{grid-template-columns:1fr 1fr}
   .home-center{grid-column:1/-1;order:-1}
@@ -196,9 +203,9 @@ body.home-lock{overflow:hidden}
   .home-orbit.far .home-tab{opacity:0;filter:blur(8px)}
   .home-orbit.dim .home-tab{opacity:.45}
   .home-bar-row{grid-template-columns:110px 1fr 48px}
-  .home-focus-head{gap:8px} .home-count{width:100%;margin-left:0}
 }
 @media (prefers-reduced-motion:reduce){
   .home-core .arc,.home-core .sat,.home-glow,.home-core-disc,.home-empty .spin{animation:none!important}
-  .home-tab,.home-col,.home-ask,.home-field,.home-focus{transition:none!important;animation:none!important}
+  .home{--home-T:0ms}
+  .home-tab,.home-col,.home-ask,.home-field,.home-focus,.home-core{transition:none!important;animation:none!important}
 }

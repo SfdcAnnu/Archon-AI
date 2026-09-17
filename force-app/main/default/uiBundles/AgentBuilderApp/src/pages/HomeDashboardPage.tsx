@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Activity, BookOpen, Bot, CheckSquare, CircleDollarSign, LayoutGrid, Layers, Loader2,
@@ -23,8 +23,9 @@ import '@/styles/home.css';
 /**
  * Home — the command center. Archon's core sits in the middle with the
  * app's tabs in orbit around it; the platform's numbers sit either side.
- * The first message you send takes the chat to full screen and the
- * dashboard recedes behind it; a plain answer hands the screen back.
+ * The first message you send fades the cards and the orbit out where they
+ * stand and fades the chat in over them — nothing travels, and the core
+ * stays put behind the transcript, dimmed. A plain answer fades it back.
  *
  * The copilot here is always Archon itself — the Architect's assistant,
  * which knows this platform and the org and can build an agent from a
@@ -79,6 +80,8 @@ const STATUS_COPY: Record<CorePhase, string> = {
   speak: 'Speaking — talk or type to interrupt',
   build: 'Building…',
 };
+/** How long the dashboard ↔ chat fade takes — mirrors --home-T in home.css. */
+const FOCUS_MS = 1600;
 const SUGGESTIONS = ['What failed today?', 'Which agents need attention?', 'What can my org do with Gmail?', 'Create an agent for lead qualification'];
 const COPILOT = { apiName: 'archon_copilot', name: 'Archon' } as const;
 
@@ -207,6 +210,11 @@ export default function HomeDashboardPage() {
   const [events, setEvents] = useState<ChatActivity[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [input, setInput] = useState('');
+  // The overlay stays mounted while it fades back out; each opening gets a
+  // fresh chat mount so a queued first message always sends.
+  const [leaving, setLeaving] = useState(false);
+  const [openSeq, setOpenSeq] = useState(0);
+  const homeRef = useRef<HTMLDivElement>(null);
 
   const chatPhase = useMemo<VoicePhase>(() => {
     let p: VoicePhase = 'ready';
@@ -218,11 +226,23 @@ export default function HomeDashboardPage() {
   const exitFocus = useCallback(() => {
     setFocus(null);
     setCountdown(null);
-  }, [setFocus, setCountdown]);
+    setLeaving(true);
+  }, [setFocus, setCountdown, setLeaving]);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(() => setLeaving(false), FOCUS_MS);
+    return () => clearTimeout(t);
+  }, [leaving]);
   const openFocus = (message: { text: string; how: 'talk' | 'type' } | null) => {
     setCountdown(null);
+    setLeaving(false);
+    setOpenSeq(n => n + 1);
     setFocus({ message });
+    // The chat fits the viewport; bring the core into view if the page was
+    // scrolled to reach the ask box.
+    homeRef.current?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  const overlayMounted = !!focus || leaving;
 
   useEffect(() => {
     document.body.classList.toggle('home-lock', !!focus);
@@ -257,8 +277,8 @@ export default function HomeDashboardPage() {
   // thread, which hands the screen back and refreshes the numbers (a build
   // may have added an agent).
   const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => {
-    if (info.ended) { setEvents([]); setFocus(null); load(); }
-  }, [load]);
+    if (info.ended) { setEvents([]); exitFocus(); load(); }
+  }, [load, exitFocus]);
 
   const submit = () => {
     const text = input.trim();
@@ -293,7 +313,7 @@ export default function HomeDashboardPage() {
 
   return (
     <AppShell title="Home" onRefresh={load} hideRail>
-      <div className={`home ${stage}`} data-focus={focus ? '1' : '0'}>
+      <div ref={homeRef} className={`home ${stage}`} data-focus={focus ? '1' : '0'} data-overlay={overlayMounted ? '1' : '0'}>
         {/* ── left ─────────────────────────────────────────────────── */}
         <aside className="home-col">
           <div className="home-panel">
@@ -446,28 +466,28 @@ export default function HomeDashboardPage() {
           </div>
         </aside>
 
-        {/* ── focus: the chat takes the screen ─────────────────────── */}
-        {focus && (
+        {/* ── focus: the chat fades in over the dashboard ─────────── */}
+        {overlayMounted && (
           <div className="home-focus" onPointerDown={() => setCountdown(null)}>
-            {/* One header only — the chat's own. Its X is "back to the
-                dashboard"; the auto-return countdown reads in its subtitle. */}
-            <div className="home-focus-body">
-              <div className="home-focus-chat">
-                <ChatPanel
-                  key="archon-copilot"
-                  variant="full"
-                  transport="copilot"
-                  headerNote={countdown != null ? `Answered — back to the dashboard in ${countdown}s. Say or type anything to stay.` : null}
-                  agentApiName={COPILOT.apiName}
-                  agentName={COPILOT.name}
-                  copilotPlatform={platformSnapshot}
-                  initialMessage={focus.message}
-                  onClose={exitFocus}
-                  onSessionChange={handleSessionChange}
-                  onActivity={handleActivity}
-                />
-              </div>
-              <ConsoleRail events={events} agentName={COPILOT.name} />
+            {/* Console on the left — listening state, this turn, the log.
+                The chat takes everything to its right; its own X is
+                "back to the dashboard" and the auto-return countdown reads
+                in its subtitle. */}
+            <ConsoleRail events={events} agentName={COPILOT.name} />
+            <div className="home-focus-chat">
+              <ChatPanel
+                key={`archon-copilot-${openSeq}`}
+                variant="full"
+                transport="copilot"
+                headerNote={countdown != null ? `Answered — back to the dashboard in ${countdown}s. Say or type anything to stay.` : null}
+                agentApiName={COPILOT.apiName}
+                agentName={COPILOT.name}
+                copilotPlatform={platformSnapshot}
+                initialMessage={focus?.message ?? null}
+                onClose={exitFocus}
+                onSessionChange={handleSessionChange}
+                onActivity={handleActivity}
+              />
             </div>
           </div>
         )}

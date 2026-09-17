@@ -190,11 +190,14 @@ export interface ChatPanelProps {
   /** Copilot only: the dashboard's numbers at the moment of asking, so the
    *  answer matches what is on screen. */
   copilotPlatform?: () => Record<string, unknown> | null;
+  /** Replaces the header subtitle while set — the Home page's auto-return
+   *  countdown, for instance. */
+  headerNote?: string | null;
 }
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform,
+  transport = 'session', copilotPlatform, headerNote,
 }: ChatPanelProps) {
   const isFull = variant === 'full';
   const isCopilot = transport === 'copilot';
@@ -978,10 +981,12 @@ export function ChatPanel({
           <PhaseRing phase={phase} />
           <div className="min-w-0">
           <div className="truncate text-[13.5px] font-bold text-foreground">{agentName}</div>
-          <div className="text-[10.5px] text-muted-foreground">
-            {isCopilot
-              ? 'Copilot — knows this platform and your org'
-              : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : 'Connection error'}
+          <div className={`text-[10.5px] ${headerNote ? 'text-[var(--archon-warning)]' : 'text-muted-foreground'}`}>
+            {headerNote
+              ? headerNote
+              : isCopilot
+                ? 'Copilot — knows this platform and your org'
+                : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : 'Connection error'}
           </div>
         </div>
         </div>

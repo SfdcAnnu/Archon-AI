@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Activity, BookOpen, Bot, CheckSquare, CircleDollarSign, LayoutGrid, Layers, Loader2,
-  MessageCircle, MessageSquare, Mic, Plug, Send, Sparkles, Sun, X,
+  MessageCircle, MessageSquare, Mic, Plug, Send, Sparkles, Sun,
 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ConsoleRail } from '@/components/chat/ConsoleRail';
-import { PhaseRing, type VoicePhase } from '@/components/chat/VoiceStrip';
+import type { VoicePhase } from '@/components/chat/VoiceStrip';
 import { CoreRing, type CorePhase } from '@/components/home/CoreRing';
 import { OrbitTabs, type OrbitTab } from '@/components/home/OrbitTabs';
 import type { ChatActivity } from '@/lib/chat-activity';
@@ -80,7 +80,6 @@ const STATUS_COPY: Record<CorePhase, string> = {
   build: 'Building…',
 };
 const SUGGESTIONS = ['What failed today?', 'Which agents need attention?', 'What can my org do with Gmail?', 'Create an agent for lead qualification'];
-const WANTS_AGENT = /\b(create|build|make|set up|new)\s+(an?\s+)?agent\b/i;
 const COPILOT = { apiName: 'archon_copilot', name: 'Archon' } as const;
 
 export default function HomeDashboardPage() {
@@ -271,9 +270,6 @@ export default function HomeDashboardPage() {
     setVoicePref(true);
     openFocus(null);
   };
-  const lastUserText = [...events].reverse().find(e => e.kind === 'user')?.text ?? '';
-  const wantsAgent = WANTS_AGENT.test(lastUserText);
-
   // ── Tabs ─────────────────────────────────────────────────────────────
   const tabs: OrbitTab[] = [
     { key: 'new', label: 'New agent', group: 'build', href: '/new-agent', icon: <Sparkles /> },
@@ -453,21 +449,15 @@ export default function HomeDashboardPage() {
         {/* ── focus: the chat takes the screen ─────────────────────── */}
         {focus && (
           <div className="home-focus" onPointerDown={() => setCountdown(null)}>
-            <div className="home-focus-head">
-              <PhaseRing phase={chatPhase} />
-              <div className="ft"><b>{COPILOT.name}</b><span>{STATUS_COPY[chatPhase]}</span></div>
-              {countdown != null && <span className="home-count">Answered — back to the dashboard in {countdown}s. Say or type anything to stay.</span>}
-              {wantsAgent && (
-                <button type="button" className="home-btn" onClick={() => navigate('/new-agent', { state: { requirement: lastUserText } })}><Sparkles /> Open in Architect</button>
-              )}
-              <button type="button" className="home-btn ghost" onClick={exitFocus}><X /> Back to dashboard</button>
-            </div>
+            {/* One header only — the chat's own. Its X is "back to the
+                dashboard"; the auto-return countdown reads in its subtitle. */}
             <div className="home-focus-body">
               <div className="home-focus-chat">
                 <ChatPanel
                   key="archon-copilot"
                   variant="full"
                   transport="copilot"
+                  headerNote={countdown != null ? `Answered — back to the dashboard in ${countdown}s. Say or type anything to stay.` : null}
                   agentApiName={COPILOT.apiName}
                   agentName={COPILOT.name}
                   copilotPlatform={platformSnapshot}

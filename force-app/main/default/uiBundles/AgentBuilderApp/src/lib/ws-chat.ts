@@ -42,6 +42,18 @@ export interface ChatTurnMessage {
   history: ChatHistoryEntry[];
   attachments?: ChatAttachmentRef[];
   debugMode?: boolean;
+  /** The turn after an approved action ran: no user text, the tool's result.
+   *  The runtime continues the agent's work from it. */
+  continuation?: { toolName: string; resultText: string };
+}
+
+/** The text a continuation turn runs on — the server composes the same
+ *  string (chat/connector-scope.ts), so the history the browser keeps reads
+ *  exactly what the model was given. */
+export function continuationText(toolName: string, resultText: string): string {
+  const result = (resultText ?? '').trim();
+  return `[Approved action executed] ${toolName}: ${result.length > 4000 ? `${result.slice(0, 4000)} …` : result || '(no output)'}\n\n` +
+    'Continue from where you left off. Do not repeat what was already said or done.';
 }
 
 export interface ChatToolCallSummary {

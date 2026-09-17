@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>Salesforce Metadata</label>
+    <protected>false</protected>
+    <values><field>DisplayName__c</field><value xsi:type="xsd:string">Salesforce Metadata</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Read, draft, validate and deploy Salesforce metadata as the signed-in user: objects, fields, validation rules, record types, layouts, list views, permission sets and flows. Uses your Salesforce sign-in; no separate connection.</value></values>
+    <values><field>Category__c</field><value xsi:type="xsd:string">Platform</value></values>
+    <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_salesforce</value></values>
+    <values><field>BrandColor__c</field><value xsi:type="xsd:string">#0b5cab</value></values>
+    <values><field>AuthType__c</field><value xsi:type="xsd:string">SalesforceSession</value></values>
+    <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">salesforce_metadata_tools</value></values>
+    <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">false</value></values>
+    <values><field>SortOrder__c</field><value xsi:type="xsd:double">15</value></values>
+    <values><field>McpServerUrl__c</field><value xsi:type="xsd:string">https://salesforce-metadata-mcp.onrender.com</value></values>
+</CustomMetadata>

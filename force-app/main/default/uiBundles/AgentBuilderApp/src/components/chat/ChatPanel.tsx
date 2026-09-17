@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { renderMarkdown } from '@/lib/render-markdown';
-import { openChatSocket, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef } from '@/lib/ws-chat';
+import { openChatSocket, continuationText, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef } from '@/lib/ws-chat';
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from './ChatApprovalCard';
 import {
@@ -803,6 +803,26 @@ export function ChatPanel({
     [startCopilotBuild],
   );
 
+  // The turn after an approved action ran. The runtime continues the
+  // agent's work from the tool's result, so nobody has to type "continue".
+  // No user bubble: the history entry carries the same text the server
+  // runs on (server: chat/connector-scope.ts), so later turns read what
+  // the model was given.
+  const continueAfterApproval = useCallback((a: ChatApproval) => {
+    if (isCopilot || sending) return;
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    const resultText = (a.resultText ?? '').trim();
+    setSending(true);
+    turnVoiceRef.current = false;
+    turnStartRef.current = Date.now();
+    emit({ kind: 'sys', text: `Approved — ${a.toolName} ran. Continuing.` });
+    emit({ kind: 'thinking' });
+    historyRef.current = [...historyRef.current, { role: 'user', content: continuationText(a.toolName, resultText) }];
+    socket.send(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText } }));
+    scrollToBottom();
+  }, [isCopilot, sending, emit, scrollToBottom]);
+
   const handleSend = useCallback(() => {
     if (sendDisabled || (!isCopilot && !socketRef.current)) {
       console.log('[ChatPanel] handleSend blocked', { sendDisabled, hasSocket: !!socketRef.current });
@@ -1167,7 +1187,10 @@ export function ChatPanel({
           <ChatApprovalCard
             key={a.id}
             approval={a}
-            onChanged={u => setApprovals(list => list.map(x => (x.id === u.id ? u : x)))}
+            onChanged={u => {
+              setApprovals(list => list.map(x => (x.id === u.id ? u : x)));
+              if (u.status === 'Executed') continueAfterApproval(u);
+            }}
           />
         ))}
         {sending && (

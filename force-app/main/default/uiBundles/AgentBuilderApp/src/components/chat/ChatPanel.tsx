@@ -1015,7 +1015,7 @@ export function ChatPanel({
         ref={listRef}
         className={
           isFull
-            ? 'flex-1 space-y-3 overflow-y-auto py-5 px-[max(1.5rem,calc((100%-46rem)/2))]'
+            ? 'flex-1 space-y-3 overflow-y-auto px-6 py-5'
             : 'flex-1 space-y-3 overflow-y-auto p-4'
         }
       >
@@ -1188,7 +1188,7 @@ export function ChatPanel({
           </Button>
         </div>
       ) : (
-        <div className={isFull ? 'border-t border-border py-3 px-[max(1.5rem,calc((100%-46rem)/2))]' : 'border-t border-border p-3'}>
+        <div className={isFull ? 'border-t border-border px-6 py-3' : 'border-t border-border p-3'}>
           {pendingAttachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {pendingAttachments.map(a => (

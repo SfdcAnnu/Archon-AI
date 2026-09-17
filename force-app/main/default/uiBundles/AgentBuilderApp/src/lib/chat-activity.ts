@@ -14,6 +14,9 @@ export type ChatActivity =
   | { kind: 'user'; text: string; how: 'talk' | 'type'; at: number }
   | { kind: 'thinking'; at: number }
   | { kind: 'tool'; name: string; note?: string; at: number }
+  /** One stage of an Architect build the copilot started — emitted each
+   *  time a stage changes state, so the console can draw the pipeline. */
+  | { kind: 'step'; label: string; state: 'pending' | 'running' | 'done' | 'warn' | 'failed'; detail?: string; at: number }
   | {
       kind: 'reply';
       text: string;

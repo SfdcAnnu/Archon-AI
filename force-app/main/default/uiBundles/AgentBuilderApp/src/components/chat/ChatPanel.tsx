@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, MicOff, Paperclip, Send, Settings2, ThumbsDown, ThumbsUp, Volume1, Volume2, VolumeX, X } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import {
+  AlertTriangle, Check, ExternalLink, Loader2, Mic, MicOff, Paperclip, Send, Settings2, Sparkles,
+  ThumbsDown, ThumbsUp, Volume1, Volume2, VolumeX, X,
+} from 'lucide-react';
+import { askArchon, getArchitectBuild, startArchitectBuild, type BuildJobView, type BuildStep } from '@/lib/architect-data';
 import {
   speak, speakable, stopSpeaking, getSoundPref, setSoundPref, nextSoundPref, SOUND_LABEL,
   getVoicePref, setVoicePref, useSpeaking, type SoundPref,
@@ -43,14 +48,99 @@ interface PendingAttachment {
 
 interface DisplayMessage {
   id: string;
-  role: 'User' | 'Assistant' | 'Tool';
+  /** 'Build' is a copilot-only card: an Architect build in progress, drawn
+   *  stage by stage in the transcript itself. */
+  role: 'User' | 'Assistant' | 'Tool' | 'Build';
   content: string;
   toolLabel: string | null;
   createdDate: string;
   isError?: boolean;
   isPending?: boolean;
   feedback?: 'up' | 'down' | null;
+  buildJobId?: string;
+  build?: BuildJobView | null;
+  /** The page was left while this build ran — its progress lives on the
+   *  New agent page now, not here. */
+  buildInterrupted?: boolean;
 }
+
+// ── Copilot transport: a conversation that lives in this browser ──────
+// Archon on the Home screen is not an agent record with sessions and a
+// socket; it is the Architect's assistant, answered over Apex REST. Its
+// transcript is kept per browser so leaving Home does not lose the thread.
+const COPILOT_STORE_KEY = 'archon:home-copilot';
+const COPILOT_KEEP_MESSAGES = 60;
+
+interface CopilotTranscript {
+  messages: DisplayMessage[];
+  history: ChatHistoryEntry[];
+}
+
+function loadCopilotTranscript(): CopilotTranscript {
+  try {
+    const raw = localStorage.getItem(COPILOT_STORE_KEY);
+    if (!raw) return { messages: [], history: [] };
+    const parsed = JSON.parse(raw) as Partial<CopilotTranscript>;
+    const messages = (Array.isArray(parsed.messages) ? parsed.messages : [])
+      .filter(m => m && typeof m.id === 'string' && !m.isPending)
+      .map(m =>
+        m.role === 'Build' && m.build && (m.build.status === 'queued' || m.build.status === 'running')
+          ? { ...m, buildInterrupted: true }
+          : m,
+      );
+    return { messages, history: Array.isArray(parsed.history) ? parsed.history : [] };
+  } catch {
+    return { messages: [], history: [] };
+  }
+}
+
+function saveCopilotTranscript(messages: DisplayMessage[], history: ChatHistoryEntry[]): void {
+  try {
+    const keep = messages.filter(m => !m.isPending).slice(-COPILOT_KEEP_MESSAGES);
+    localStorage.setItem(COPILOT_STORE_KEY, JSON.stringify({ messages: keep, history: history.slice(-COPILOT_KEEP_MESSAGES) }));
+  } catch {
+    /* storage unavailable — the conversation lasts for this page only */
+  }
+}
+
+function clearCopilotTranscript(): void {
+  try {
+    localStorage.removeItem(COPILOT_STORE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+/** What the copilot says once a build stops, so the person hears the
+ *  outcome in the transcript and not only in the card. */
+function describeBuildOutcome(view: BuildJobView): string {
+  const done = view.steps.filter(s => s.state === 'done' || s.state === 'warn').length;
+  if (view.status === 'done' && view.result) {
+    const r = view.result;
+    const prereqs = r.prerequisites.filter(p => p.blocking).length;
+    const bits = [
+      `The Architect has built **${r.apiName}** as a ${r.shape} and saved it as ${r.status}.`,
+      r.summarySteps.length ? `It works like this: ${r.summarySteps.join(' → ')}.` : '',
+      prereqs
+        ? `${prereqs} blocking prerequisite${prereqs === 1 ? '' : 's'} need${prereqs === 1 ? 's' : ''} someone in your org before it can go live.`
+        : 'Nothing in your org stands in its way.',
+      `About $${r.estimate.costPerRunUsd.toFixed(3)} per run, roughly ${r.estimate.latencySeconds}s. Open it from the card above to review and activate.`,
+    ];
+    return bits.filter(Boolean).join(' ');
+  }
+  if (view.status === 'paused') {
+    return `The build paused at its $${view.maxCostUsd.toFixed(2)} cost ceiling after ${done} of ${view.steps.length} stages — everything finished is saved. Continue it from the New agent page with Resume.`;
+  }
+  return `The build stopped after ${done} of ${view.steps.length} stages: ${view.error ?? 'unknown error'}. Nothing was created.`;
+}
+
+const STEP_TONE: Record<BuildStep['state'], string> = {
+  done: 'text-[var(--archon-success)]',
+  warn: 'text-[var(--archon-warning)]',
+  running: 'text-primary',
+  failed: 'text-[var(--archon-error)]',
+  pending: 'text-[var(--archon-faint)]',
+};
 
 function toDisplay(m: RawChatMessage): DisplayMessage | null {
   if (m.Role__c === 'System') return null;
@@ -89,17 +179,50 @@ export interface ChatPanelProps {
    *  reads. Optional: the side-panel variant has no console and passes
    *  nothing. */
   onActivity?: (e: ChatActivity) => void;
+  /** Sent as the first turn as soon as the socket is open — the Home page
+   *  hands the panel the message it captured before opening it. */
+  initialMessage?: { text: string; how: 'talk' | 'type' } | null;
+  /** 'session' (default): a portal agent — Apex session + WebSocket.
+   *  'copilot': Archon itself on the Home screen — the Architect's
+   *  assistant over Apex REST, no session, transcript kept per browser,
+   *  and "build me an agent" runs the Architect with its stages drawn here. */
+  transport?: 'session' | 'copilot';
+  /** Copilot only: the dashboard's numbers at the moment of asking, so the
+   *  answer matches what is on screen. */
+  copilotPlatform?: () => Record<string, unknown> | null;
 }
 
-export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity }: ChatPanelProps) {
+export function ChatPanel({
+  agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
+  transport = 'session', copilotPlatform,
+}: ChatPanelProps) {
   const isFull = variant === 'full';
+  const isCopilot = transport === 'copilot';
+  const navigate = useNavigate();
+  const copilotPlatformRef = useRef(copilotPlatform);
+  useEffect(() => { copilotPlatformRef.current = copilotPlatform; }, [copilotPlatform]);
+  const buildPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
+  // The copilot's async replies land through the same result handler the
+  // socket uses; a ref keeps the build poll loop off its dependency chain.
+  const handleTurnResultRef = useRef<(r: ChatTurnResult) => void>(() => {});
+  useEffect(
+    () => () => {
+      unmountedRef.current = true;
+      if (buildPollRef.current) clearTimeout(buildPollRef.current);
+    },
+    [],
+  );
   const [session, setSession] = useState<RawChatSession | null>(null);
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The copilot restores the thread this browser kept and is ready at
+  // once; a session-backed chat starts empty and loads.
+  const [restored] = useState<CopilotTranscript>(() => (isCopilot ? loadCopilotTranscript() : { messages: [], history: [] }));
+  const [messages, setMessages] = useState<DisplayMessage[]>(restored.messages);
+  const [loading, setLoading] = useState(!isCopilot);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'error'>('connecting');
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'error'>(isCopilot ? 'open' : 'connecting');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   // ── Voice: answer in kind ─────────────────────────────────────────
@@ -121,6 +244,8 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     onActivityRef.current?.({ ...e, at: Date.now() } as ChatActivity);
   }, []);
   const turnStartRef = useRef(0);
+  const initialSentRef = useRef(false);
+  const pendingSendRef = useRef<string | null>(null);
   const [voiceSupported] = useState(
     () => typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
   );
@@ -132,7 +257,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
   const [approvals, setApprovals] = useState<ChatApproval[]>([]);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const historyRef = useRef<ChatHistoryEntry[]>([]);
+  const historyRef = useRef<ChatHistoryEntry[]>(restored.history);
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<InstanceType<NonNullable<Window['SpeechRecognition']>> | null>(null);
@@ -202,10 +327,11 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
 
   // ── Access gate (PerUser agents) ────────────────────────────────
   const refreshGate = useCallback(() => {
+    if (isCopilot) return; // Archon runs on the org connection Setup made; there is no per-user gate
     getConnectionGate(agentApiName)
       .then(g => setGate(g))
       .catch(() => setGate({ accessMode: 'Org', connected: true, accountEmail: null }));
-  }, [agentApiName]);
+  }, [agentApiName, isCopilot]);
 
   useEffect(() => {
     refreshGate();
@@ -348,6 +474,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     },
     [session, reportSessionChange, scrollToBottom, refreshApprovals, emit]
   );
+  useEffect(() => { handleTurnResultRef.current = handleTurnResult; }, [handleTurnResult]);
 
   // ── Bootstrap: load/start session, open WS ──────────────────────
   useEffect(() => {
@@ -355,7 +482,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     // agent/session than the one we already loaded. This intentionally
     // does NOT re-run just because initialSessionId flips from null to
     // a real id after our own onSessionChange call — see refs above.
-    const bootstrapKey = `${agentApiName}::${initialSessionId ?? ''}`;
+    const bootstrapKey = isCopilot ? 'copilot' : `${agentApiName}::${initialSessionId ?? ''}`;
     console.log('[ChatPanel] bootstrap effect ran', {
       bootstrapKey,
       previousKey: bootstrappedForRef.current,
@@ -363,6 +490,13 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     });
     if (bootstrappedForRef.current === bootstrapKey) return;
     bootstrappedForRef.current = bootstrapKey;
+
+    if (isCopilot) {
+      // No session, no socket: the thread this browser kept was restored
+      // at mount, and the panel is ready as soon as it is on screen.
+      emit({ kind: 'sys', text: 'Archon ready — ask about the platform or your org, or describe an agent to build.' });
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
@@ -505,9 +639,16 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
   // ready. Browsers refuse to listen without a gesture on a fresh page, so
   // this can be declined — the strip then reads Ready and waits for a tap.
   useEffect(() => {
-    if (wsStatus !== 'open' || !session || !getVoicePref()) return;
+    if (wsStatus !== 'open' || (!session && !isCopilot) || !getVoicePref()) return;
     try { recognitionRef.current?.start(); } catch { /* declined — tap the mic */ }
-  }, [wsStatus, session]);
+  }, [wsStatus, session, isCopilot]);
+
+  // The copilot's thread outlives this panel: every settled message is
+  // written back so returning to Home picks up where it left off.
+  useEffect(() => {
+    if (!isCopilot) return;
+    saveCopilotTranscript(messages, historyRef.current);
+  }, [messages, isCopilot]);
 
   // ── Attachments ──────────────────────────────────────────────────
   const handleFilesPicked = useCallback(
@@ -574,8 +715,93 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     pendingAttachments.some(a => a.uploading) ||
     (!input.trim() && pendingAttachments.length === 0);
 
+  // ── Copilot: the Architect's assistant, and builds it starts ──────
+  // The poll loop re-schedules itself through a ref, so the callback
+  // never has to name itself before it exists.
+  const pollBuildRef = useRef<(messageId: string, jobId: string, seen: Record<string, string>) => void>(() => {});
+  const pollBuild = useCallback(
+    (messageId: string, jobId: string, seen: Record<string, string>) => {
+      getArchitectBuild(jobId)
+        .then(view => {
+          if (unmountedRef.current) return;
+          // Narrate each stage the moment its state changes — the console
+          // rail draws the pipeline from these, the card below from `view`.
+          for (const s of view.steps) {
+            const sig = `${s.state}|${s.detail ?? ''}`;
+            if (seen[s.key] === sig) continue;
+            seen[s.key] = sig;
+            emit({ kind: 'step', label: s.label, state: s.state, detail: s.detail });
+          }
+          setMessages(list => list.map(m => (m.id === messageId ? { ...m, build: view } : m)));
+          scrollToBottom();
+          if (view.status === 'done' || view.status === 'failed' || view.status === 'paused') {
+            const outcome = describeBuildOutcome(view);
+            emit({ kind: 'sys', text: view.status === 'done' ? 'Build finished.' : view.status === 'paused' ? 'Build paused at its cost ceiling.' : 'Build failed.' });
+            handleTurnResultRef.current({ status: 'complete', assistantText: outcome, toolCalls: [] });
+            return;
+          }
+          buildPollRef.current = setTimeout(() => pollBuildRef.current(messageId, jobId, seen), 2500);
+        })
+        .catch(() => {
+          // A transient read failure must not lose the build — keep polling.
+          if (unmountedRef.current) return;
+          buildPollRef.current = setTimeout(() => pollBuildRef.current(messageId, jobId, seen), 4000);
+        });
+    },
+    [emit, scrollToBottom],
+  );
+  useEffect(() => { pollBuildRef.current = pollBuild; }, [pollBuild]);
+
+  const startCopilotBuild = useCallback(
+    (requirement: string) => {
+      const id = `build_${Date.now()}`;
+      setMessages(list => [
+        ...list,
+        { id, role: 'Build', content: requirement, toolLabel: null, createdDate: new Date().toISOString(), build: null },
+      ]);
+      emit({ kind: 'sys', text: 'Handing the requirement to the Architect.' });
+      scrollToBottom();
+      startArchitectBuild({ requirement })
+        .then(jobId => {
+          if (unmountedRef.current) return;
+          setMessages(list => list.map(m => (m.id === id ? { ...m, buildJobId: jobId } : m)));
+          pollBuild(id, jobId, {});
+        })
+        .catch(err => {
+          if (unmountedRef.current) return;
+          const msg = err instanceof Error ? err.message : 'The build could not start.';
+          emit({ kind: 'error', text: msg });
+          setMessages(list => list.map(m => (m.id === id ? { ...m, isError: true, content: `${requirement}\n\nCouldn't start the build: ${msg}` } : m)));
+        });
+    },
+    [emit, pollBuild, scrollToBottom],
+  );
+
+  const runCopilotTurn = useCallback(
+    (text: string) => {
+      // The turn just sent is already the last history entry; the copilot
+      // takes it as `message` and the rest as conversation.
+      const history = historyRef.current
+        .slice(0, -1)
+        .filter(h => h.role === 'user' || h.role === 'assistant')
+        .slice(-12)
+        .map(h => ({ role: h.role as 'user' | 'assistant', content: h.content.slice(0, 4000) }));
+      askArchon({ message: text, history, mode: 'home', platform: copilotPlatformRef.current?.() ?? undefined })
+        .then(res => {
+          if (unmountedRef.current) return;
+          handleTurnResultRef.current({ status: 'complete', assistantText: res.reply, toolCalls: [] });
+          if (res.action?.kind === 'build_agent') startCopilotBuild(res.action.requirement);
+        })
+        .catch(err => {
+          if (unmountedRef.current) return;
+          handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Archon could not answer that.' });
+        });
+    },
+    [startCopilotBuild],
+  );
+
   const handleSend = useCallback(() => {
-    if (sendDisabled || !socketRef.current) {
+    if (sendDisabled || (!isCopilot && !socketRef.current)) {
       console.log('[ChatPanel] handleSend blocked', { sendDisabled, hasSocket: !!socketRef.current });
       return;
     }
@@ -624,20 +850,40 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
     scrollToBottom();
 
     historyRef.current = [...historyRef.current, { role: 'user', content: text }];
-    console.log('[ChatPanel] sending over websocket', {
-      text,
-      historyLen: historyRef.current.length,
-      attachments,
-    });
-    socketRef.current.send(
-      JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments })
-    );
+    if (isCopilot) {
+      console.log('[ChatPanel] sending to the copilot', { text, historyLen: historyRef.current.length });
+      runCopilotTurn(text);
+    } else {
+      console.log('[ChatPanel] sending over websocket', {
+        text,
+        historyLen: historyRef.current.length,
+        attachments,
+      });
+      socketRef.current!.send(
+        JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments })
+      );
+    }
 
     for (const a of attachedThisTurn) {
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
     }
-  }, [sendDisabled, input, pendingAttachments, scrollToBottom]);
+  }, [sendDisabled, input, pendingAttachments, scrollToBottom, isCopilot, runCopilotTurn]);
   useEffect(() => { sendRef.current = handleSend; }, [handleSend]);
+  // The Home page's first message: queue it once the socket is open, then
+  // send on the render where the input actually holds it — never on a timer.
+  useEffect(() => {
+    if (initialSentRef.current || !initialMessage?.text || wsStatus !== 'open' || (!session && !isCopilot)) return;
+    initialSentRef.current = true;
+    lastInputVoiceRef.current = initialMessage.how === 'talk';
+    pendingSendRef.current = initialMessage.text;
+    setInput(initialMessage.text);
+  }, [initialMessage, wsStatus, session, isCopilot]);
+  useEffect(() => {
+    if (pendingSendRef.current != null && input === pendingSendRef.current) {
+      pendingSendRef.current = null;
+      sendRef.current();
+    }
+  }, [input]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -661,6 +907,22 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
   }, [discardIfNeverUsed, reportSessionChange, onClose]);
 
   const handleEnd = useCallback(async () => {
+    if (isCopilot) {
+      const ok = await confirmDialog({
+        title: 'Clear this conversation?',
+        description: 'Archon starts fresh next time. A build already running keeps going on the New agent page.',
+        confirmLabel: 'Clear',
+        variant: 'destructive',
+      });
+      if (!ok) return;
+      if (buildPollRef.current) clearTimeout(buildPollRef.current);
+      clearCopilotTranscript();
+      historyRef.current = [];
+      setMessages([]);
+      reportSessionChange({ sessionId: null, ended: true });
+      onClose();
+      return;
+    }
     if (!session) return;
     const ok = await confirmDialog({
       title: 'End this chat?',
@@ -678,7 +940,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
         console.error('Could not end session:', err);
         toast.error('Could not end the session', { description: err instanceof Error ? err.message : undefined });
       });
-  }, [session, reportSessionChange, onClose]);
+  }, [session, reportSessionChange, onClose, isCopilot]);
 
   // Thumbs on an assistant reply. Clicking the same thumb again clears it.
   // Fresh WS replies have a client-generated id ('assistant_…') because
@@ -717,7 +979,9 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
           <div className="min-w-0">
           <div className="truncate text-[13.5px] font-bold text-foreground">{agentName}</div>
           <div className="text-[10.5px] text-muted-foreground">
-            {wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : 'Connection error'}
+            {isCopilot
+              ? 'Copilot — knows this platform and your org'
+              : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : 'Connection error'}
           </div>
         </div>
         </div>
@@ -731,9 +995,9 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
           >
             {sound === 'off' ? <VolumeX className="h-4 w-4" /> : sound === 'always' ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
           </button>
-          {session && (
+          {(session || (isCopilot && messages.length > 0)) && (
             <button type="button" onClick={handleEnd} className="text-[11px] text-muted-foreground hover:text-destructive">
-              End chat
+              {isCopilot ? 'Clear' : 'End chat'}
             </button>
           )}
           <button type="button" onClick={handleClose} className="rounded-md p-1 hover:bg-muted">
@@ -757,9 +1021,72 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
         )}
         {loadError && <p className="text-[12.5px] text-destructive">{loadError}</p>}
         {!loading && !loadError && messages.length === 0 && (
-          <p className="py-6 text-center text-[12px] text-muted-foreground">Say hello to get started.</p>
+          <p className="py-6 text-center text-[12px] text-muted-foreground">
+            {isCopilot ? 'Ask what is happening on the platform, what your org can do, or describe an agent to build.' : 'Say hello to get started.'}
+          </p>
         )}
         {messages.map(m => {
+          if (m.role === 'Build') {
+            const view = m.build;
+            const result = view?.status === 'done' ? view.result : undefined;
+            return (
+              <div key={m.id} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-[11px] font-semibold text-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-[var(--node-purple)]" />
+                  Architect build
+                  {view && (
+                    <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                      ${view.costUsd.toFixed(2)} of ${view.maxCostUsd.toFixed(2)} · {(view.elapsedMs / 1000).toFixed(0)}s
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{m.content}</p>
+                {m.buildInterrupted ? (
+                  <p className="mt-2 text-[11px] text-[var(--archon-warning)]">
+                    You left while this was building — its progress is on the New agent page.
+                  </p>
+                ) : m.isError ? null : !view ? (
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Starting…
+                  </div>
+                ) : (
+                  <ul className="mt-2 space-y-1">
+                    {view.steps.map(s => (
+                      <li key={s.key} className={`flex items-start gap-2 text-[11px] ${STEP_TONE[s.state]}`}>
+                        <span className="mt-0.5 w-3 shrink-0">
+                          {s.state === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> : s.state === 'done' ? <Check className="h-3 w-3" /> : s.state === 'failed' || s.state === 'warn' ? <AlertTriangle className="h-3 w-3" /> : <span className="block h-3 w-3 text-center leading-3">·</span>}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {s.label}
+                          {s.detail && <span className="text-muted-foreground"> — {s.detail}</span>}
+                          {s.reused && <span className="text-muted-foreground"> (kept from before)</span>}
+                        </span>
+                        {s.ms != null && <span className="text-[10px] text-muted-foreground">{(s.ms / 1000).toFixed(1)}s</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {result && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                    <span className="text-[11px] text-foreground">
+                      <b>{result.apiName}</b> · {result.shape} · {result.status}
+                    </span>
+                    <Button size="xs" className="ml-auto" onClick={() => navigate(`/agent/${encodeURIComponent(result.apiName)}`)}>
+                      <ExternalLink className="h-3 w-3" /> Open agent
+                    </Button>
+                  </div>
+                )}
+                {view?.status === 'paused' && (
+                  <div className="mt-2.5 flex items-center gap-2 border-t border-border pt-2">
+                    <span className="text-[11px] text-muted-foreground">Paused at its cost ceiling — every finished stage is saved.</span>
+                    <Button size="xs" variant="outline" className="ml-auto" onClick={() => navigate('/new-agent')}>
+                      Resume on New agent
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          }
           if (m.role === 'Tool') {
             return (
               <div key={m.id} className="flex items-start gap-2 rounded-lg bg-muted/40 px-3 py-2">
@@ -798,7 +1125,7 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
                 )}
               </div>
               <div className="mt-1 flex items-center gap-1.5 px-1">
-                {!isUser && !m.isError && (
+                {!isUser && !m.isError && !isCopilot && (
                   <>
                     <button
                       type="button"
@@ -873,15 +1200,17 @@ export function ChatPanel({ agentApiName, agentName, variant = 'overlay', initia
           <VoiceStrip phase={phase} voiceSupported={voiceSupported} />
           <div className="mt-2 flex items-end gap-1.5">
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesPicked} />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={sending || pendingAttachments.length >= MAX_ATTACHMENTS_PER_TURN}
-              className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted disabled:opacity-40"
-              aria-label="Attach file"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
+            {!isCopilot && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending || pendingAttachments.length >= MAX_ATTACHMENTS_PER_TURN}
+                className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted disabled:opacity-40"
+                aria-label="Attach file"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+            )}
             {voiceSupported && (
               <button
                 type="button"

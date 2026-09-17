@@ -83,3 +83,4 @@ force-app.zip
 .graphqlrc.yml
 .tmp-retrieve/
 server-langchain/
+Salesforce Metadata MCP Server/

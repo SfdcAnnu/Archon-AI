@@ -65,6 +65,10 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
+        <apexClass>AgentHomeStatsRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>AgentApprovalRestService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -106,6 +110,10 @@
     </classAccesses>
     <classAccesses>
         <apexClass>ArchonServerClient</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>ArchonWakeService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -324,6 +332,7 @@
     <fieldPermissions><field>ChatMessage__c.UsageJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Sensitive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Feedback__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.TurnStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <!-- Client-org customization: competitor intel captured by the revival agent -->
     <fieldPermissions><field>Opportunity.CompetitorIntel__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <!-- Client-org customization: per-product discount authority read by the server's price-floor guardrail -->

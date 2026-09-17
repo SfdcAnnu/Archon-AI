@@ -1,22 +1,71 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Cloud, KeyRound, Loader2, ShieldCheck, Sliders, Users } from 'lucide-react';
+import { Cloud, KeyRound, Loader2, ShieldCheck, Sliders, Users, Zap } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageBody } from '@/components/shell/PageBody';
-import { AttnRow, EmptyPanel, IconSquare, NoteBar, SpecCard, StatusBadge } from '@/components/spec/blocks';
+import { AttnRow, EmptyPanel, IconSquare, NoteBar, SpecCard, StatusBadge, type BadgeTone } from '@/components/spec/blocks';
 import { Button } from '@/components/ui/button';
 import { toast as notify } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { getSetupStatus, refreshSetupStatus, startSetup, resetSetup, type SetupStatus } from '@/lib/setup-data';
 import { ENGINE_TYPES, listConnectionsForEngine, type ConnectionSummary } from '@/lib/engine-connections-data';
+import { allServices, wakeUntilSettled, type ServiceState, type WakeOutcome, type WakeResult, type WakeStatus } from '@/lib/wake-data';
 
 /** Approved spec screen 14 — Setup: "Environments, people and promotion".
  *  Four cards: AI providers and keys (real connection counts), Environments
- *  (this org's real status — no invented version numbers), the org-level
+ *  (this org's real status, plus "Wake servers" — cold-starts the Archon
+ *  server and every MCP server up front so an agent run doesn't pay for
+ *  them inside its first tool call), the org-level
  *  Archon OAuth connection wizard (every behavior of the old page kept:
  *  full-page redirect flow via ?synapse_setup=1|0, refresh-then-fallback
  *  status load, authorize/re-authorize/reset), and People (honest empty
  *  state — no client-side user list exists yet). */
+
+const WAKE_TONE: Record<WakeStatus, BadgeTone> = { online: 'ok', waking: 'warn', pending: 'muted', unreachable: 'error' };
+const WAKE_LABEL: Record<WakeStatus, string> = { online: 'Online', waking: 'Waking…', pending: 'Waiting', unreachable: 'Unreachable' };
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function WakeServiceRow({ s }: { s: ServiceState }) {
+  return (
+    <div className="flex items-center gap-3 px-3.5 py-1.5 text-[11.5px]">
+      <div className="min-w-0 flex-1">
+        <span className="font-semibold text-foreground">{s.name}</span>
+        <span className="ml-1.5 text-[var(--archon-faint)]">{hostOf(s.url)}</span>
+        {s.message && <div className="truncate text-[10.5px] text-muted-foreground">{s.message}</div>}
+      </div>
+      {s.status === 'online' && s.ms != null && <span className="text-[10.5px] text-muted-foreground">{s.ms} ms</span>}
+      <StatusBadge tone={WAKE_TONE[s.status]}>
+        {s.status === 'waking' && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+        {WAKE_LABEL[s.status]}
+      </StatusBadge>
+    </div>
+  );
+}
+
+const WAKE_OUTCOME_TEXT: Record<WakeOutcome, string> = {
+  ready: 'Everything is online — agent runs will start without a cold-start delay.',
+  partial: 'Some services did not come up. Agents that only use the online ones will still run.',
+  timeout: 'Still not fully up after three minutes. Press Wake again, or check the Environments page.',
+  cancelled: '',
+};
+
+interface WakeState {
+  phase: 'idle' | 'running' | 'done' | 'error';
+  result: WakeResult | null;
+  outcome: WakeOutcome | null;
+  error: string | null;
+  startedAt: number;
+}
+
+const WAKE_IDLE: WakeState = { phase: 'idle', result: null, outcome: null, error: null, startedAt: 0 };
+
 export default function SetupPage() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<SetupStatus | null>(null);
@@ -25,6 +74,45 @@ export default function SetupPage() {
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [engines, setEngines] = useState<ConnectionSummary[] | null>(null);
   const [enginesFailed, setEnginesFailed] = useState(false);
+  const [wake, setWake] = useState<WakeState>(WAKE_IDLE);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  // Bumped on every new click (and on unmount) so a superseded poll loop's
+  // late answers never overwrite the newer one's rows.
+  const wakeRunRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      wakeRunRef.current += 1;
+    },
+    []
+  );
+
+  // Elapsed-seconds ticker while a wake is in progress.
+  useEffect(() => {
+    if (wake.phase !== 'running') return;
+    const id = setInterval(() => setElapsedSec(Math.round((Date.now() - wake.startedAt) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [wake.phase, wake.startedAt]);
+
+  const handleWake = useCallback(() => {
+    const run = ++wakeRunRef.current;
+    setElapsedSec(0);
+    setWake({ ...WAKE_IDLE, phase: 'running', startedAt: Date.now() });
+    wakeUntilSettled({
+      isCancelled: () => wakeRunRef.current !== run,
+      onUpdate: result => setWake(w => ({ ...w, result })),
+    })
+      .then(outcome => {
+        if (wakeRunRef.current !== run || outcome === 'cancelled') return;
+        setWake(w => ({ ...w, phase: 'done', outcome }));
+        if (outcome === 'ready') notify.success('Servers are awake.');
+      })
+      .catch(err => {
+        if (wakeRunRef.current !== run) return;
+        console.error('Wake servers failed:', err);
+        setWake(w => ({ ...w, phase: 'error', error: err instanceof Error ? err.message : 'Wake failed.' }));
+      });
+  }, []);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -199,6 +287,55 @@ export default function SetupPage() {
               <StatusBadge tone="muted">Not configured</StatusBadge>
             )}
           </AttnRow>
+          <AttnRow
+            icon={
+              <IconSquare
+                bg={wake.phase === 'running' ? 'var(--archon-warning-tint)' : 'var(--node-blue-tint)'}
+                color={wake.phase === 'running' ? 'var(--archon-warning)' : 'var(--node-blue)'}
+              >
+                <Zap className="h-3.5 w-3.5" />
+              </IconSquare>
+            }
+            title="Wake servers before an agent run"
+            sub={
+              wake.phase === 'running'
+                ? `Pinging the Archon server and every MCP server… ${elapsedSec}s`
+                : 'Cold-starts the Archon server and every MCP server now, so the first run does not stall'
+            }
+          >
+            <Button size="xs" onClick={handleWake} disabled={wake.phase === 'running'}>
+              {wake.phase === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              {wake.phase === 'running' ? 'Waking…' : wake.phase === 'idle' ? 'Wake servers' : 'Wake again'}
+            </Button>
+          </AttnRow>
+          {wake.phase !== 'idle' && (
+            <div className="border-b border-border bg-secondary/40 py-1.5">
+              {wake.phase === 'running' && !wake.result && (
+                <div className="flex items-center gap-2 px-3.5 py-1.5 text-[11.5px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Reaching the Archon server…
+                </div>
+              )}
+              {wake.result && allServices(wake.result).map(s => <WakeServiceRow key={s.key} s={s} />)}
+              {wake.result && wake.result.targets.length === 0 && (
+                <div className="px-3.5 py-1.5 text-[10.5px] text-muted-foreground">
+                  No MCP servers are configured for this org yet, so only the Archon server was woken.
+                </div>
+              )}
+              {wake.phase === 'done' && wake.outcome && WAKE_OUTCOME_TEXT[wake.outcome] && (
+                <div
+                  className="px-3.5 pt-1.5 text-[10.5px]"
+                  style={{ color: wake.outcome === 'ready' ? 'var(--archon-success)' : 'var(--archon-warning)' }}
+                >
+                  {WAKE_OUTCOME_TEXT[wake.outcome]}
+                </div>
+              )}
+              {wake.phase === 'error' && (
+                <div className="px-3.5 pt-1.5 text-[10.5px]" style={{ color: 'var(--archon-error)' }}>
+                  {wake.error}
+                </div>
+              )}
+            </div>
+          )}
           <AttnRow
             icon={
               <IconSquare bg="var(--node-teal-tint)" color="var(--node-teal)">

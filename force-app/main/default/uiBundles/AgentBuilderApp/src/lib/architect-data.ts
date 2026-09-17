@@ -165,9 +165,15 @@ export type CopilotOperation =
   | { kind: 'setContextPolicy'; nodeId: string; value: 'isolated' | 'windowed' | 'full'; why: string }
   | { kind: 'setMode'; nodeId: string; value: 'call' | 'transfer'; why: string };
 
+/** What the copilot decided the person wants done beyond an answer. Only
+ *  the Home mode raises 'build_agent'; the page then starts the build and
+ *  shows its stages — the copilot never claims a build happened. */
+export type CopilotAction = { kind: 'none' } | { kind: 'build_agent'; requirement: string };
+
 export interface CopilotReply {
   reply: string;
   operations: CopilotOperation[];
+  action?: CopilotAction;
   costUsd: number;
 }
 
@@ -180,6 +186,11 @@ export async function askArchon(input: {
     department?: string;
     nodes: Array<{ id: string; name: string; nodeType: string; nodeSubType: string; config: Record<string, unknown> }>;
   };
+  /** 'builder' (default) proposes changes to the open agent; 'home' answers
+   *  from the platform snapshot and can hand a requirement to the Architect. */
+  mode?: 'builder' | 'home';
+  /** The Home dashboard's own numbers, so answers match what is on screen. */
+  platform?: Record<string, unknown>;
 }): Promise<CopilotReply> {
   return apexFetch<CopilotReply>(
     `${BASE}/copilot`,

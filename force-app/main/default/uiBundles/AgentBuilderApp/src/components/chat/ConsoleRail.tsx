@@ -15,6 +15,15 @@ const PHASE_COPY: Record<ChatPhase, [string, string]> = {
   ready: ['READY', 'type or talk'],
 };
 
+/** One glyph per build-stage state, for the monospace step lines. */
+const STAGE_MARK: Record<Extract<ChatActivity, { kind: 'step' }>['state'], string> = {
+  pending: '·',
+  running: '▸',
+  done: '✓',
+  warn: '!',
+  failed: '✕',
+};
+
 function fmtTime(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -37,9 +46,22 @@ export function ConsoleRail({ events, agentName }: { events: ChatActivity[]; age
     const sawThinking = turn.some(e => e.kind === 'thinking');
     const tools = turn.filter(e => e.kind === 'tool') as Extract<ChatActivity, { kind: 'tool' }>[];
     const sawReply = turn.some(e => e.kind === 'reply' || e.kind === 'error');
+    // An Architect build the copilot started this turn: one line per stage,
+    // latest state wins, in the order the stages first appeared.
+    const stageState = new Map<string, Extract<ChatActivity, { kind: 'step' }>>();
+    for (const e of turn) if (e.kind === 'step') stageState.set(e.label, e);
+    const stages = [...stageState.values()];
+    const buildRunning = stages.some(s => s.state === 'running' || s.state === 'pending');
     const steps: Array<{ label: string; lines: string[]; state: 'off' | 'on' | 'done' }> = [
       { label: 'Router', lines: how ? [`heard by: ${how === 'talk' ? 'voice' : 'keyboard'}`] : [], state: !how ? 'off' : sawThinking ? 'done' : 'on' },
       { label: 'Tools', lines: tools.map(t => `${t.name}${t.note ? ' — ' + t.note : ''}`), state: tools.length ? (sawReply ? 'done' : 'on') : sawThinking && !sawReply ? 'on' : 'off' },
+      ...(stages.length
+        ? [{
+            label: 'Build',
+            lines: stages.map(s => `${STAGE_MARK[s.state]} ${s.label}${s.detail ? ' — ' + s.detail : ''}`),
+            state: (buildRunning ? 'on' : 'done') as 'on' | 'done',
+          }]
+        : []),
       { label: 'Reply', lines: reply ? [`tokens : ${reply.tokensIn ?? '—'} in · ${reply.tokensOut ?? '—'} out`, `latency : ${reply.latencyMs != null ? (reply.latencyMs / 1000).toFixed(1) + 's' : '—'}`] : [], state: reply ? 'done' : sawThinking ? 'on' : 'off' },
       { label: 'Voice', lines: reply ? [reply.aloud ? 'read aloud — you spoke' : 'text only — you typed'] : [], state: reply ? 'done' : 'off' },
     ];
@@ -102,6 +124,7 @@ export function ConsoleRail({ events, agentName }: { events: ChatActivity[]; age
               case 'user': return <div key={i} className="you">{t} You{e.how === 'talk' ? ' 🎙' : ''}: {e.text}</div>;
               case 'thinking': return <div key={i} className="sys">{t} SYS: Turn started.</div>;
               case 'tool': return <div key={i} className="sys">{t} TOOL: {e.name}{e.note ? ` · ${e.note}` : ''}</div>;
+              case 'step': return <div key={i} className={e.state === 'failed' ? 'err' : e.state === 'done' ? 'ok' : 'sys'}>{t} BUILD: {e.label} · {e.state}{e.detail ? ` · ${e.detail}` : ''}</div>;
               case 'reply': return <div key={i} className="ai">{t} {agentName}: {e.text}{e.aloud ? ' 🔊' : ''}</div>;
               case 'approval': return <div key={i} className="ok">{t} SYS: An action is waiting for approval — nothing written yet.</div>;
               case 'error': return <div key={i} className="err">{t} ERR: {e.text}</div>;

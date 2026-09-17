@@ -52,6 +52,14 @@ global with sharing class AgentSetupRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
                 return;
             }
+            if (action == 'wake') {
+                // One shallow probe of the Archon server + every MCP server;
+                // the page polls this until nothing is still 'waking'.
+                ArchonWakeService.WakeResult result = ArchonWakeService.wake();
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(result));
+                return;
+            }
             writeError(res, 400, 'Unknown action "' + action + '".');
         } catch (Exception e) {
             writeError(res, 400, e.getMessage());

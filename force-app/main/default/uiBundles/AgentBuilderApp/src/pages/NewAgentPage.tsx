@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import {
   ArrowLeft,
   ArrowRight,
@@ -55,6 +55,15 @@ export default function NewAgentPage() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>('choose');
   const [text, setText] = useState('');
+  // Home hands over a requirement captured in chat: land on "describe"
+  // with it already filled in, instead of making the person retype it.
+  const handoff = (useLocation().state as { requirement?: string } | null)?.requirement;
+  useEffect(() => {
+    if (handoff) {
+      setText(handoff);
+      setPhase('describe');
+    }
+  }, [handoff]);
   const [attachment, setAttachment] = useState<{ name: string; content: string } | null>(null);
   const [listening, setListening] = useState(false);
   const [job, setJob] = useState<BuildJobView | null>(null);

@@ -106,8 +106,12 @@ export function AppShell({
   title,
   actions,
   onRefresh,
+  hideRail = false,
 }: {
   children: ReactNode;
+  /** No navigation rail at all — for a page that carries its own launcher
+   *  (Home's orbit of tabs); every other page keeps the rail. */
+  hideRail?: boolean;
   /** Start with just the icon rail — the agent canvas needs its width
    *  for the graph, not the full nav; still expandable via the toggle. */
   defaultCollapsed?: boolean;
@@ -151,6 +155,7 @@ export function AppShell({
 
   return (
     <div className="flex h-full w-full">
+      {!hideRail && (
       <aside
         className={cn(
           'flex h-full shrink-0 flex-col bg-[var(--sidebar)] transition-[width] duration-150',
@@ -267,6 +272,7 @@ export function AppShell({
           </div>
         </div>
       </aside>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {title && (

@@ -1,44 +1,44 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import {
-  Activity, BookOpen, Bot, CheckSquare, CircleDollarSign, LayoutGrid, Layers, Loader2,
-  MessageCircle, MessageSquare, Mic, Plug, Send, Sparkles, Sun,
-} from 'lucide-react';
+import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ConsoleRail } from '@/components/chat/ConsoleRail';
 import type { VoicePhase } from '@/components/chat/VoiceStrip';
 import { CoreRing, type CorePhase } from '@/components/home/CoreRing';
-import { OrbitTabs, type OrbitTab } from '@/components/home/OrbitTabs';
 import type { ChatActivity } from '@/lib/chat-activity';
 import { getVoicePref, setVoicePref } from '@/lib/voice';
-import { introMode } from '@/lib/home-prefs';
 import { loadAgents, type AgentSummary } from '@/lib/agents-data';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { loadPendingApprovals, type ApprovalDto } from '@/lib/approvals-data';
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { loadHomeStats, type HomeStats } from '@/lib/home-stats-data';
+import { loadExecutionLogs, type RawAgentExecution } from '@/lib/executions-data';
+import { loadConnectorDirectory, type DirectoryEntry } from '@/lib/connectors-data';
 import '@/styles/home.css';
 
 /**
- * Home — the command center. Archon's core sits in the middle with the
- * app's tabs in orbit around it; the platform's numbers sit either side.
- * The first message you send fades the cards and the orbit out where they
- * stand and fades the chat in over them — nothing travels, and the core
- * stays put behind the transcript, dimmed. A plain answer fades it back.
+ * Home — the command center. Four numbers across the top (what the agents
+ * saved, handled, how many are live, how often they succeed), Archon's
+ * voice agent in the middle with what it did today beside it, and what
+ * needs a person on the right. Sending a message fades the dashboard out
+ * and the chat in over it; a plain answer fades it back.
  *
- * The copilot here is always Archon itself — the Architect's assistant,
- * which knows this platform and the org and can build an agent from a
- * requirement, drawing every stage on this same screen. Agents built on
- * the portal are talked to on the Chat page, never here.
- *
- * Activity counts both kinds of work the platform does — automation runs
- * and chat turns — org-wide, from one aggregate request. Every number is
- * live; anything the platform cannot back with real data says so instead
- * of inventing it.
+ * Every number comes from the org: activity runs and chat turns from one
+ * aggregate request, approvals, agents, recent runs and sessions, the
+ * connector directory. The one derived figure — cost saved — is an
+ * estimate built from those counts, and says so on the tile.
  */
 
-const WINDOW_DAYS = 7;
+type Range = 1 | 7 | 30;
+const RANGE_LABEL: Record<Range, string> = { 1: 'Today', 7: 'Last 7 days', 30: 'Last 30 days' };
+/** The savings estimate: minutes of a person's time each handled task
+ *  would have taken, an hourly rate for that time, and blended token
+ *  prices for the AI spend. Shown on the tile as an estimate. */
+const MINUTES_PER_TASK = 9;
+const HOURLY_RATE_USD = 35;
+const USD_PER_M_IN = 2.5;
+const USD_PER_M_OUT = 10;
 
 interface HomeData {
   stats: HomeStats | null;
@@ -48,57 +48,78 @@ interface HomeData {
   chatApprovals: ChatApproval[] | null;
   agents: AgentSummary[] | null;
   agentsError: string | null;
+  runs: RawAgentExecution[] | null;
+  loadedAt: number;
 }
 
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-function fmtK(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : String(n);
-}
-function pct(ok: number, total: number): string {
-  return total ? `${((ok / total) * 100).toFixed(1)}%` : '—';
-}
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const fmtN = (n: number): string => n.toLocaleString();
+const fmtMoney = (n: number): string => `$${Math.round(n).toLocaleString()}`;
 function dayLabel(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'short' });
 }
+function delta(now: number, before: number): { text: string; tone: 'up' | 'down' | 'flat' } | null {
+  if (!before) return null;
+  const p = Math.round(((now - before) / before) * 100);
+  return { text: `${p > 0 ? '+' : ''}${p}%`, tone: p > 0 ? 'up' : p < 0 ? 'down' : 'flat' };
+}
+function ago(ms: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return `${h} h ago`;
+}
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
 
-const PHASE_COPY: Record<CorePhase, string> = {
-  off: 'standby',
-  ready: 'how can I help?',
-  listen: 'listening…',
-  think: 'working on it',
-  speak: 'answering',
-  build: 'building',
-};
+const PHASE_COPY: Record<CorePhase, string> = { off: 'standby', ready: 'Ready', listen: 'Listening…', think: 'Working on it', speak: 'Answering', build: 'Building' };
 const STATUS_COPY: Record<CorePhase, string> = {
   off: 'Waking up…',
-  ready: 'Ready — type or talk, the answer comes back the same way',
-  listen: 'Listening — it sends when you pause',
+  ready: 'Ready — type or talk, the answer comes back the same way.',
+  listen: 'Listening — it sends when you pause.',
   think: 'Working on it…',
-  speak: 'Speaking — talk or type to interrupt',
+  speak: 'Speaking — talk or type to interrupt.',
   build: 'Building…',
 };
-/** How long the dashboard ↔ chat fade takes — mirrors --home-T in home.css. */
 const FOCUS_MS = 1600;
-const SUGGESTIONS = ['What failed today?', 'Which agents need attention?', 'What can my org do with Gmail?', 'Create an agent for lead qualification'];
+const SUGGESTIONS = ['What failed today, and why?', 'Which agents need attention?', 'How much did we save this month?', 'Create an agent for lead qualification'];
 const COPILOT = { apiName: 'archon_copilot', name: 'Archon' } as const;
+
+const NAV: Array<{ label: string; href: string; key: 'command' | 'chat' | 'fleet' | 'inbox' | 'review' | 'log' }> = [
+  { label: 'Command Center', href: '/home', key: 'command' },
+  { label: 'Agent Chat', href: '/chat', key: 'chat' },
+  { label: 'Agent Fleet', href: '/', key: 'fleet' },
+  { label: 'Customer Inbox', href: '/conversations', key: 'inbox' },
+  { label: 'Review Queue', href: '/approvals', key: 'review' },
+  { label: 'Activity Log', href: '/executions', key: 'log' },
+];
+const MORE: Array<{ label: string; href: string }> = [
+  { label: 'Knowledge', href: '/knowledge' }, { label: 'Connectors', href: '/connectors' }, { label: 'Templates', href: '/templates' },
+  { label: 'AI Models', href: '/ai-connections' }, { label: 'Cost', href: '/cost' }, { label: 'Setup', href: '/setup' },
+];
 
 export default function HomeDashboardPage() {
   const navigate = useNavigate();
+  const [range, setRange] = useState<Range>(7);
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectors, setConnectors] = useState<DirectoryEntry[] | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
+    // Twice the window, so the previous period gives the "vs last" delta.
     Promise.allSettled([
-      loadHomeStats(WINDOW_DAYS),
+      loadHomeStats(range * 2),
       listMySessions(50),
       loadPendingApprovals(),
       listChatApprovals({ status: 'Pending' }),
       loadAgents(),
-    ]).then(([statsR, sessR, apprR, chatR, agentsR]) => {
+      loadExecutionLogs({ pageSize: 25, pageOffset: 0 }),
+    ]).then(([statsR, sessR, apprR, chatR, agentsR, runsR]) => {
       setData({
         stats: statsR.status === 'fulfilled' ? statsR.value : null,
         statsError: statsR.status === 'rejected' ? errMsg(statsR.reason) : null,
@@ -107,367 +128,260 @@ export default function HomeDashboardPage() {
         chatApprovals: chatR.status === 'fulfilled' ? chatR.value : null,
         agents: agentsR.status === 'fulfilled' ? agentsR.value : null,
         agentsError: agentsR.status === 'rejected' ? errMsg(agentsR.reason) : null,
+        runs: runsR.status === 'fulfilled' ? runsR.value.records : null,
+        loadedAt: Date.now(),
       });
       setLoading(false);
     });
-  }, []);
+  }, [range]);
+  useEffect(() => { load(); }, [load]);
+  // The connector directory is a proxy hop to the server; it fills in on
+  // its own so a slow server never holds the numbers back.
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    loadConnectorDirectory().then(list => { if (!cancelled) setConnectors(list); }).catch(() => { if (!cancelled) setConnectors([]); });
+    return () => { cancelled = true; };
+  }, []);
 
-  // ── Derivations, all from what was actually fetched ─────────────────
+  // ── Derivations ──────────────────────────────────────────────────────
   const stats = data?.stats ?? null;
-  const week = useMemo(() => {
-    const days = (stats?.byDay ?? []).map(d => ({
-      key: d.day,
-      label: dayLabel(d.day),
-      ok: d.runsOk + d.turnsOk,
-      fail: d.runsFailed + d.turnsFailed,
-      other: d.runsOther,
-    }));
-    return { days, ok: days.reduce((s, d) => s + d.ok, 0), fail: days.reduce((s, d) => s + d.fail, 0) };
-  }, [stats]);
-  const today = week.days[week.days.length - 1] ?? null;
-  const todayTotal = today ? today.ok + today.fail + today.other : 0;
-
-  const sessions = data?.sessions ?? [];
-  const activeSessions = sessions.filter(s => s.status === 'Active');
-  // Reply time is only tracked on chat turns, and only your sessions carry
-  // the rollup we can read here — say so on the tile.
-  const avgReplyS = (() => {
-    const turns = sessions.reduce((s, x) => s + (x.totalTurns ?? 0), 0);
-    const ms = sessions.reduce((s, x) => s + (x.latencyMsTotal ?? 0), 0);
-    return turns && ms ? ms / turns / 1000 : null;
-  })();
-  const pendingCount = (data?.approvals?.length ?? 0) + (data?.chatApprovals?.length ?? 0);
-  const approvalsAvailable = data != null && (data.approvals != null || data.chatApprovals != null);
+  const period = useMemo(() => {
+    const all = (stats?.byDay ?? []).map(d => ({ key: d.day, label: dayLabel(d.day), runs: d.runsOk + d.runsFailed + d.runsOther, turns: d.turnsOk + d.turnsFailed, ok: d.runsOk + d.turnsOk, fail: d.runsFailed + d.turnsFailed }));
+    const cur = all.slice(-range);
+    const prev = all.slice(Math.max(0, all.length - range * 2), all.length - range);
+    const sum = (rows: typeof all) => rows.reduce((a, d) => ({ runs: a.runs + d.runs, turns: a.turns + d.turns, ok: a.ok + d.ok, fail: a.fail + d.fail }), { runs: 0, turns: 0, ok: 0, fail: 0 });
+    return { days: cur, now: sum(cur), before: sum(prev) };
+  }, [stats, range]);
+  const total = period.now.runs + period.now.turns;
+  const totalBefore = period.before.runs + period.before.turns;
+  // Tokens are reported for the whole (doubled) window; halve for the period.
+  const tokensIn = stats ? stats.tokensIn / 2 : 0;
+  const tokensOut = stats ? stats.tokensOut / 2 : 0;
+  const spend = (tokensIn / 1e6) * USD_PER_M_IN + (tokensOut / 1e6) * USD_PER_M_OUT;
+  const hours = (total * MINUTES_PER_TASK) / 60;
+  const hoursBefore = (totalBefore * MINUTES_PER_TASK) / 60;
+  const saved = Math.max(0, hours * HOURLY_RATE_USD - spend);
+  const savedBefore = Math.max(0, hoursBefore * HOURLY_RATE_USD - spend);
+  const ret = spend > 0 ? (hours * HOURLY_RATE_USD) / spend : null;
+  const okShare = period.now.ok + period.now.fail ? Math.round((period.now.ok / (period.now.ok + period.now.fail)) * 100) : null;
+  const successPct = period.now.ok + period.now.fail ? ((period.now.ok / (period.now.ok + period.now.fail)) * 100).toFixed(1) : null;
+  const dayMax = Math.max(1, ...period.days.map(d => d.ok + d.fail));
 
   const agents = data?.agents ?? [];
-  const agentRows = useMemo(() => {
-    const by = new Map((stats?.byAgent ?? []).map(a => [a.apiName, a]));
-    const rank = (st: string) => (st === 'Active' ? 0 : st === 'Draft' ? 1 : 2);
-    return agents
-      .map(a => {
-        const c = by.get(a.apiName);
-        const total = c ? c.runsToday + c.turnsToday : 0;
-        const fail = c ? c.runsFailedToday + c.turnsFailedToday : 0;
-        return { a, total, ok: total - fail, fail, tokens: c ? c.tokensIn + c.tokensOut : 0 };
-      })
-      .sort((x, y) => rank(x.a.status) - rank(y.a.status) || y.total - x.total || x.a.name.localeCompare(y.a.name));
-  }, [agents, stats]);
-  const counts = { active: agents.filter(a => a.status === 'Active').length, draft: agents.filter(a => a.status === 'Draft').length };
-  const inactive = agents.length - counts.active - counts.draft;
-  const failingAgents = (stats?.byAgent ?? [])
-    .map(a => ({ name: a.name, fail: a.runsFailedToday + a.turnsFailedToday }))
-    .filter(a => a.fail > 0)
-    .sort((a, b) => b.fail - a.fail);
-  const todayFailed = today?.fail ?? 0;
-  // Failures go to the page that can show them: runs to Runs, chat turns
-  // to Conversations.
-  const todayRaw = stats?.byDay[stats.byDay.length - 1];
-  const failuresAreChat = !!todayRaw && todayRaw.runsFailed === 0 && todayRaw.turnsFailed > 0;
+  const active = agents.filter(a => a.status === 'Active');
+  const byDept = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const a of active) m.set(a.department || 'Other', (m.get(a.department || 'Other') ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  }, [active]);
+
+  const pendingCount = (data?.approvals?.length ?? 0) + (data?.chatApprovals?.length ?? 0);
+  const failingAgents = (stats?.byAgent ?? []).map(a => ({ name: a.name, fail: a.runsFailedToday + a.turnsFailedToday, runs: a.runsFailedToday })).filter(a => a.fail > 0).sort((a, b) => b.fail - a.fail);
   const drafts = agents.filter(a => a.status === 'Draft');
+  const brokenConnectors = (connectors ?? []).filter(c => c.connectorId && /error|expired|disconnected|revoked/i.test(c.status) );
+  const attention = [
+    ...(pendingCount ? [{ kind: 'a', title: `${pendingCount} ${pendingCount === 1 ? 'reply' : 'replies'} waiting for approval`, sub: [...(data?.approvals ?? []).map(a => a.nodeLabel), ...(data?.chatApprovals ?? []).map(a => a.toolName)].slice(0, 2).join(' · ') || 'nothing is written until someone signs off', action: 'Review', href: '/approvals' }] : []),
+    ...failingAgents.slice(0, 2).map(f => ({ kind: 'r', title: `${f.name} failed ${f.fail} ${f.fail === 1 ? 'run' : 'runs'} today`, sub: 'open the runs to see the error', action: 'View runs', href: f.runs ? '/executions' : '/conversations' })),
+    ...brokenConnectors.slice(0, 2).map(c => ({ kind: 'c', title: `${c.displayName} connection needs attention`, sub: c.lastErrorMessage ?? c.status, action: 'Reconnect', href: '/connectors' })),
+    ...(drafts.length ? [{ kind: 'b', title: `${drafts.length} ${drafts.length === 1 ? 'agent' : 'agents'} still in Draft`, sub: drafts.slice(0, 3).map(d => d.name).join(' · '), action: 'Open', href: '/' }] : []),
+  ];
 
-  // ── The entrance ────────────────────────────────────────────────────
-  const [stage, setStage] = useState<'dark' | 'fly' | 'set' | 'live'>('dark');
-  const [burst, setBurst] = useState(0);
-  useEffect(() => {
-    const short = introMode() === 'short';
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const t = (ms: number) => (reduced ? 0 : short ? Math.round(ms * 0.45) : ms);
-    const timers = [
-      setTimeout(() => setStage('fly'), t(120)),
-      setTimeout(() => setBurst(b => b + 1), t(1250)),
-      setTimeout(() => setStage('set'), t(1600)),
-      setTimeout(() => setStage('live'), t(1950)),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
+  const doneToday = useMemo(() => {
+    const items: Array<{ at: string; text: string; ok: boolean }> = [];
+    for (const r of data?.runs ?? []) if (isToday(r.CreatedDate)) items.push({ at: r.CreatedDate, text: `${r['AgentDefinition__r.Name']} · ${r.AgentReason__c?.slice(0, 60) || r.Status__c}`, ok: !/fail|error/i.test(r.Status__c) });
+    for (const s of data?.sessions ?? []) if (isToday(s.lastActivityAt)) items.push({ at: s.lastActivityAt!, text: `${s.agentName}: ${s.title ?? 'conversation'}${s.totalTurns ? ` · ${s.totalTurns} turns` : ''}`, ok: true });
+    return items.sort((a, b) => b.at.localeCompare(a.at));
+  }, [data]);
 
   // ── Focus: the chat takes the screen ────────────────────────────────
+  const [stage, setStage] = useState<'dark' | 'live'>('dark');
+  useEffect(() => { const t = setTimeout(() => setStage('live'), 80); return () => clearTimeout(t); }, []);
   const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null } | null>(null);
-  // Who is answering in the focus screen: Archon, until it transfers the
-  // conversation to another agent (the Metadata Expert for org changes).
   const [copilotAgent, setCopilotAgent] = useState<{ apiName: string; name: string }>(COPILOT);
   const [events, setEvents] = useState<ChatActivity[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [input, setInput] = useState('');
-  // The overlay stays mounted while it fades back out; each opening gets a
-  // fresh chat mount so a queued first message always sends.
   const [leaving, setLeaving] = useState(false);
   const [openSeq, setOpenSeq] = useState(0);
   const homeRef = useRef<HTMLDivElement>(null);
-
-  const chatPhase = useMemo<VoicePhase>(() => {
-    let p: VoicePhase = 'ready';
-    for (const e of events) if (e.kind === 'phase') p = e.phase;
-    return p;
-  }, [events]);
+  const chatPhase = useMemo<VoicePhase>(() => { let p: VoicePhase = 'ready'; for (const e of events) if (e.kind === 'phase') p = e.phase; return p; }, [events]);
   const phase: CorePhase = stage !== 'live' ? 'off' : focus ? chatPhase : 'ready';
-
-  const exitFocus = useCallback(() => {
-    setFocus(null);
-    setCountdown(null);
-    setLeaving(true);
-    setCopilotAgent(COPILOT);
-  }, [setFocus, setCountdown, setLeaving]);
+  const exitFocus = useCallback(() => { setFocus(null); setCountdown(null); setLeaving(true); setCopilotAgent(COPILOT); }, []);
   const handleTransfer = useCallback((t: { agentApiName: string; agentName: string; message: string }) => {
-    setCopilotAgent({ apiName: t.agentApiName, name: t.agentName });
-    setCountdown(null);
-    setOpenSeq(n => n + 1);
-    setFocus({ message: { text: t.message, how: 'type' } });
+    setCopilotAgent({ apiName: t.agentApiName, name: t.agentName }); setCountdown(null); setOpenSeq(n => n + 1); setFocus({ message: { text: t.message, how: 'type' } });
   }, []);
-  useEffect(() => {
-    if (!leaving) return;
-    const t = setTimeout(() => setLeaving(false), FOCUS_MS);
-    return () => clearTimeout(t);
-  }, [leaving]);
+  useEffect(() => { if (!leaving) return; const t = setTimeout(() => setLeaving(false), FOCUS_MS); return () => clearTimeout(t); }, [leaving]);
   const openFocus = (message: { text: string; how: 'talk' | 'type' } | null) => {
-    setCountdown(null);
-    setLeaving(false);
-    setOpenSeq(n => n + 1);
-    setFocus({ message });
-    // The chat fits the viewport; bring the core into view if the page was
-    // scrolled to reach the ask box.
+    setCountdown(null); setLeaving(false); setOpenSeq(n => n + 1); setFocus({ message });
     homeRef.current?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const overlayMounted = !!focus || leaving;
-
-  useEffect(() => {
-    document.body.classList.toggle('home-lock', !!focus);
-    return () => document.body.classList.remove('home-lock');
-  }, [focus]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && focus) exitFocus(); };
-    addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
-  }, [focus, exitFocus]);
-
-  // A plain answer hands the screen back after a moment. A question from
-  // the agent, or an open mic, means the conversation is still going.
+  useEffect(() => { document.body.classList.toggle('home-lock', !!focus); return () => document.body.classList.remove('home-lock'); }, [focus]);
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && focus) exitFocus(); if (e.key === 'Escape') setMoreOpen(false); }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [focus, exitFocus]);
   useEffect(() => {
     if (!focus) return;
     const last = events[events.length - 1];
     if (!last) return;
-    if (last.kind === 'reply' && !/\?\s*$/.test(last.text.trim()) && !getVoicePref()) setCountdown(15);
-    else setCountdown(null);
+    if (last.kind === 'reply' && !/\?\s*$/.test(last.text.trim()) && !getVoicePref()) setCountdown(15); else setCountdown(null);
   }, [events, focus]);
-  useEffect(() => {
-    if (countdown == null) return;
-    if (countdown <= 0) { exitFocus(); return; }
-    const t = setTimeout(() => setCountdown(c => (c == null ? null : c - 1)), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, exitFocus]);
+  useEffect(() => { if (countdown == null) return; if (countdown <= 0) { exitFocus(); return; } const t = setTimeout(() => setCountdown(c => (c == null ? null : c - 1)), 1000); return () => clearTimeout(t); }, [countdown, exitFocus]);
+  const handleActivity = useCallback((e: ChatActivity) => { setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e])); }, []);
+  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => { if (info.ended) { setEvents([]); exitFocus(); load(); } }, [load, exitFocus]);
+  const submit = () => { const text = input.trim(); if (!text) return; setInput(''); openFocus({ text, how: 'type' }); };
+  const talk = () => { setVoicePref(true); openFocus(null); };
 
-  const handleActivity = useCallback((e: ChatActivity) => {
-    setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e]));
-  }, []);
-  // Archon has no session to track; "ended" means the person cleared the
-  // thread, which hands the screen back and refreshes the numbers (a build
-  // may have added an agent).
-  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => {
-    if (info.ended) { setEvents([]); exitFocus(); load(); }
-  }, [load, exitFocus]);
-
-  const submit = () => {
-    const text = input.trim();
-    if (!text) return;
-    setInput('');
-    openFocus({ text, how: 'type' });
-  };
-  const talk = () => {
-    setVoicePref(true);
-    openFocus(null);
-  };
-  // ── Tabs ─────────────────────────────────────────────────────────────
-  const tabs: OrbitTab[] = [
-    { key: 'new', label: 'New agent', group: 'build', href: '/new-agent', icon: <Sparkles /> },
-    { key: 'models', label: 'AI Models', group: 'build', href: '/ai-connections', icon: <Layers /> },
-    { key: 'agents', label: 'Agents', group: 'build', href: '/', icon: <Bot /> },
-    { key: 'knowledge', label: 'Knowledge', group: 'build', href: '/knowledge', icon: <BookOpen /> },
-    { key: 'connectors', label: 'Connectors', group: 'build', href: '/connectors', icon: <Plug /> },
-    { key: 'templates', label: 'Templates', group: 'build', href: '/templates', icon: <LayoutGrid /> },
-    { key: 'chat', label: 'Chat', group: 'build', href: '/chat', icon: <MessageCircle /> },
-    { key: 'runs', label: 'Runs', group: 'monitor', href: '/executions', icon: <Activity /> },
-    { key: 'conversations', label: 'Conversations', group: 'monitor', href: '/conversations', icon: <MessageSquare /> },
-    { key: 'approvals', label: 'Approvals', group: 'monitor', href: '/approvals', icon: <CheckSquare />, badge: pendingCount || undefined },
-    { key: 'cost', label: 'Cost', group: 'manage', href: '/cost', icon: <CircleDollarSign /> },
-    { key: 'setup', label: 'Setup', group: 'manage', href: '/setup', icon: <Sun /> },
-  ];
-
-  const weekMax = Math.max(1, ...week.days.map(d => d.ok + d.fail + d.other));
-  const tokensByAgent = agentRows.filter(r => r.tokens > 0).sort((a, b) => b.tokens - a.tokens);
-  const tokMax = tokensByAgent[0]?.tokens ?? 1;
-  const attnCount = (todayFailed ? 1 : 0) + (pendingCount ? 1 : 0) + (drafts.length ? 1 : 0);
+  const today = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+  const savedDelta = delta(saved, savedBefore);
+  const totalDelta = delta(total, totalBefore);
 
   return (
-    <AppShell title="Home" onRefresh={load} hideRail>
-      <div ref={homeRef} className={`home ${stage}`} data-focus={focus ? '1' : '0'} data-overlay={overlayMounted ? '1' : '0'}>
-        {/* ── left ─────────────────────────────────────────────────── */}
-        <aside className="home-col">
-          <div className="home-panel">
-            <div className="home-hd"><span className="home-eyebrow">Today</span><span className="sub">{loading && !data ? 'loading…' : stats ? 'runs + chat turns · org' : 'live'}</span></div>
-            <div className="home-tiles">
-              <Tile k="Activity" v={stats ? String(todayTotal) : '—'} small={stats ? 'runs + chat turns' : data?.statsError ? 'unavailable' : undefined} />
-              <Tile k="Succeeded · failed" v={stats && today ? <><span className="g">{today.ok}</span><small>·</small><span className={today.fail ? 'r' : ''}>{today.fail}</span></> : '—'} />
-              <Tile k="Success rate" v={stats && today ? pct(today.ok, today.ok + today.fail) : '—'} tone="g" small={stats && today ? `${today.ok} of ${today.ok + today.fail}` : undefined} />
-              <Tile k="Avg reply" v={avgReplyS != null ? avgReplyS.toFixed(1) : '—'} small={avgReplyS != null ? 's · your sessions' : 'no timed turns'} />
-              <Tile k="Tokens in / out" v={stats ? fmtK(stats.tokensIn) : '—'} tone="c" small={stats ? `/ ${fmtK(stats.tokensOut)} · ${WINDOW_DAYS} days` : undefined} />
-              <Tile k="Active chats" v={data?.sessions ? String(activeSessions.length) : '—'} small={data?.sessions ? `of ${sessions.length} recent` : undefined} />
-              <Tile k="Approvals waiting" v={approvalsAvailable ? String(pendingCount) : '—'} tone={pendingCount ? 'a' : undefined} />
-              <Tile k="Agents" v={data?.agents ? String(counts.active) : '—'} small={data?.agents ? `active · ${counts.draft} draft · ${inactive} off` : undefined} />
-            </div>
-          </div>
-          <div className="home-panel">
-            <div className="home-hd"><span className="home-eyebrow">Agents</span><span className="sub">{data?.agents ? `${agents.length} total · ${counts.active} active · ${counts.draft} draft · ${inactive} inactive` : ''}</span></div>
-            <div className="home-agents">
-              {data?.agentsError && <div className="home-empty">Couldn't load agents — {data.agentsError}</div>}
-              {data?.agents && agents.length === 0 && <div className="home-empty">No agents yet — build one from the orbit.</div>}
-              {agentRows.map(({ a, total, ok, fail, tokens }) => {
-                const cls = a.status === 'Active' ? '' : a.status === 'Draft' ? 'd' : 'x';
-                return (
-                  <button key={a.id} type="button" className="home-ag" onClick={() => navigate(`/agent/${encodeURIComponent(a.apiName)}`)}>
-                    <i className={cls} />
-                    <span className="n" title={a.apiName}>{a.name}</span>
-                    <span className={`s ${cls}`}>{a.status.toUpperCase()}</span>
-                    <span className="m">
-                      {total > 0 ? (
-                        <>
-                          <span><b>{total}</b> today</span>
-                          <span className={fail ? 'bad' : 'ok'}>{ok} ok · {fail} failed</span>
-                          <span className={fail ? '' : 'ok'}>{pct(ok, ok + fail)}</span>
-                        </>
-                      ) : a.totalExecutions ? (
-                        <span className="q">{a.totalExecutions} runs all-time{a.successRate != null ? ` · ${Math.round(a.successRate)}% ok` : ''} · nothing today</span>
-                      ) : (
-                        <span className="q">{a.status === 'Draft' ? 'not yet activated' : a.status === 'Active' ? 'nothing today' : 'switched off'}</span>
-                      )}
-                      {tokens > 0 && <span><b>{fmtK(tokens)}</b> tok · {WINDOW_DAYS}d</span>}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
-
-        {/* ── centre ───────────────────────────────────────────────── */}
-        <section className="home-center">
-          <div className="home-field">
-            <div className="home-glow" />
-            <div className={`home-flash${burst ? ' go' : ''}`} key={`f${burst}`} />
-            <OrbitTabs tabs={tabs} state={stage === 'dark' ? 'far' : stage === 'fly' ? 'fly' : 'set'} dim={!!focus} onPick={href => navigate(href)} />
-            <CoreRing phase={phase} label="ARCHON" sub={PHASE_COPY[phase]} burst={burst} />
-            <div className={`home-burst${burst ? ' go' : ''}`} key={`b${burst}`} />
-          </div>
-
-          <div className="home-panel home-ask">
-            <div className="home-ask-head">
-              <span className="home-eyebrow">Copilot</span>
-              <span className="sub"><b>Archon</b> answers here — the platform, your org, and building agents · your own agents are on <button type="button" className="link" onClick={() => navigate('/chat')}>Chat</button></span>
-            </div>
-            <div className="home-chips">
-              {SUGGESTIONS.map(s => (
-                <button key={s} type="button" className="home-chip" onClick={() => openFocus({ text: s, how: 'type' })}>{s}</button>
-              ))}
-            </div>
-            <div className="home-inrow">
-              <button type="button" className="home-mic" onClick={talk} aria-label="Talk to the copilot" title="Talk"><Mic /></button>
-              <input
-                id="home-ask-input"
-                className="home-in"
-                type="text"
-                placeholder="Type here, or just talk"
-                autoComplete="off"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-              />
-              <button type="button" className="home-send" onClick={submit} disabled={!input.trim()}><Send /> Send</button>
-            </div>
-            <div className="home-status" data-phase={phase}><span className="dot" />{STATUS_COPY[phase]}</div>
-          </div>
-        </section>
-
-        {/* ── right ────────────────────────────────────────────────── */}
-        <aside className="home-col">
-          <div className="home-panel">
-            <div className="home-hd"><span className="home-eyebrow">Needs attention</span><span className="sub">{attnCount} item{attnCount === 1 ? '' : 's'}</span></div>
-            <div className="home-att">
-              {todayFailed > 0 && (
-                <button type="button" onClick={() => navigate(failuresAreChat ? '/conversations' : '/executions')}><span className="bar r" /><span className="t">{todayFailed} failed today<small>{failingAgents.slice(0, 3).map(f => `${f.name} ×${f.fail}`).join(' · ')}</small></span><span className="go">Open →</span></button>
-              )}
-              {pendingCount > 0 && (
-                <button type="button" onClick={() => navigate('/approvals')}><span className="bar a" /><span className="t">{pendingCount} approval{pendingCount === 1 ? '' : 's'} waiting<small>nothing is written until someone signs off</small></span><span className="go">Approvals →</span></button>
-              )}
-              {drafts.length > 0 && (
-                <button type="button" onClick={() => navigate('/')}><span className="bar c" /><span className="t">{drafts.length} agent{drafts.length === 1 ? '' : 's'} in Draft<small>{drafts.slice(0, 3).map(d => d.name).join(' · ')}</small></span><span className="go">Agents →</span></button>
-              )}
-              {attnCount === 0 && <div className="home-empty">Nothing needs you right now.</div>}
-            </div>
-          </div>
-
-          <div className="home-panel">
-            <div className="home-hd"><span className="home-eyebrow">Success · failure</span><span className="sub">runs + chat turns · last {WINDOW_DAYS} days</span></div>
-            <div className="home-bd">
-              {data?.statsError ? (
-                <div className="home-empty">Couldn't load activity — {data.statsError}</div>
-              ) : !stats ? (
-                <div className="home-empty"><Loader2 className="spin" /> Loading…</div>
-              ) : week.ok + week.fail === 0 ? (
-                <div className="home-empty">No finished runs or chat turns in the last {WINDOW_DAYS} days.</div>
-              ) : (
+    <AppShell hideRail>
+      <div ref={homeRef} className={`home cc ${stage}`} data-focus={focus ? '1' : '0'} data-overlay={overlayMounted ? '1' : '0'}>
+        {/* ── top bar ───────────────────────────────────────────────── */}
+        <header className="cc-top">
+          <div className="cc-brand"><span className="cc-logo"><Layers /></span>Archon</div>
+          <nav className="cc-nav">
+            {NAV.map(n => (
+              <button key={n.key} type="button" className={n.key === 'command' ? 'on' : ''} onClick={() => navigate(n.href)}>
+                {n.label}{n.key === 'review' && pendingCount > 0 && <span className="cc-badge">{pendingCount}</span>}
+              </button>
+            ))}
+            <div className="cc-more">
+              <button type="button" onClick={() => setMoreOpen(o => !o)} aria-expanded={moreOpen}>More <ChevronDown /></button>
+              {moreOpen && (
                 <>
-                  <div className="home-sf-sum"><b>{pct(week.ok, week.ok + week.fail)}</b><span>{week.ok} of {week.ok + week.fail} succeeded · <em>{week.fail} failed</em></span></div>
-                  <svg className="home-chart" viewBox="0 0 296 118" aria-label="Succeeded and failed runs and chat turns per day">
-                    {week.days.map((d, i) => {
-                      const l = 6, r = 6, t = 16, b = 30, gap = 8, W = 296, H = 118;
-                      const bw = (W - l - r - gap * (week.days.length - 1)) / week.days.length;
-                      const y = (v: number) => t + (H - t - b) * (1 - v / weekMax);
-                      const x = l + i * (bw + gap);
-                      const total = d.ok + d.fail;
-                      const yTop = y(total), yOk = y(d.ok), base = H - b;
-                      return (
-                        <g key={d.key}>
-                          {d.ok > 0 && <rect x={x} y={yOk} width={bw} height={base - yOk} rx={2} className="ok" opacity={i === week.days.length - 1 ? 1 : 0.75}><title>{d.ok} succeeded</title></rect>}
-                          {d.fail > 0 && <rect x={x} y={yTop} width={bw} height={Math.max(2, yOk - yTop)} className="fail"><title>{d.fail} failed</title></rect>}
-                          {total > 0 && <text x={x + bw / 2} y={yTop - 4} textAnchor="middle" className="n">{total}</text>}
-                          <text x={x + bw / 2} y={H - 18} textAnchor="middle" className="d">{d.label}</text>
-                          <text x={x + bw / 2} y={H - 6} textAnchor="middle" className={d.fail ? 'p warn' : 'p'}>{total ? pct(d.ok, total) : ''}</text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                  <div className="home-legend"><span><i className="g" />succeeded</span><span><i className="r" />failed</span><span className="right">% = success rate that day</span></div>
+                  <div className="cc-more-scrim" onClick={() => setMoreOpen(false)} />
+                  <div className="cc-more-menu">{MORE.map(m => <button key={m.href} type="button" onClick={() => { setMoreOpen(false); navigate(m.href); }}>{m.label}</button>)}</div>
                 </>
               )}
             </div>
+          </nav>
+          <div className="cc-top-r">
+            <span className="cc-env"><i /> Production</span>
+            <button type="button" className="cc-create" onClick={() => navigate('/new-agent')}><Plus /> Create agent</button>
+          </div>
+        </header>
+
+        <div className="cc-main">
+          {/* ── date row ─────────────────────────────────────────────── */}
+          <div className="cc-date">
+            <b>{today}</b>
+            <span className="cc-upd">{loading && !data ? 'loading…' : data ? `Updated ${ago(data.loadedAt)}` : ''}</span>
+            <div className="cc-range">
+              {([1, 7, 30] as Range[]).map(r => <button key={r} type="button" className={range === r ? 'on' : ''} onClick={() => setRange(r)}>{r === 1 ? 'Today' : `${r} days`}</button>)}
+            </div>
+            <button type="button" className="cc-refresh" onClick={load} aria-label="Refresh" title="Refresh"><RefreshCw className={loading ? 'spin' : ''} /></button>
           </div>
 
-          <div className="home-panel">
-            <div className="home-hd"><span className="home-eyebrow">Tokens by agent</span><span className="sub">org · {WINDOW_DAYS} days · {stats ? fmtK(stats.tokensIn + stats.tokensOut) : '—'} total</span></div>
-            <div className="home-bd home-bars">
-              {tokensByAgent.length === 0 && <div className="home-empty">{stats ? `No token usage in the last ${WINDOW_DAYS} days.` : 'unavailable'}</div>}
-              {tokensByAgent.map(({ a, tokens }) => (
-                <div key={a.id} className="home-bar-row"><span title={a.apiName}>{a.name}</span><span className="tr"><b style={{ width: `${(tokens / tokMax) * 100}%` }} /></span><span className="n">{fmtK(tokens)}</span></div>
-              ))}
+          {/* ── the four tiles ───────────────────────────────────────── */}
+          <div className="cc-tiles">
+            <div className="cc-tile">
+              <div className="cc-th"><span>Cost saved</span><span className="sub">{RANGE_LABEL[range]}</span></div>
+              <div className="cc-big">{stats ? fmtMoney(saved) : '—'}{savedDelta && <span className={`cc-delta ${savedDelta.tone}`}>{savedDelta.text}</span>}<span className="cc-vs">{savedDelta ? `vs previous ${range === 1 ? 'day' : `${range} days`}` : 'estimate'}</span></div>
+              <div className="cc-sub3">
+                <div><b>{stats ? Math.round(hours) : '—'} <small>h</small></b><span>Work automated</span></div>
+                <div><b>{stats ? fmtMoney(spend) : '—'}</b><span>AI spend</span></div>
+                <div><b className="g">{ret != null ? `${Math.round(ret)}×` : '—'}</b><span>Return</span></div>
+              </div>
+              <div className="cc-note" title={`${MINUTES_PER_TASK} minutes of a person's time per handled task at $${HOURLY_RATE_USD}/h, less the AI spend from tokens at blended rates.`}>estimate · {MINUTES_PER_TASK} min per task · ${HOURLY_RATE_USD}/h</div>
+            </div>
+
+            <div className="cc-tile">
+              <div className="cc-th"><span>Transactions handled</span><span className="sub">{RANGE_LABEL[range]}</span></div>
+              <div className="cc-big">{stats ? fmtN(total) : '—'}{totalDelta && <span className={`cc-delta ${totalDelta.tone}`}>{totalDelta.text}</span>}<span className="cc-vs">{okShare != null ? `${okShare}% succeeded` : ''}</span></div>
+              <div className="cc-bar">{total > 0 && <><i className="c" style={{ width: `${(period.now.runs / total) * 100}%` }} /><i className="v" style={{ width: `${(period.now.turns / total) * 100}%` }} /></>}</div>
+              <div className="cc-sub3">
+                <div><b>{stats ? fmtN(period.now.runs) : '—'}</b><span><i className="dot c" />Salesforce runs</span></div>
+                <div><b>{stats ? fmtN(period.now.turns) : '—'}</b><span><i className="dot v" />Chat turns</span></div>
+                <div><b>{stats ? fmtN(period.now.fail) : '—'}</b><span><i className="dot r" />Failed</span></div>
+              </div>
+            </div>
+
+            <div className="cc-tile">
+              <div className="cc-th"><span>Active agents</span><span className="sub live"><i />Right now</span></div>
+              <div className="cc-big">{data?.agents ? active.length : '—'}<span className="cc-vs">of {agents.length} {agents.length === 1 ? 'agent' : 'agents'}</span></div>
+              <div className="cc-segs">{agents.map(a => <i key={a.id} className={a.status === 'Active' ? 'on' : a.status === 'Draft' ? 'd' : ''} title={`${a.name} · ${a.status}`} />)}</div>
+              <div className="cc-sub3">
+                {byDept.length ? byDept.map(([d, n], i) => <div key={d}><b>{n}</b><span><i className={`dot ${['c', 'a', 'v'][i]}`} />{d}</span></div>) : <div><b>{drafts.length}</b><span>in Draft</span></div>}
+              </div>
+            </div>
+
+            <div className="cc-tile">
+              <div className="cc-th"><span>Success and failure</span><span className="sub">{RANGE_LABEL[range]}</span></div>
+              <div className="cc-sf">
+                <div className="cc-sf-l">
+                  <div className="cc-big g">{successPct != null ? `${successPct}%` : '—'}</div>
+                  <div className="cc-sf-c"><span>{stats ? fmtN(period.now.ok) : '—'} succeeded</span><span className="r">{stats ? fmtN(period.now.fail) : '—'} failed</span></div>
+                </div>
+                <div className="cc-days">
+                  {period.days.map(d => (
+                    <div key={d.key} className="cc-day" title={`${d.label}: ${d.ok} succeeded, ${d.fail} failed`}>
+                      <div className="col"><i className="f" style={{ height: `${(d.fail / dayMax) * 100}%` }} /><i className="o" style={{ height: `${(d.ok / dayMax) * 100}%` }} /></div>
+                      {range <= 7 && <small>{d.label}</small>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </aside>
+
+          {/* ── voice agent + attention ──────────────────────────────── */}
+          <div className="cc-row">
+            <section className="cc-voice">
+              <div className="cc-vh">
+                <span className="cc-vt">Archon voice agent</span>
+                <span className={`cc-pill ${pendingCount ? 'a' : 'g'}`}><i />{pendingCount ? 'Waiting for your OK' : PHASE_COPY[phase]}</span>
+                {pendingCount > 0 ? <button type="button" className="cc-open" onClick={() => navigate('/approvals')}>Open current task</button> : <button type="button" className="cc-open quiet" onClick={() => navigate('/chat')}>Open Agent Chat</button>}
+              </div>
+              <div className="cc-vb">
+                <div className="cc-try">
+                  <div className="cc-label">Try saying</div>
+                  {SUGGESTIONS.map(s => <button key={s} type="button" className="cc-say" onClick={() => openFocus({ text: s, how: 'type' })}>“{s}”</button>)}
+                </div>
+                <div className="cc-core">
+                  <div className="cc-core-scale"><CoreRing phase={phase} label="ARCHON" sub={pendingCount ? 'Waiting for your OK' : PHASE_COPY[phase]} burst={0} /></div>
+                  <div className="cc-inrow">
+                    <button type="button" className="home-mic cc-mic" onClick={talk} aria-label="Talk to Archon" title="Talk"><Mic /></button>
+                    <input id="home-ask-input" className="home-in" type="text" placeholder="Or type a request" autoComplete="off" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }} />
+                    <button type="button" className="cc-send" onClick={submit} disabled={!input.trim()} aria-label="Send"><Send /></button>
+                  </div>
+                  <div className="cc-status" data-phase={phase}>{pendingCount ? 'A task is waiting for your OK.' : STATUS_COPY[phase]}</div>
+                </div>
+                <div className="cc-done">
+                  <div className="cc-dh"><span>Done by Archon today</span><span className="n">{data ? `${doneToday.length} ${doneToday.length === 1 ? 'task' : 'tasks'}` : ''}</span></div>
+                  <div className="cc-dl">
+                    {loading && !data && <div className="cc-empty"><Loader2 className="spin" /> Loading…</div>}
+                    {data && doneToday.length === 0 && <div className="cc-empty">Nothing yet today.</div>}
+                    {doneToday.slice(0, 6).map((it, i) => <div key={i} className="cc-di"><i className={it.ok ? 'ok' : 'bad'}>{it.ok ? '✓' : '!'}</i><span>{it.text}</span><small>{timeOf(it.at)}</small></div>)}
+                  </div>
+                  <button type="button" className="link cc-log" onClick={() => navigate('/executions')}>Open Activity Log</button>
+                </div>
+              </div>
+            </section>
+
+            <aside className="cc-att">
+              <div className="cc-ah"><span>Needs attention</span>{attention.length > 0 && <span className="cc-count">{attention.length}</span>}<button type="button" className="link" onClick={() => navigate('/approvals')}>Review Queue</button></div>
+              <div className="cc-al">
+                {loading && !data && <div className="cc-empty"><Loader2 className="spin" /> Loading…</div>}
+                {data && attention.length === 0 && <div className="cc-empty">Nothing needs you right now.</div>}
+                {attention.map((a, i) => (
+                  <div key={i} className="cc-ai">
+                    <span className={`ic ${a.kind}`}>{a.kind === 'a' ? '✓' : a.kind === 'r' ? '!' : a.kind === 'c' ? '⚡' : '✎'}</span>
+                    <div className="t"><b>{a.title}</b><small>{a.sub}</small></div>
+                    <button type="button" className="cc-act" onClick={() => navigate(a.href)}>{a.action}</button>
+                  </div>
+                ))}
+                {data?.statsError && <div className="cc-empty">Activity unavailable — {data.statsError}</div>}
+              </div>
+            </aside>
+          </div>
+        </div>
 
         {/* ── focus: the chat fades in over the dashboard ─────────── */}
         {overlayMounted && (
           <div className="home-focus" onPointerDown={() => setCountdown(null)}>
-            {/* Console on the left — listening state, this turn, the log.
-                The chat takes everything to its right; its own X is
-                "back to the dashboard" and the auto-return countdown reads
-                in its subtitle. */}
             <ConsoleRail events={events} agentName={copilotAgent.name} />
             <div className="home-focus-chat">
-              {/* A normal chat session with the built-in archon_copilot agent —
-                  the same path every agent runs on. Its stage tools draw the
-                  build card; transfer_to_agent remounts this with the target. */}
               <ChatPanel
                 key={`${copilotAgent.apiName}-${openSeq}`}
                 variant="full"
@@ -485,14 +399,5 @@ export default function HomeDashboardPage() {
         )}
       </div>
     </AppShell>
-  );
-}
-
-function Tile({ k, v, small, tone }: { k: string; v: React.ReactNode; small?: string; tone?: 'g' | 'r' | 'a' | 'c' }) {
-  return (
-    <div className="home-tile">
-      <div className="k">{k}</div>
-      <div className={`v${tone ? ' ' + tone : ''}`}>{v}{small ? <small>{small}</small> : null}</div>
-    </div>
   );
 }

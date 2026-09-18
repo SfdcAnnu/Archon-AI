@@ -578,6 +578,16 @@ public with sharing class AgentChatController {
             SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c
             FROM AgentDefinition__c WHERE ApiName__c = :apiName WITH USER_MODE LIMIT 1
         ];
+        // A built-in agent (the Archon Copilot) is created by the server on
+        // first use. This runs before any DML in the transaction, so the
+        // callout is allowed; an unknown name comes back false and is reported
+        // as not found exactly as before.
+        if (rows.isEmpty() && SystemAgentSync.ensure(apiName)) {
+            rows = [
+                SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c
+                FROM AgentDefinition__c WHERE ApiName__c = :apiName WITH USER_MODE LIMIT 1
+            ];
+        }
         if (rows.isEmpty()) throw new ChatException('Agent not found: ' + apiName);
         if (rows[0].Status__c != 'Active') throw new ChatException('Agent not Active.');
         if (rows[0].ExecuteType__c != 'Chat' && rows[0].ExecuteType__c != 'Both') {

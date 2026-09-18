@@ -71,6 +71,21 @@ export async function getConnectionGate(agentApiName: string): Promise<Connectio
   });
 }
 
+/** A large tool result the runtime stored by reference (an `art_…` id in
+ *  a tool output). The full text or record list, for drawing a result card;
+ *  expired handles come back as an error. */
+export interface StoredArtifact {
+  id: string;
+  kind: 'json-records' | 'text';
+  text?: string;
+  records?: unknown[];
+  totalChars: number;
+  truncated: boolean;
+}
+export async function loadArtifact(id: string): Promise<StoredArtifact> {
+  return apexFetch<StoredArtifact>(`${CHAT_BASE}?resource=artifact&id=${encodeURIComponent(id)}`, { method: 'GET' });
+}
+
 export async function startChatSession(
   agentApiName: string,
   recordContextId?: string | null,

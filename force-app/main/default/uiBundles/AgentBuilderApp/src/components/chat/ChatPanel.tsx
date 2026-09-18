@@ -15,9 +15,10 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { renderMarkdown } from '@/lib/render-markdown';
-import { openChatSocket, continuationText, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef } from '@/lib/ws-chat';
+import { openChatSocket, continuationText, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary } from '@/lib/ws-chat';
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from './ChatApprovalCard';
+import { ToolResultCards, flattenCalls } from './ToolResultCards';
 import {
   startChatSession,
   getConnectionGate,
@@ -59,6 +60,9 @@ interface DisplayMessage {
   feedback?: 'up' | 'down' | null;
   buildJobId?: string;
   build?: BuildJobView | null;
+  /** The turn's tool calls (a specialist's own calls nested) — drawn as
+   *  result cards under the reply. */
+  toolCalls?: ChatToolCallSummary[];
   /** The page was left while this build ran — its progress lives on the
    *  New agent page now, not here. */
   buildInterrupted?: boolean;
@@ -431,6 +435,7 @@ export function ChatPanel({
             content: result.assistantText ?? '',
             toolLabel: null,
             createdDate: new Date().toISOString(),
+            toolCalls: result.toolCalls?.length ? result.toolCalls : undefined,
           },
         ]);
         // Answer in kind: aloud if this turn was spoken, unless the sound
@@ -438,7 +443,9 @@ export function ChatPanel({
         // if voice is on, so a spoken conversation keeps flowing.
         const spoke = turnVoiceRef.current;
         const aloud = soundRef.current === 'always' || (soundRef.current === 'auto' && spoke);
-        for (const tc of result.toolCalls ?? []) {
+        // A specialist's own calls count too: the console shows the work, and
+        // the Architect card follows a build the Agent Builder started.
+        for (const tc of flattenCalls(result.toolCalls)) {
           const output = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output ?? '');
           emit({
             kind: 'tool',
@@ -1213,6 +1220,7 @@ export function ChatPanel({
                   />
                 )}
               </div>
+              {!isUser && m.toolCalls?.length ? <ToolResultCards calls={m.toolCalls} /> : null}
               <div className="mt-1 flex items-center gap-1.5 px-1">
                 {!isUser && !m.isError && !isCopilot && (
                   <>

@@ -62,6 +62,9 @@ export interface ChatToolCallSummary {
   input: Record<string, unknown>;
   output?: unknown;
   isError?: boolean;
+  /** For a call into a specialist (ask_*): the calls the specialist made
+   *  in its own turn — the work behind the hand-off. */
+  nested?: ChatToolCallSummary[];
 }
 
 export interface ChatTurnResult {

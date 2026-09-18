@@ -85,3 +85,52 @@
 .tc-tree-root{font-weight:600;color:var(--foreground)} .tc-tree-sub{padding-left:10px;color:var(--node-purple)} .tc-tree small{font:10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground);margin-left:6px}
 .tc-tree-tools{padding-left:10px;color:var(--muted-foreground);font-size:11.5px;display:flex;flex-direction:column;gap:4px}
 @media (prefers-reduced-motion:reduce){.tc-card,.tc-field.add,.tc-flow-edge path,.tc-flow-node,.tc-section.new,.tc-step.wait .dot{animation:none!important}}
+
+/* ── every reply: markdown and safe HTML, styled ───────────────── */
+.prose-chat{font-size:12.5px;line-height:1.6;word-break:break-word}
+.prose-chat>:first-child{margin-top:0} .prose-chat>:last-child{margin-bottom:0}
+.prose-chat p{margin:0 0 8px}
+.prose-chat h1,.prose-chat h2,.prose-chat h3,.prose-chat h4{margin:12px 0 6px;line-height:1.3;font-weight:600;text-wrap:balance}
+.prose-chat h1{font-size:16px} .prose-chat h2{font-size:14.5px} .prose-chat h3{font-size:13.5px} .prose-chat h4{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+.prose-chat ul,.prose-chat ol{margin:4px 0 8px;padding-left:20px} .prose-chat li{margin:2px 0} .prose-chat li>p{margin:0}
+.prose-chat ul{list-style:disc} .prose-chat ol{list-style:decimal}
+.prose-chat a{color:var(--primary);text-decoration:underline;text-underline-offset:2px}
+.prose-chat code{font:11.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:color-mix(in srgb,var(--foreground) 8%,transparent);border-radius:4px;padding:1px 5px}
+.prose-chat pre{margin:6px 0 10px;padding:10px 12px;background:var(--secondary);border:1px solid var(--border);border-radius:6px;overflow:auto;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.prose-chat pre code{background:none;padding:0;font-size:inherit}
+.prose-chat blockquote{margin:6px 0 10px;padding:4px 12px;border-left:3px solid var(--primary);color:var(--muted-foreground)}
+.prose-chat hr{border:0;border-top:1px solid var(--border);margin:10px 0}
+.prose-chat table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:6px 0 10px;font-size:12px}
+.prose-chat th,.prose-chat td{padding:5px 9px;border:1px solid var(--border);vertical-align:top;text-align:left}
+.prose-chat th{font:600 10.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);background:var(--secondary);white-space:nowrap}
+.prose-chat tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--foreground) 3%,transparent)}
+.prose-chat img{max-width:100%;height:auto;border-radius:6px;border:1px solid var(--border);margin:4px 0}
+.prose-chat figure{margin:6px 0 10px} .prose-chat figcaption{font-size:11px;color:var(--muted-foreground);margin-top:4px}
+.prose-chat details{margin:6px 0 10px;border:1px solid var(--border);border-radius:6px;padding:6px 10px} .prose-chat summary{cursor:pointer;font-weight:600}
+.prose-chat kbd{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--secondary)}
+.prose-chat mark{background:color-mix(in srgb,var(--archon-warning) 30%,transparent);color:inherit;border-radius:2px;padding:0 2px}
+.prose-chat input[type=checkbox]{margin-right:6px;vertical-align:middle}
+.gr-prose{font-size:12px}
+
+/* ── generic results, drawn by shape ───────────────────────────── */
+.gr-table-wrap{overflow-x:auto;position:relative}
+.gr-badge{display:inline-block;font:600 9.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);border:1px solid color-mix(in srgb,var(--primary) 40%,transparent);border-radius:3px;padding:1px 6px;margin-bottom:6px}
+.gr-table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
+.gr-table th{text-align:left;font:600 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;background:var(--card)}
+.gr-table td{padding:5px 8px;border-bottom:1px solid var(--border);color:var(--foreground);white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.gr-table tbody tr:hover td{background:color-mix(in srgb,var(--foreground) 4%,transparent)}
+.gr-table tr:last-child td{border-bottom:0}
+.gr-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0 0;font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground)}
+.gr-meta{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground);margin-bottom:6px}
+.gr-link{color:var(--primary);text-decoration:underline;text-underline-offset:2px}
+.gr-link-btn{background:none;border:0;padding:0;color:var(--primary);font:11.5px inherit;font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.gr-null{color:var(--muted-foreground)} .gr-num{font-variant-numeric:tabular-nums}
+.gr-bool{font:600 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;border-radius:3px;padding:1px 5px}
+.gr-bool.y{color:var(--archon-success);background:color-mix(in srgb,var(--archon-success) 14%,transparent)} .gr-bool.n{color:var(--muted-foreground);background:var(--secondary)}
+.gr-json{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground)}
+.gr-kv{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}
+.gr-kv div{display:contents} .gr-kv dt{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground);white-space:nowrap} .gr-kv dd{margin:0;color:var(--foreground);word-break:break-word}
+.gr-chips{display:flex;flex-wrap:wrap;gap:4px}
+.gr-chip{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:var(--foreground);background:var(--secondary)} .gr-chip.muted{color:var(--muted-foreground)}
+.gr-fold{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.gr-code{margin:0;width:100%;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--secondary);border:1px solid var(--border);border-radius:5px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;color:var(--foreground);max-height:360px;overflow:auto}

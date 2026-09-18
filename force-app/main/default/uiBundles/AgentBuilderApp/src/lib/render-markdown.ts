@@ -15,8 +15,9 @@ const ALLOWED_TAGS = [
   'a',
   'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
   'span', 'div',
+  'img', 'figure', 'figcaption', 'caption', 'details', 'summary', 'kbd', 'mark', 'small',
 ];
-const ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'align', 'colspan', 'rowspan', 'class'];
+const ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'align', 'colspan', 'rowspan', 'class', 'src', 'alt', 'width', 'height', 'loading', 'open'];
 
 export function renderMarkdown(raw: string | null | undefined): string {
   if (!raw) return '';

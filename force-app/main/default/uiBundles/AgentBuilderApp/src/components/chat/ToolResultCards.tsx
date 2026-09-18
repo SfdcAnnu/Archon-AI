@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ChatToolCallSummary } from '@/lib/ws-chat';
 import { loadArtifact } from '@/lib/chat-data';
+import { GenericBody, describeShape } from './GenericResultCard';
 import '@/styles/chat-cards.css';
 
 /**
@@ -371,9 +372,10 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
     const diff = d && isObj(d.diff) ? (d.diff as Json) : null;
     const diffFields = diff && Array.isArray(diff.fields) ? (diff.fields as Json[]) : [];
     const diffValues = diff && Array.isArray(diff.picklistValues) ? (diff.picklistValues as string[]) : [];
-    return <Card kind="specialist" title={`${label} returned`} sub={d?.status ? str(d.status) : undefined} tone={d?.status === 'failed' ? 'err' : d?.status === 'question' ? 'warn' : undefined}>{d ? <KV rows={[['Change', d.changeId ? str(d.changeId, 20) : undefined], ['Component', d.type ? `${str(d.type)} ${str(d.object)}${d.apiName ? '.' + str(d.apiName) : ''}` : undefined], ['Reason', str(d.reason, 300)], ['Warnings', Array.isArray(d.warnings) && d.warnings.length ? <Chips items={(d.warnings as unknown[]).map(w => str(w, 80))} tone="warn" /> : undefined]]} /> : <div className="tc-empty">{str(typeof call.output === 'string' ? call.output : '', 300)}</div>}{diffFields.length > 0 && <Table rows={diffFields.map(f => ({ field: f.apiName ?? f.name, label: f.label, type: f.type, values: Array.isArray(f.picklistValues) ? (f.picklistValues as string[]).join(', ') : '' }))} max={20} />}{diffValues.length > 0 && <Chips items={diffValues} />}</Card>;
+    return <Card kind="specialist" title={`${label} returned`} sub={d?.status ? str(d.status) : undefined} tone={d?.status === 'failed' ? 'err' : d?.status === 'question' ? 'warn' : undefined}>{d ? <KV rows={[['Change', d.changeId ? str(d.changeId, 20) : undefined], ['Component', d.type ? `${str(d.type)} ${str(d.object)}${d.apiName ? '.' + str(d.apiName) : ''}` : undefined], ['Reason', str(d.reason, 300)], ['Warnings', Array.isArray(d.warnings) && d.warnings.length ? <Chips items={(d.warnings as unknown[]).map(w => str(w, 80))} tone="warn" /> : undefined]]} /> : <GenericBody value={call.output} />}{diffFields.length > 0 && <Table rows={diffFields.map(f => ({ field: f.apiName ?? f.name, label: f.label, type: f.type, values: Array.isArray(f.picklistValues) ? (f.picklistValues as string[]).join(', ') : '' }))} max={20} />}{diffValues.length > 0 && <Chips items={diffValues} />}</Card>;
   }
-  return <Card kind="generic" title={name.replace(/_/g, ' ')}><pre className="tc-code">{str(typeof data === 'string' ? data : JSON.stringify(data, null, 2), 800)}</pre></Card>;
+  // Any other tool, on any agent: drawn by the shape of what came back.
+  return <Card kind="generic" title={name.replace(/_/g, ' ')} sub={describeShape(data)}><GenericBody value={data} /></Card>;
 }
 
 /** Paging through a stored result is plumbing, not a result — the card for

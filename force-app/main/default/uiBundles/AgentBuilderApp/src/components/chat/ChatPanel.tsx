@@ -266,7 +266,9 @@ export function ChatPanel({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'error'>(isCopilot ? 'open' : 'connecting');
+  // 'closed' is the idle state after the server hung up (it does after a
+  // quiet spell): nothing is wrong, the next send reopens the socket.
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>(isCopilot ? 'open' : 'connecting');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   // ── Voice: answer in kind ─────────────────────────────────────────
@@ -609,7 +611,7 @@ export function ChatPanel({
           };
           ws.onclose = () => {
             console.log('[ChatPanel] websocket closed');
-            setWsStatus(prev => (prev === 'open' ? 'error' : prev));
+            setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
           };
           ws.onmessage = ev => {
             console.log('[ChatPanel] websocket message received', ev.data);
@@ -779,7 +781,7 @@ export function ChatPanel({
 
   const sendDisabled =
     sending ||
-    wsStatus !== 'open' ||
+    wsStatus === 'connecting' ||
     (gate.accessMode === 'PerUser' && !gate.connected) ||
     pendingAttachments.some(a => a.uploading) ||
     (!input.trim() && pendingAttachments.length === 0);
@@ -897,6 +899,24 @@ export function ChatPanel({
     [startCopilotBuild],
   );
 
+  // Sends a turn over the socket, reopening it first when the server has
+  // hung up on a quiet conversation. The ticket is single-use, so every
+  // reopen mints a new one. Handlers mirror the ones set at bootstrap.
+  const sendOverSocket = useCallback((payload: string): Promise<void> => {
+    const live = socketRef.current;
+    if (live && live.readyState === WebSocket.OPEN) { live.send(payload); return Promise.resolve(); }
+    const sessionId = session?.Id ?? lastReportedSessionIdRef.current;
+    if (!sessionId) return Promise.reject(new Error('No conversation to send to.'));
+    setWsStatus('connecting');
+    return openChatSocket(agentApiName, sessionId).then(ws => new Promise<void>((resolve, reject) => {
+      socketRef.current = ws;
+      ws.onopen = () => { setWsStatus('open'); emit({ kind: 'sys', text: `Reconnected to ${agentName}.` }); ws.send(payload); resolve(); };
+      ws.onerror = () => { setWsStatus('error'); reject(new Error('Could not reconnect to the agent. Try again.')); };
+      ws.onclose = () => setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
+      ws.onmessage = ev => handleTurnResultRef.current(JSON.parse(ev.data) as ChatTurnResult);
+    }));
+  }, [session, agentApiName, agentName, emit]);
+
   // The turn after an approved action ran. The runtime continues the
   // agent's work from the tool's result, so nobody has to type "continue".
   // No user bubble: the history entry carries the same text the server
@@ -904,8 +924,6 @@ export function ChatPanel({
   // the model was given.
   const continueAfterApproval = useCallback((a: ChatApproval) => {
     if (isCopilot || sending) return;
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
     const resultText = (a.resultText ?? '').trim();
     setSending(true);
     turnVoiceRef.current = false;
@@ -913,13 +931,14 @@ export function ChatPanel({
     emit({ kind: 'sys', text: `Approved — ${a.toolName} ran. Continuing.` });
     emit({ kind: 'thinking' });
     historyRef.current = [...historyRef.current, { role: 'user', content: continuationText(a.toolName, resultText) }];
-    socket.send(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText } }));
+    sendOverSocket(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText } }))
+      .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
     scrollToBottom();
-  }, [isCopilot, sending, emit, scrollToBottom]);
+  }, [isCopilot, sending, emit, scrollToBottom, sendOverSocket]);
 
   const handleSend = useCallback(() => {
-    if (sendDisabled || (!isCopilot && !socketRef.current)) {
-      console.log('[ChatPanel] handleSend blocked', { sendDisabled, hasSocket: !!socketRef.current });
+    if (sendDisabled || (!isCopilot && !session)) {
+      console.log('[ChatPanel] handleSend blocked', { sendDisabled, hasSession: !!session });
       return;
     }
     const text = input.trim();
@@ -976,15 +995,14 @@ export function ChatPanel({
         historyLen: historyRef.current.length,
         attachments,
       });
-      socketRef.current!.send(
-        JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments })
-      );
+      sendOverSocket(JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments }))
+        .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
     }
 
     for (const a of attachedThisTurn) {
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
     }
-  }, [sendDisabled, input, pendingAttachments, scrollToBottom, isCopilot, runCopilotTurn]);
+  }, [sendDisabled, input, pendingAttachments, scrollToBottom, isCopilot, runCopilotTurn, session, sendOverSocket]);
   useEffect(() => { sendRef.current = handleSend; }, [handleSend]);
   // The Home page's first message: queue it once the socket is open, then
   // send on the render where the input actually holds it — never on a timer.
@@ -1100,7 +1118,7 @@ export function ChatPanel({
               ? headerNote
               : isCopilot
                 ? 'Copilot — knows this platform and your org'
-                : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : 'Connection error'}
+                : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : wsStatus === 'closed' ? 'Ready — reconnects when you send' : 'Connection lost — retrying when you send'}
           </div>
         </div>
         </div>

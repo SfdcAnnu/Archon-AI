@@ -184,29 +184,12 @@ export default function HomeDashboardPage() {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  // ── What Archon is looking at ───────────────────────────────────────
-  // The same numbers the tiles show, in a compact shape the copilot can
-  // quote from. Bounded, so a large org never turns a question into a
-  // wall of context.
-  const snapshot = useMemo<Record<string, unknown>>(() => ({
-    windowDays: WINDOW_DAYS,
-    today: today ? { activity: todayTotal, succeeded: today.ok, failed: today.fail, other: today.other, successRate: pct(today.ok, today.ok + today.fail) } : null,
-    lastDays: stats ? { succeeded: week.ok, failed: week.fail, tokensIn: stats.tokensIn, tokensOut: stats.tokensOut } : null,
-    failingAgentsToday: failingAgents.slice(0, 10),
-    approvalsWaiting: approvalsAvailable ? pendingCount : null,
-    agents: data?.agents
-      ? {
-          total: agents.length, active: counts.active, draft: counts.draft, inactive,
-          list: agentRows.slice(0, 15).map(r => ({ name: r.a.name, status: r.a.status, department: r.a.department ?? null, today: r.total, failedToday: r.fail })),
-        }
-      : null,
-    chats: data?.sessions ? { active: activeSessions.length, recent: sessions.length, avgReplySeconds: avgReplyS != null ? Number(avgReplyS.toFixed(1)) : null } : null,
-    notTracked: ['per-agent cost in currency', 'user-level activity'],
-  }), [today, todayTotal, stats, week, failingAgents, approvalsAvailable, pendingCount, data, agents, counts, inactive, agentRows, activeSessions, sessions, avgReplyS]);
-  const platformSnapshot = useCallback(() => snapshot, [snapshot]);
 
   // ── Focus: the chat takes the screen ────────────────────────────────
   const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null } | null>(null);
+  // Who is answering in the focus screen: Archon, until it transfers the
+  // conversation to another agent (the Metadata Expert for org changes).
+  const [copilotAgent, setCopilotAgent] = useState<{ apiName: string; name: string }>(COPILOT);
   const [events, setEvents] = useState<ChatActivity[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [input, setInput] = useState('');
@@ -227,7 +210,14 @@ export default function HomeDashboardPage() {
     setFocus(null);
     setCountdown(null);
     setLeaving(true);
+    setCopilotAgent(COPILOT);
   }, [setFocus, setCountdown, setLeaving]);
+  const handleTransfer = useCallback((t: { agentApiName: string; agentName: string; message: string }) => {
+    setCopilotAgent({ apiName: t.agentApiName, name: t.agentName });
+    setCountdown(null);
+    setOpenSeq(n => n + 1);
+    setFocus({ message: { text: t.message, how: 'type' } });
+  }, []);
   useEffect(() => {
     if (!leaving) return;
     const t = setTimeout(() => setLeaving(false), FOCUS_MS);
@@ -473,20 +463,22 @@ export default function HomeDashboardPage() {
                 The chat takes everything to its right; its own X is
                 "back to the dashboard" and the auto-return countdown reads
                 in its subtitle. */}
-            <ConsoleRail events={events} agentName={COPILOT.name} />
+            <ConsoleRail events={events} agentName={copilotAgent.name} />
             <div className="home-focus-chat">
+              {/* A normal chat session with the built-in archon_copilot agent —
+                  the same path every agent runs on. Its stage tools draw the
+                  build card; transfer_to_agent remounts this with the target. */}
               <ChatPanel
-                key={`archon-copilot-${openSeq}`}
+                key={`${copilotAgent.apiName}-${openSeq}`}
                 variant="full"
-                transport="copilot"
                 headerNote={countdown != null ? `Answered — back to the dashboard in ${countdown}s. Say or type anything to stay.` : null}
-                agentApiName={COPILOT.apiName}
-                agentName={COPILOT.name}
-                copilotPlatform={platformSnapshot}
+                agentApiName={copilotAgent.apiName}
+                agentName={copilotAgent.name}
                 initialMessage={focus?.message ?? null}
                 onClose={exitFocus}
                 onSessionChange={handleSessionChange}
                 onActivity={handleActivity}
+                onTransfer={handleTransfer}
               />
             </div>
           </div>

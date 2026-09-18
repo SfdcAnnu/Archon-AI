@@ -385,6 +385,11 @@ export default function HomePage() {
                         </td>
                         <td className={T.td}>
                           <span className="text-[12.5px] font-semibold text-primary">{a.name}</span>
+                          {a.isSystem && (
+                            <span className="ml-2 rounded-full bg-[var(--node-purple-tint)] px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-[var(--node-purple)]" title="Shipped and managed by the platform — read-only; switch it Active or Inactive">
+                              Built-in
+                            </span>
+                          )}
                           <div className="text-[10.5px] text-[var(--archon-faint)]">
                             {a.department || 'No department'}
                             {a.version != null && ` · v${a.version}`}
@@ -403,6 +408,9 @@ export default function HomePage() {
                           <StatusBadge tone={statusTone(a.status)}>{a.status}</StatusBadge>
                         </td>
                         <td className={T.td}>
+                          {a.isSystem ? (
+                            <span className="block text-center text-[10px] text-[var(--archon-faint)]" title="Built-in agents cannot be deleted — open it and switch it Inactive">—</span>
+                          ) : (
                           <button
                             type="button"
                             disabled={deletingId === a.id}
@@ -419,6 +427,7 @@ export default function HomePage() {
                               <Trash2 className="h-3.5 w-3.5" />
                             )}
                           </button>
+                          )}
                         </td>
                       </tr>
                     );

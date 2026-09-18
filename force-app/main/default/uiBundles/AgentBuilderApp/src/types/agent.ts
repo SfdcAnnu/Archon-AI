@@ -210,4 +210,8 @@ export interface AgentGraph {
   agent: AgentDefinition;
   nodes: AgentNode[];
   connections: AgentConnection[];
+  /** Present on an agent the platform ships and manages (the Archon
+   *  Copilot): the canvas is read-only and the platform rewrites the nodes
+   *  when a newer version ships. Written by the server's sync, never here. */
+  system?: { apiName: string; version: number } | null;
 }

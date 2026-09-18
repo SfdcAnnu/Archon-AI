@@ -18,6 +18,7 @@ import AutomationReviewView from './AutomationReviewView';
 import { MOCK_AGENT_GRAPH } from '@/data/mock-agent';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import { loadAgentGraph, saveAgentGraph } from '@/lib/salesforce-data';
+import { updateAgentStatus } from '@/lib/agents-data';
 import type { DirectoryEntry } from '@/lib/connectors-data';
 import type { AgentGraph, NodeConfig } from '@/types/agent';
 
@@ -69,6 +70,9 @@ export default function AgentBuilder() {
   }, [apiName]);
 
   const handleSave = useCallback(() => {
+    // A built-in agent is managed by the platform — nothing here is saved
+    // back; its status goes through the status API instead (see toggleActive).
+    if (graph.system) return;
     setSaveState('saving');
     saveAgentGraph(graph)
       .then(() => {
@@ -411,9 +415,16 @@ export default function AgentBuilder() {
   }, []);
 
   const isActiveStatus = graph.agent.status === 'Active';
+  const isSystem = !!graph.system;
   const toggleActive = useCallback(() => {
-    setGraph(g => ({ ...g, agent: { ...g.agent, status: isActiveStatus ? 'Inactive' : 'Active' } }));
-  }, [isActiveStatus]);
+    const next = isActiveStatus ? 'Inactive' : 'Active';
+    setGraph(g => ({ ...g, agent: { ...g.agent, status: next } }));
+    // The only thing an org changes on a built-in agent — written at once,
+    // since there is no Save for it.
+    if (isSystem && graph.agent.id) {
+      updateAgentStatus(graph.agent.id, next).catch(err => console.error('Status change failed:', err));
+    }
+  }, [isActiveStatus, isSystem, graph.agent.id]);
 
   // Trigger-mode agents use a different node vocabulary the drag-and-drop
   // canvas was never built to author (see AutomationReviewView.tsx's doc
@@ -424,7 +435,7 @@ export default function AgentBuilder() {
     <AppShell
       defaultCollapsed
       railExtra={
-        isAutomationMode ? undefined : (
+        isAutomationMode || isSystem ? undefined : (
           <button
             ref={addRailBtnRef}
             type="button"
@@ -559,9 +570,16 @@ export default function AgentBuilder() {
             </Button>
           </div>
         </header>
+        {isSystem && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-[var(--node-purple-tint)] px-5 py-1.5 text-[11.5px] text-[var(--node-purple)]">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span><b>Built-in agent</b> · v{graph.system?.version} · managed by the platform. Read-only here — it cannot be edited or deleted; the switch above turns it on or off.</span>
+          </div>
+        )}
         <div className="relative flex min-h-0 flex-1">
           <div className="min-w-0 flex-1">
             <Canvas
+              readOnly={isSystem}
               nodes={graph.nodes}
               connections={graph.connections}
               selectedNodeId={selectedNodeId}
@@ -573,6 +591,7 @@ export default function AgentBuilder() {
               onCanvasDoubleClick={handleCanvasDoubleClick}
               onDeleteConnection={handleDeleteConnection}
             />
+            {!isSystem && (
             <button
               type="button"
               onClick={openQuickAddFromPill}
@@ -581,8 +600,10 @@ export default function AgentBuilder() {
               <Plus className="h-3 w-3 text-primary" /> Add node
               <span className="font-normal text-muted-foreground">· double-click canvas</span>
             </button>
+            )}
           </div>
           <PropertiesPanel
+            readOnly={isSystem}
             graph={graph}
             selectedNodeId={selectedNodeId}
             onDeselect={() => setSelectedNodeId(null)}

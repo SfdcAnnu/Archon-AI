@@ -193,11 +193,19 @@ export interface ChatPanelProps {
   /** Replaces the header subtitle while set — the Home page's auto-return
    *  countdown, for instance. */
   headerNote?: string | null;
+  /** The agent called transfer_to_agent: the host switches the conversation
+   *  to that agent, carrying the message. */
+  onTransfer?: (t: { agentApiName: string; agentName: string; message: string }) => void;
 }
+
+/** Platform tools that report an Architect build job in their result — the
+ *  panel draws the build card and follows the job for each of them. */
+const BUILD_TOOLS = new Set(['analyze_requirement', 'inspect_org', 'find_gaps', 'design_agent', 'write_instructions', 'review_design', 'save_agent', 'resume_build', 'get_build_status']);
+const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exec(output)?.[1] ?? null;
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform, headerNote,
+  transport = 'session', copilotPlatform, headerNote, onTransfer,
 }: ChatPanelProps) {
   const isFull = variant === 'full';
   const isCopilot = transport === 'copilot';
@@ -209,6 +217,12 @@ export function ChatPanel({
   // The copilot's async replies land through the same result handler the
   // socket uses; a ref keeps the build poll loop off its dependency chain.
   const handleTurnResultRef = useRef<(r: ChatTurnResult) => void>(() => {});
+  const onTransferRef = useRef(onTransfer);
+  useEffect(() => { onTransferRef.current = onTransfer; }, [onTransfer]);
+  // Builds started by the agent's own tools: one card per build, its job id
+  // moving forward as each stage tool resumes the job under a new id.
+  const toolBuildsRef = useRef<{ jobs: Set<string>; seen: Record<string, Record<string, string>>; lastMessageId: string | null }>({ jobs: new Set(), seen: {}, lastMessageId: null });
+  const pendingTransferRef = useRef<{ agentApiName: string; agentName: string; message: string } | null>(null);
   useEffect(
     () => () => {
       unmountedRef.current = true;
@@ -431,6 +445,20 @@ export function ChatPanel({
             name: tc.name,
             note: tc.isError ? 'failed' : output.includes('PENDING_APPROVAL') ? 'waiting for approval' : `${output.length} chars back`,
           });
+          // A build tool reported a job: draw the Architect card and follow it.
+          // The id is read from the text because a long result arrives as a
+          // preview handle, and jobId is the first key either way.
+          if (BUILD_TOOLS.has(tc.name) && !tc.isError) {
+            const jobId = jobIdIn(output);
+            if (jobId) {
+              const req = (tc.input as { requirement?: unknown } | undefined)?.requirement;
+              followToolBuild(jobId, tc.name === 'analyze_requirement', typeof req === 'string' ? req : null);
+            }
+          }
+          if (tc.name === 'transfer_to_agent' && !tc.isError) {
+            const m = /"agentApiName"\s*:\s*"([^"]+)"[\s\S]*?"agentName"\s*:\s*"([^"]*)"[\s\S]*?"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(output);
+            if (m) pendingTransferRef.current = { agentApiName: m[1], agentName: m[2] || m[1], message: JSON.parse(`"${m[3]}"`) };
+          }
         }
         emit({
           kind: 'reply',
@@ -441,6 +469,14 @@ export function ChatPanel({
           model: result.modelUsed,
           latencyMs: turnStartRef.current ? Date.now() - turnStartRef.current : undefined,
         });
+        // The agent handed the conversation over: let the reply land, then
+        // the host switches agents with the message carried across.
+        if (pendingTransferRef.current) {
+          const t = pendingTransferRef.current;
+          pendingTransferRef.current = null;
+          emit({ kind: 'sys', text: `Transferring to ${t.agentName}.` });
+          setTimeout(() => onTransferRef.current?.(t), 700);
+        }
         const rearm = () => {
           if (!getVoicePref()) return;
           try { recognitionRef.current?.start(); } catch { /* not allowed, or already on */ }
@@ -738,9 +774,13 @@ export function ChatPanel({
           setMessages(list => list.map(m => (m.id === messageId ? { ...m, build: view } : m)));
           scrollToBottom();
           if (view.status === 'done' || view.status === 'failed' || view.status === 'paused') {
-            const outcome = describeBuildOutcome(view);
-            emit({ kind: 'sys', text: view.status === 'done' ? 'Build finished.' : view.status === 'paused' ? 'Build paused at its cost ceiling.' : 'Build failed.' });
-            handleTurnResultRef.current({ status: 'complete', assistantText: outcome, toolCalls: [] });
+            const stageStop = view.status === 'paused' && /as asked/.test(String((view as { error?: string }).error ?? ''));
+            emit({ kind: 'sys', text: view.status === 'done' ? 'Build finished.' : stageStop ? 'Stage finished — waiting for the next step.' : view.status === 'paused' ? 'Build paused at its cost ceiling.' : 'Build failed.' });
+            // A build the agent drives through its tools narrates itself; only
+            // the copilot's hand-off needs a synthetic reply here.
+            if (!toolBuildsRef.current.jobs.has(jobId)) {
+              handleTurnResultRef.current({ status: 'complete', assistantText: describeBuildOutcome(view), toolCalls: [] });
+            }
             return;
           }
           buildPollRef.current = setTimeout(() => pollBuildRef.current(messageId, jobId, seen), 2500);
@@ -754,6 +794,30 @@ export function ChatPanel({
     [emit, scrollToBottom],
   );
   useEffect(() => { pollBuildRef.current = pollBuild; }, [pollBuild]);
+
+  const followToolBuild = useCallback(
+    (jobId: string, fresh: boolean, requirement: string | null) => {
+      const st = toolBuildsRef.current;
+      if (st.jobs.has(jobId)) return;
+      st.jobs.add(jobId);
+      st.seen[jobId] = {};
+      let messageId = fresh ? null : st.lastMessageId;
+      if (!messageId) {
+        messageId = `build_${Date.now()}`;
+        const id = messageId;
+        setMessages(list => [
+          ...list,
+          { id, role: 'Build', content: requirement ?? 'Architect build', toolLabel: null, createdDate: new Date().toISOString(), build: null, buildJobId: jobId },
+        ]);
+      } else {
+        const id = messageId;
+        setMessages(list => list.map(m => (m.id === id ? { ...m, buildJobId: jobId } : m)));
+      }
+      st.lastMessageId = messageId;
+      pollBuildRef.current(messageId, jobId, st.seen[jobId]);
+    },
+    [],
+  );
 
   const startCopilotBuild = useCallback(
     (requirement: string) => {

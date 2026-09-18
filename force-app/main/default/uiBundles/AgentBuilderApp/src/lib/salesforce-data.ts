@@ -128,7 +128,7 @@ function fromRaw(raw: RawAgentWithNodes): AgentGraph {
     setupChecklist: parseSetupChecklist(raw.agent.SetupChecklistJson__c),
   };
 
-  return { agent, nodes, connections };
+  return { agent, nodes, connections, system: canvasJson.system ?? null };
 }
 
 export async function loadAgentGraph(apiName: string): Promise<AgentGraph> {
@@ -164,7 +164,10 @@ export async function saveAgentGraph(graph: AgentGraph): Promise<string> {
       status: graph.agent.status,
       accessMode: graph.agent.accessMode,
       executeType: graph.agent.executeType,
-      canvasJson: JSON.stringify({ connections: indexedConnections }),
+      // A built-in's marker travels with its wiring, so a save (the status
+      // switch goes through here) never turns a managed agent into an
+      // ordinary one.
+      canvasJson: JSON.stringify(graph.system ? { connections: indexedConnections, system: graph.system } : { connections: indexedConnections }),
       setupChecklistJson: JSON.stringify(graph.agent.setupChecklist ?? []),
     },
     nodes: graph.nodes.map(n => ({

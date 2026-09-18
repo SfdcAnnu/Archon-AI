@@ -17,11 +17,14 @@ interface RawAgentSummary {
   Version__c: number | null;
   TotalExecutions__c: number | null;
   SuccessRate__c: number | null;
+  IsSystem__c?: boolean;
   CreatedDate: string;
   LastModifiedDate: string;
 }
 
 export interface AgentSummary {
+  /** Shipped and managed by the platform: read-only, cannot be deleted. */
+  isSystem: boolean;
   id: string;
   name: string;
   apiName: string;
@@ -46,6 +49,7 @@ function fromRaw(r: RawAgentSummary): AgentSummary {
     version: r.Version__c,
     totalExecutions: r.TotalExecutions__c,
     successRate: r.SuccessRate__c,
+    isSystem: r.IsSystem__c === true,
     createdDate: r.CreatedDate,
     lastModifiedDate: r.LastModifiedDate,
   };

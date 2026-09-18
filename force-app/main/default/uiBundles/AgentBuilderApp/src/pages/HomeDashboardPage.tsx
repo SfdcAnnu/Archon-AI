@@ -101,6 +101,23 @@ const MORE: Array<{ label: string; href: string }> = [
   { label: 'AI Models', href: '/ai-connections' }, { label: 'Cost', href: '/cost' }, { label: 'Setup', href: '/setup' },
 ];
 
+function MoreMenu({ open, setOpen, pending, onGo, label = 'More' }: { open: boolean; setOpen: (f: (o: boolean) => boolean) => void; pending: number; onGo: (href: string) => void; label?: string }) {
+  return (
+    <div className="cc-more">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}>{label} <ChevronDown /></button>
+      {open && (
+        <>
+          <div className="cc-more-scrim" onClick={() => setOpen(() => false)} />
+          <div className="cc-more-menu">
+            {NAV.map(n => <button key={n.key} type="button" className="nav-only" onClick={() => { setOpen(() => false); onGo(n.href); }}>{n.label}{n.key === 'review' && pending > 0 && <span className="cc-badge">{pending}</span>}</button>)}
+            {MORE.map(m => <button key={m.href} type="button" onClick={() => { setOpen(() => false); onGo(m.href); }}>{m.label}</button>)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function HomeDashboardPage() {
   const navigate = useNavigate();
   const [range, setRange] = useState<Range>(7);
@@ -246,16 +263,10 @@ export default function HomeDashboardPage() {
                 {n.label}{n.key === 'review' && pendingCount > 0 && <span className="cc-badge">{pendingCount}</span>}
               </button>
             ))}
-            <div className="cc-more">
-              <button type="button" onClick={() => setMoreOpen(o => !o)} aria-expanded={moreOpen}>More <ChevronDown /></button>
-              {moreOpen && (
-                <>
-                  <div className="cc-more-scrim" onClick={() => setMoreOpen(false)} />
-                  <div className="cc-more-menu">{MORE.map(m => <button key={m.href} type="button" onClick={() => { setMoreOpen(false); navigate(m.href); }}>{m.label}</button>)}</div>
-                </>
-              )}
-            </div>
+            <MoreMenu open={moreOpen} setOpen={setMoreOpen} pending={pendingCount} onGo={navigate} />
           </nav>
+          {/* On a narrow screen the sections fold into one menu. */}
+          <div className="cc-more cc-menu-btn"><MoreMenu open={moreOpen} setOpen={setMoreOpen} pending={pendingCount} onGo={navigate} label="Menu" /></div>
           <div className="cc-top-r">
             <span className="cc-env"><i /> Production</span>
             <button type="button" className="cc-create" onClick={() => navigate('/new-agent')}><Plus /> Create agent</button>

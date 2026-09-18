@@ -22,6 +22,12 @@ global with sharing class AgentChatRestService {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
         try {
+            if (req.params.get('resource') == 'artifact') {
+                // A large tool result, passed through from the server as-is.
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(ArchonArtifactReader.read(req.params.get('id')));
+                return;
+            }
             if (req.params.get('resource') == 'gate') {
                 AgentUserConnectionController.ConnectionGate gate =
                     AgentUserConnectionController.getGate(req.params.get('agentApiName'));

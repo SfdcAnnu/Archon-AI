@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
 import {
-  AlertTriangle, Check, ExternalLink, Loader2, Mic, MicOff, Paperclip, Send, Settings2, Sparkles,
+  Loader2, Mic, MicOff, Paperclip, Send, Settings2,
   ThumbsDown, ThumbsUp, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react';
-import { askArchon, getArchitectBuild, startArchitectBuild, type BuildJobView, type BuildStep } from '@/lib/architect-data';
+import { askArchon, getArchitectBuild, startArchitectBuild, type BuildJobView } from '@/lib/architect-data';
 import {
   speak, speakable, stopSpeaking, getSoundPref, setSoundPref, nextSoundPref, SOUND_LABEL,
   getVoicePref, setVoicePref, useSpeaking, type SoundPref,
@@ -19,6 +18,7 @@ import { openChatSocket, continuationText, type ChatTurnResult, type ChatHistory
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from './ChatApprovalCard';
 import { ToolResultCards, flattenCalls } from './ToolResultCards';
+import { BuildWorkspace } from './BuildWorkspace';
 import {
   startChatSession,
   getConnectionGate,
@@ -138,14 +138,6 @@ function describeBuildOutcome(view: BuildJobView): string {
   return `The build stopped after ${done} of ${view.steps.length} stages: ${view.error ?? 'unknown error'}. Nothing was created.`;
 }
 
-const STEP_TONE: Record<BuildStep['state'], string> = {
-  done: 'text-[var(--archon-success)]',
-  warn: 'text-[var(--archon-warning)]',
-  running: 'text-primary',
-  failed: 'text-[var(--archon-error)]',
-  pending: 'text-[var(--archon-faint)]',
-};
-
 function toDisplay(m: RawChatMessage): DisplayMessage | null {
   if (m.Role__c === 'System') return null;
   let toolLabel: string | null = null;
@@ -236,7 +228,6 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const isFull = variant === 'full';
   const isCopilot = transport === 'copilot';
-  const navigate = useNavigate();
   const copilotPlatformRef = useRef(copilotPlatform);
   useEffect(() => { copilotPlatformRef.current = copilotPlatform; }, [copilotPlatform]);
   const buildPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1004,6 +995,15 @@ export function ChatPanel({
     }
   }, [sendDisabled, input, pendingAttachments, scrollToBottom, isCopilot, runCopilotTurn, session, sendOverSocket]);
   useEffect(() => { sendRef.current = handleSend; }, [handleSend]);
+  // A card's button speaks for the person: the text goes into the box and
+  // is sent on the render where it lands, never on a timer — the same path
+  // the Home page's first message takes.
+  const queueSend = useCallback((text: string) => {
+    if (!text.trim()) return;
+    lastInputVoiceRef.current = false;
+    pendingSendRef.current = text;
+    setInput(text);
+  }, []);
   // The Home page's first message: queue it once the socket is open, then
   // send on the render where the input actually holds it — never on a timer.
   useEffect(() => {
@@ -1164,64 +1164,16 @@ export function ChatPanel({
         )}
         {messages.map(m => {
           if (m.role === 'Build') {
-            const view = m.build;
-            const result = view?.status === 'done' ? view.result : undefined;
             return (
-              <div key={m.id} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                <div className="flex items-center gap-2 text-[11px] font-semibold text-foreground">
-                  <Sparkles className="h-3.5 w-3.5 text-[var(--node-purple)]" />
-                  Architect build
-                  {view && (
-                    <span className="ml-auto text-[10px] font-normal text-muted-foreground">
-                      ${view.costUsd.toFixed(2)} of ${view.maxCostUsd.toFixed(2)} · {(view.elapsedMs / 1000).toFixed(0)}s
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{m.content}</p>
-                {m.buildInterrupted ? (
-                  <p className="mt-2 text-[11px] text-[var(--archon-warning)]">
-                    You left while this was building — its progress is on the New agent page.
-                  </p>
-                ) : m.isError ? null : !view ? (
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Starting…
-                  </div>
-                ) : (
-                  <ul className="mt-2 space-y-1">
-                    {view.steps.map(s => (
-                      <li key={s.key} className={`flex items-start gap-2 text-[11px] ${STEP_TONE[s.state]}`}>
-                        <span className="mt-0.5 w-3 shrink-0">
-                          {s.state === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> : s.state === 'done' ? <Check className="h-3 w-3" /> : s.state === 'failed' || s.state === 'warn' ? <AlertTriangle className="h-3 w-3" /> : <span className="block h-3 w-3 text-center leading-3">·</span>}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          {s.label}
-                          {s.detail && <span className="text-muted-foreground"> — {s.detail}</span>}
-                          {s.reused && <span className="text-muted-foreground"> (kept from before)</span>}
-                        </span>
-                        {s.ms != null && <span className="text-[10px] text-muted-foreground">{(s.ms / 1000).toFixed(1)}s</span>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {result && (
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                    <span className="text-[11px] text-foreground">
-                      <b>{result.apiName}</b> · {result.shape} · {result.status}
-                    </span>
-                    <Button size="xs" className="ml-auto" onClick={() => navigate(`/agent/${encodeURIComponent(result.apiName)}`)}>
-                      <ExternalLink className="h-3 w-3" /> Open agent
-                    </Button>
-                  </div>
-                )}
-                {view?.status === 'paused' && (
-                  <div className="mt-2.5 flex items-center gap-2 border-t border-border pt-2">
-                    <span className="text-[11px] text-muted-foreground">Paused at its cost ceiling — every finished stage is saved.</span>
-                    <Button size="xs" variant="outline" className="ml-auto" onClick={() => navigate('/new-agent')}>
-                      Resume on New agent
-                    </Button>
-                  </div>
-                )}
-              </div>
+              <BuildWorkspace
+                key={m.id}
+                requirement={m.content}
+                jobId={m.buildJobId}
+                view={m.build ?? null}
+                interrupted={m.buildInterrupted}
+                isError={m.isError}
+                onSend={queueSend}
+              />
             );
           }
           if (m.role === 'Tool') {

@@ -95,8 +95,11 @@ global with sharing class AgentArchitectRestService {
                 writeError(res, 400, 'jobId is required.');
                 return;
             }
+            // resource=detail: every stage's saved work for the chat's build
+            // workspace (questions, gaps, design preview, review, setup list).
+            String suffix = req.params.get('resource') == 'detail' ? '/detail' : '';
             HttpResponse serverRes = ArchonServerClient.callout(
-                'GET', '/api/architect/build/' + EncodingUtil.urlEncode(jobId, 'UTF-8'), null, 60000);
+                'GET', '/api/architect/build/' + EncodingUtil.urlEncode(jobId, 'UTF-8') + suffix, null, 60000);
             if (serverRes.getStatusCode() >= 400) {
                 writeError(res, 400, 'Could not read the build: ' + ArchonServerClient.extractServerError(serverRes));
                 return;

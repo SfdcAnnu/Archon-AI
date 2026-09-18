@@ -123,6 +123,34 @@ export async function getArchitectBuild(jobId: string): Promise<BuildJobView> {
   return apexFetch<BuildJobView>(`${BASE}?jobId=${encodeURIComponent(jobId)}`, { method: 'GET' }, 30000);
 }
 
+/** Everything a build has produced so far, stage by stage — what the chat's
+ *  build workspace draws. Read-only; the design preview is laid out from
+ *  the checkpoint, not saved. */
+export interface BuildDetail {
+  jobId: string;
+  status: BuildJobView['status'];
+  stoppedAfter: string | null;
+  requirement: { goal: string; capabilities: string[]; openQuestions: string[]; successCriteria: string[]; riskLevel: string | null; trigger: string | null } | null;
+  survey: Record<string, { count: number; sample: string[] } | { keys: string[] } | string> | null;
+  match: { coverage: number | null; matched: string[]; gaps: Array<{ state: 'partial' | 'missing'; capability: string; why: string; have: string; need: string }> } | null;
+  design: {
+    name: string; department: string; description: string | null;
+    trigger: { type: string; channel?: string; sobject?: string } | null;
+    preview: { nodes: Array<{ id: string; name: string; nodeType: 'ai' | 'subagent' | 'tool' | 'catalog'; nodeSubType: string; config: Record<string, unknown>; positionX: number; positionY: number }>; connections: Array<{ id: string; fromNodeId: string; fromPort: 'tool'; toNodeId: string; toPort: 'in' }> };
+    counts: { specialists: number; tools: number; approvals: number };
+    instructions: Array<{ id: string; label: string; role: 'agent' | 'subagent'; text: string }>;
+    guardrails: string[];
+    budgets: { maxSteps: number; maxCostUsd: number; timeoutSeconds: number } | null;
+  } | null;
+  review: { verdict: 'pass' | 'pass_with_risk' | 'blocked' | 'fail'; uncovered?: string[]; failures?: Array<Record<string, unknown>>; repaired?: boolean } | null;
+  prerequisites: BuildPrerequisite[];
+  result: BuildResult | null;
+  error: string | null;
+}
+export async function getArchitectBuildDetail(jobId: string): Promise<BuildDetail> {
+  return apexFetch<BuildDetail>(`${BASE}?jobId=${encodeURIComponent(jobId)}&resource=detail`, { method: 'GET' }, 30000);
+}
+
 /** Who a prerequisite belongs to, in the client's vocabulary. */
 export const ASSIGNEE_LABEL: Record<string, string> = {
   salesforce_admin: 'Needs your Salesforce admin',

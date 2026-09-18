@@ -370,6 +370,8 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
   if (BUILD_STAGE.has(name)) return null; // the Architect card draws these
   if (name.startsWith('ask_')) {
     const d = isObj(data) ? data : null;
+    // A bare status ("ok") carries nothing worth a card; the reply says it.
+    if (d && Object.keys(d).every(k => k === 'status' || k === 'ok')) return null;
     const label = name.replace(/^ask_/, '').replace(/_[a-z0-9]{6}$/, '').replace(/_/g, ' ');
     // A read task reports the data itself: a field list or picklist values.
     const diff = d && isObj(d.diff) ? (d.diff as Json) : null;

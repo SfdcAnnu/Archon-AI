@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>IsSystem__c</fullName>
+    <label>Built-in</label>
+    <description>Set by the platform on agents it ships and manages (for example the Archon Copilot). A built-in agent is read-only on the canvas and cannot be deleted — it can only be switched Active or Inactive. The platform rewrites its nodes when a new version ships.</description>
+    <defaultValue>false</defaultValue>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

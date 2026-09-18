@@ -250,6 +250,7 @@
     <fieldPermissions><field>AgentDefinition__c.Status__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.KnowledgeBase__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.Version__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.IsSystem__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.CanvasJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExternalServerUrl__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.TotalExecutions__c</field><readable>true</readable><editable>true</editable></fieldPermissions>

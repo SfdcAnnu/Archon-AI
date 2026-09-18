@@ -154,6 +154,7 @@
     <fieldPermissions><field>AgentDefinition__c.CanvasJson__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.KnowledgeBase__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.Version__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
+    <fieldPermissions><field>AgentDefinition__c.IsSystem__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExternalServerUrl__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.ExecuteType__c</field><readable>true</readable><editable>false</editable></fieldPermissions>
     <fieldPermissions><field>AgentDefinition__c.PostTurnAutomationAgent__c</field><readable>true</readable><editable>false</editable></fieldPermissions>

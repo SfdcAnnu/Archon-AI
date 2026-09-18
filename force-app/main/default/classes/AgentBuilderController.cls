@@ -15,7 +15,7 @@ public with sharing class AgentBuilderController {
             return [
                 SELECT Id, Name, ApiName__c, Department__c, Description__c,
                        Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
-                       CreatedDate, LastModifiedDate
+                       IsSystem__c, CreatedDate, LastModifiedDate
                 FROM AgentDefinition__c
                 WITH USER_MODE
                 ORDER BY Department__c, Name ASC
@@ -25,7 +25,7 @@ public with sharing class AgentBuilderController {
         return [
             SELECT Id, Name, ApiName__c, Department__c, Description__c,
                    Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
-                   ExecuteType__c, CreatedDate, LastModifiedDate
+                   ExecuteType__c, IsSystem__c, CreatedDate, LastModifiedDate
             FROM AgentDefinition__c
             WHERE Department__c = :department
             WITH USER_MODE
@@ -315,12 +315,18 @@ public with sharing class AgentBuilderController {
     @AuraEnabled
     public static void deleteAgent(String agentId) {
         List<AgentDefinition__c> toDelete = [
-            SELECT Id FROM AgentDefinition__c
+            SELECT Id, Name, IsSystem__c FROM AgentDefinition__c
             WHERE Id = :agentId
             WITH USER_MODE
             LIMIT 1
         ];
-        if (!toDelete.isEmpty()) delete toDelete;
+        if (toDelete.isEmpty()) return;
+        // A built-in agent is part of the product: it can be switched off,
+        // never removed. The platform rewrites it when a new version ships.
+        if (toDelete[0].IsSystem__c == true) {
+            throw new IllegalArgumentException('"' + toDelete[0].Name + '" is a built-in agent — set it to Inactive instead of deleting it.');
+        }
+        delete toDelete;
     }
 
     // ACTIVATE / DEACTIVATE

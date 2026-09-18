@@ -468,7 +468,7 @@ export function ChatPanel({
         const aloud = soundRef.current === 'always' || (soundRef.current === 'auto' && spoke);
         // A specialist's own calls count too: the console shows the work, and
         // the Architect card follows a build the Agent Builder started.
-        for (const tc of flattenCalls(result.toolCalls)) {
+        for (const tc of flattenCalls(result.toolCalls).filter(c => c.name !== 'read_artifact')) {
           const output = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output ?? '');
           emit({
             kind: 'tool',

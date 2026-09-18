@@ -309,6 +309,18 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
     const like = typeof call.input.fieldsLike === 'string' ? call.input.fieldsLike : '';
     return <Card kind="describe" title={`Describe ${str(d.label ?? call.input.object)}`} sub={like ? `fields like "${like}" · ${rows.length} of ${str(d.fieldCount ?? rows.length)}` : `${rows.length} fields`}><Table rows={rows.map(f => ({ field: f.name, label: f.label, type: f.type, required: f.required ? 'yes' : '', values: Array.isArray(f.picklistValues) ? (f.picklistValues as string[]).join(', ') : '' }))} max={20} /></Card>;
   }
+  if (name === 'describe_field') {
+    const d = isObj(data) ? data : {};
+    const f = isObj(d.field) ? d.field : d;
+    const meta = isObj(d.metadata) ? d.metadata : {};
+    const values = Array.isArray(f.picklistValues) ? (f.picklistValues as string[]) : [];
+    return (
+      <Card kind="describe" title={`Field ${str(d.object ?? call.input.object)}.${str(f.name ?? call.input.field)}`} sub={str(f.label)}>
+        <KV rows={[['Type', `${str(f.type)}${f.length ? ` (${str(f.length)})` : ''}`], ['Required', f.required ? 'yes' : undefined], ['Custom', f.custom ? 'yes' : undefined], ['Unique', f.unique ? 'yes' : undefined], ['External id', f.externalId ? 'yes' : undefined], ['References', Array.isArray(f.referenceTo) && f.referenceTo.length ? (f.referenceTo as string[]).join(', ') : undefined], ['Default', str(meta.defaultValue ?? f.defaultValue)], ['Help text', str(meta.inlineHelpText ?? f.inlineHelpText, 200)], ['Description', str(meta.description, 300)], ['History tracking', meta.trackHistory ? 'yes' : undefined], ['Picklist values', values.length ? <Chips items={values} /> : undefined]]} />
+        {typeof meta.formula === 'string' && meta.formula ? <pre className="tc-code">{str(meta.formula, 1500)}</pre> : null}
+      </Card>
+    );
+  }
   if (name === 'serialize') {
     const env = (isObj(call.input.ir) ? call.input.ir : call.input) as Envelope;
     const out = isObj(data) ? data : {};
@@ -355,18 +367,27 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
   if (name.startsWith('ask_')) {
     const d = isObj(data) ? data : null;
     const label = name.replace(/^ask_/, '').replace(/_[a-z0-9]{6}$/, '').replace(/_/g, ' ');
-    return <Card kind="specialist" title={`${label} returned`} sub={d?.status ? str(d.status) : undefined} tone={d?.status === 'failed' ? 'err' : d?.status === 'question' ? 'warn' : undefined}>{d ? <KV rows={[['Change', d.changeId ? str(d.changeId, 20) : undefined], ['Component', d.type ? `${str(d.type)} ${str(d.object)}${d.apiName ? '.' + str(d.apiName) : ''}` : undefined], ['Reason', str(d.reason, 300)], ['Warnings', Array.isArray(d.warnings) && d.warnings.length ? <Chips items={(d.warnings as unknown[]).map(w => str(w, 80))} tone="warn" /> : undefined]]} /> : <div className="tc-empty">{str(typeof call.output === 'string' ? call.output : '', 300)}</div>}</Card>;
+    // A read task reports the data itself: a field list or picklist values.
+    const diff = d && isObj(d.diff) ? (d.diff as Json) : null;
+    const diffFields = diff && Array.isArray(diff.fields) ? (diff.fields as Json[]) : [];
+    const diffValues = diff && Array.isArray(diff.picklistValues) ? (diff.picklistValues as string[]) : [];
+    return <Card kind="specialist" title={`${label} returned`} sub={d?.status ? str(d.status) : undefined} tone={d?.status === 'failed' ? 'err' : d?.status === 'question' ? 'warn' : undefined}>{d ? <KV rows={[['Change', d.changeId ? str(d.changeId, 20) : undefined], ['Component', d.type ? `${str(d.type)} ${str(d.object)}${d.apiName ? '.' + str(d.apiName) : ''}` : undefined], ['Reason', str(d.reason, 300)], ['Warnings', Array.isArray(d.warnings) && d.warnings.length ? <Chips items={(d.warnings as unknown[]).map(w => str(w, 80))} tone="warn" /> : undefined]]} /> : <div className="tc-empty">{str(typeof call.output === 'string' ? call.output : '', 300)}</div>}{diffFields.length > 0 && <Table rows={diffFields.map(f => ({ field: f.apiName ?? f.name, label: f.label, type: f.type, values: Array.isArray(f.picklistValues) ? (f.picklistValues as string[]).join(', ') : '' }))} max={20} />}{diffValues.length > 0 && <Chips items={diffValues} />}</Card>;
   }
   return <Card kind="generic" title={name.replace(/_/g, ' ')}><pre className="tc-code">{str(typeof data === 'string' ? data : JSON.stringify(data, null, 2), 800)}</pre></Card>;
 }
 
+/** Paging through a stored result is plumbing, not a result — the card for
+ *  the call that produced it already shows the whole thing. */
+const isPlumbing = (c: ChatToolCallSummary) => c.name === 'read_artifact';
+
 export function ToolResultCards({ calls }: { calls: ChatToolCallSummary[] | undefined }) {
-  const flat = useMemo(() => flattenCalls(calls), [calls]);
+  const flat = useMemo(() => flattenCalls(calls).filter(c => !isPlumbing(c)), [calls]);
   if (!flat.length) return null;
   // Specialist calls are grouped under the ask_* that made them.
   const groups: Array<{ owner: ChatToolCallSummary | null; calls: ChatToolCallSummary[] }> = [];
-  for (const c of calls ?? []) {
-    if (c.nested?.length) groups.push({ owner: c, calls: c.nested });
+  for (const c of (calls ?? []).filter(x => !isPlumbing(x))) {
+    const inner = (c.nested ?? []).filter(x => !isPlumbing(x));
+    if (inner.length) groups.push({ owner: c, calls: inner });
     groups.push({ owner: null, calls: [c] });
   }
   return (

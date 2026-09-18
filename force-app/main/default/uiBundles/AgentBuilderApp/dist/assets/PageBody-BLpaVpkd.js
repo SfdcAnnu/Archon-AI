@@ -1,1 +1,0 @@
-import{j as p,d as m}from"./index-Cwdg1vnY.js";const t={wide:"max-w-[1920px]",standard:"max-w-[1920px]",read:"max-w-3xl"};function r({children:a,width:x="standard",className:s}){return p.jsx("div",{className:m("mx-auto w-full px-3 py-3 sm:px-4 sm:py-3.5 lg:px-5 lg:py-4",t[x],s),children:a})}export{r as P};

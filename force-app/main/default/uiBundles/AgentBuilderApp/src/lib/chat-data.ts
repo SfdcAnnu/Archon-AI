@@ -28,6 +28,8 @@ export interface RawChatMessage {
   Role__c: 'User' | 'Assistant' | 'Tool' | 'System';
   Content__c: string | null;
   ToolCallsJson__c: string | null;
+  /** The whole call as the server reported it (input, output, nested calls). */
+  ToolResultsJson__c?: string | null;
   ModelUsed__c: string | null;
   TokensIn__c: number | null;
   TokensOut__c: number | null;

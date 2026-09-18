@@ -166,6 +166,29 @@ function toDisplay(m: RawChatMessage): DisplayMessage | null {
   };
 }
 
+/** Stored Tool rows carry the whole call (ToolResultsJson__c, nested calls
+ *  included); reopening a conversation draws the same cards under the reply
+ *  that followed them, and the raw Tool rows drop out of the transcript. A
+ *  Tool row that fails to parse stays as it was. */
+function foldToolRows(display: DisplayMessage[], raw: RawChatMessage[]): DisplayMessage[] {
+  const rawById = new Map(raw.map(m => [m.Id, m]));
+  const out: DisplayMessage[] = [];
+  let pending: ChatToolCallSummary[] = [];
+  for (const m of display) {
+    if (m.role === 'Tool') {
+      const json = rawById.get(m.id)?.ToolResultsJson__c;
+      let call: ChatToolCallSummary | null = null;
+      try { const c = json ? (JSON.parse(json) as ChatToolCallSummary) : null; if (c && typeof c.name === 'string') call = c; } catch { /* keep the row */ }
+      if (call) { pending.push(call); continue; }
+      out.push(m);
+      continue;
+    }
+    if (m.role === 'Assistant' && pending.length) { out.push({ ...m, toolCalls: pending }); pending = []; continue; }
+    out.push(m);
+  }
+  return out;
+}
+
 export interface ChatPanelProps {
   agentApiName: string;
   agentName: string;
@@ -558,7 +581,7 @@ export function ChatPanel({
         });
         setSession(result.session);
         lastReportedSessionIdRef.current = result.session.Id;
-        const display = result.messages.map(toDisplay).filter((m): m is DisplayMessage => m != null);
+        const display = foldToolRows(result.messages.map(toDisplay).filter((m): m is DisplayMessage => m != null), result.messages);
         setMessages(display);
         historyRef.current = result.messages
           .filter(m => m.Role__c !== 'System')

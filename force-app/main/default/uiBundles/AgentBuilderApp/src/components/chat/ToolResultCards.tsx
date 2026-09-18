@@ -230,7 +230,7 @@ function DeployTimeline({ calls }: { calls: ChatToolCallSummary[] }) {
     const out = typeof c.output === 'string' ? c.output : JSON.stringify(c.output ?? '');
     if (c.isError || /^\s*Error/.test(out)) return 'fail';
     if (/PENDING_APPROVAL/.test(out)) return 'wait';
-    if (name === 'check_deploy' && /"success"\s*:\s*false/.test(out)) return 'fail';
+    if (name === 'check_deploy' && (/"passed"\s*:\s*false/.test(out) || /"success"\s*:\s*false/.test(out))) return 'fail';
     return 'done';
   };
   const shown = PIPE_STEPS.filter(([n]) => byName.has(n) || ['validate', 'serialize', 'check_deploy', 'deploy'].includes(n));
@@ -298,12 +298,16 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
 
   if (name === 'resolve_object' || name === 'resolve_field') {
     const d = isObj(data) ? data : {};
-    const ok = !!d.apiName && (d.resolved !== false);
-    return <Card kind="resolve" title={name === 'resolve_object' ? 'Resolved object' : 'Resolved field'} sub={ok ? `${str(d.label ?? call.input.label)} → ${str(d.apiName)}${d.confidence != null ? ` · ${Number(d.confidence).toFixed(2)}` : ''}` : 'needs a choice'} tone={ok ? 'ok' : 'warn'}>{!ok && Array.isArray(d.candidates) && <Chips items={(d.candidates as Json[]).map(c => `${str(c.label ?? c.apiName)} (${str(c.apiName)})`)} />}</Card>;
+    const apiName = typeof d.resolved === 'string' ? d.resolved : typeof d.apiName === 'string' ? d.apiName : '';
+    const ok = !!apiName;
+    const where = name === 'resolve_field' && call.input.object ? `${str(call.input.object)}.` : '';
+    return <Card kind="resolve" title={name === 'resolve_object' ? 'Resolved object' : 'Resolved field'} sub={ok ? `${str(call.input.label)} → ${where}${apiName}${d.type ? ` · ${str(d.type)}` : ''}${d.confidence != null && Number(d.confidence) < 1 ? ` · ${Math.round(Number(d.confidence) * 100)}%` : ''}` : 'needs a choice'} tone={ok ? 'ok' : 'warn'}>{!ok && Array.isArray(d.candidates) && <Chips items={(d.candidates as Json[]).map(c => `${str(c.label ?? c.name)} (${str(c.name ?? c.apiName)})`)} />}</Card>;
   }
   if (name === 'describe_object') {
     const rows = firstArray(data, 'fields');
-    return <Card kind="describe" title={`Describe ${str(call.input.object)}`} sub={`${rows.length} fields`}><Table rows={rows.map(f => ({ field: f.name, label: f.label, type: f.type, required: f.required ? 'yes' : '' }))} max={20} /></Card>;
+    const d = isObj(data) ? data : {};
+    const like = typeof call.input.fieldsLike === 'string' ? call.input.fieldsLike : '';
+    return <Card kind="describe" title={`Describe ${str(d.label ?? call.input.object)}`} sub={like ? `fields like "${like}" · ${rows.length} of ${str(d.fieldCount ?? rows.length)}` : `${rows.length} fields`}><Table rows={rows.map(f => ({ field: f.name, label: f.label, type: f.type, required: f.required ? 'yes' : '', values: Array.isArray(f.picklistValues) ? (f.picklistValues as string[]).join(', ') : '' }))} max={20} /></Card>;
   }
   if (name === 'serialize') {
     const env = (isObj(call.input.ir) ? call.input.ir : call.input) as Envelope;
@@ -313,7 +317,7 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
     return (
       <Card kind="change" title={`${env.operation === 'modify' ? 'Change' : 'New'} ${TYPE_LABEL[env.type ?? ''] ?? env.type ?? 'component'}`} sub={out.changeId ? `change ${str(out.changeId, 20)}` : undefined}>
         <EnvelopeView env={env} preview={isObj(previewData) ? previewData : null} />
-        {typeof out.diff === 'string' && out.diff.trim() && <Diff text={out.diff} />}
+        {typeof out.diff === 'string' && out.diff.trim() ? <Diff text={out.diff} /> : Array.isArray(out.files) && (out.files as Json[]).length > 0 ? <pre className="tc-code">{str((out.files as Json[])[0].preview, 3000)}</pre> : null}
       </Card>
     );
   }
@@ -329,15 +333,15 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
     if (pipeCalls[pipeCalls.length - 1] !== call) return null;
     return <Card kind="deploy" title="Deploy pipeline"><DeployTimeline calls={pipeCalls} /></Card>;
   }
-  if (name === 'validate_flow_graph' || name === 'validate') {
+  if (name === 'validate_flow_graph') {
     const d = isObj(data) ? data : {};
     const v = (Array.isArray(d.violations) ? d.violations : []) as Json[];
-    return <Card kind="validate" title={name === 'validate' ? 'Validation' : 'Flow graph check'} sub={v.length ? `${v.length} issue${v.length === 1 ? '' : 's'}` : 'passed'} tone={v.length ? 'warn' : 'ok'}>{v.length > 0 && <ul className="tc-problems">{v.slice(0, 8).map((x, i) => <li key={i}>{str(x.path ?? x.field, 60)} {str(x.message ?? x, 200)}</li>)}</ul>}</Card>;
+    return <Card kind="validate" title="Flow graph check" sub={v.length ? `${v.length} issue${v.length === 1 ? '' : 's'}` : 'passed'} tone={v.length ? 'warn' : 'ok'}>{v.length > 0 && <ul className="tc-problems">{v.slice(0, 8).map((x, i) => <li key={i}>{str(x.path ?? x.field, 60)} {str(x.message ?? x, 200)}</li>)}</ul>}</Card>;
   }
   if (name === 'compile_formula') {
     const d = isObj(data) ? data : {};
-    const ok = d.ok === true || d.valid === true || (!d.error && !d.message);
-    return <Card kind="validate" title="Formula check" sub={ok ? 'compiles' : str(d.message ?? d.error, 200)} tone={ok ? 'ok' : 'err'} />;
+    const ok = d.ok === true || d.valid === true;
+    return <Card kind="validate" title="Formula check" sub={ok ? 'compiles' : str(d.message ?? d.error, 200)} tone={ok ? 'ok' : 'err'}>{ok && typeof call.input.formula === 'string' ? <pre className="tc-code">{str(call.input.formula, 1200)}</pre> : null}</Card>;
   }
   if (name === 'home_stats' && isObj(data)) return <Card kind="stats" title="Platform activity"><StatsCard data={data} /></Card>;
   if (name === 'agent_details' && isObj(data)) return <Card kind="agent" title={`Agent · ${str(data.name)}`} sub={str(data.apiName)}><AgentTree data={data} /></Card>;

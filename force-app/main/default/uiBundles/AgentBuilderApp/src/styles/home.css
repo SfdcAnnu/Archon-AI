@@ -215,7 +215,7 @@ body.home-lock{overflow:hidden}
    dashboard fills it by flex rather than by a percentage height that has
    nothing definite to resolve against. Taller content still scrolls. */
 div:has(> .home.cc){display:flex;flex-direction:column}
-.home.cc{display:flex;flex-direction:column;gap:12px;padding:0 0 16px;font-size:13px;flex:1 0 auto;min-height:100%;box-sizing:border-box}
+.home.cc{display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:0 0 16px;font-size:13px;flex:1 0 auto;min-height:100%;box-sizing:border-box}
 .home.cc.dark .cc-top,.home.cc.dark .cc-main{opacity:0;transform:translateY(8px)}
 .cc-top,.cc-main{transition:opacity .7s ease,transform .7s ease}
 .home[data-focus="1"] .cc-main{opacity:0;pointer-events:none;transition:opacity var(--home-T) var(--home-ease)}
@@ -309,15 +309,15 @@ div:has(> .home.cc){display:flex;flex-direction:column}
 .cc-act{border:1px solid var(--border);background:var(--secondary);color:var(--foreground);font:600 12px var(--font-sans);padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap} .cc-act:hover{border-color:var(--primary)}
 /* ── responsive: laptops, tablets, phones ─────────────────── */
 @media (max-width:1380px){.cc-nav>button,.cc-more>button{padding:0 9px;font-size:13px}.cc-top{gap:14px}}
-@media (max-width:1240px){.cc-tiles{grid-template-columns:1fr 1fr}.cc-row{grid-template-columns:1fr;flex:none}.cc-vb{grid-template-columns:1fr 1fr}.cc-try{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}.cc-say{flex:1 1 220px}}
+@media (max-width:1240px){.cc-tiles{grid-template-columns:1fr 1fr}.cc-row{grid-template-columns:1fr;grid-template-rows:minmax(0,2fr) minmax(0,1fr)}.cc-vb{grid-template-columns:1fr 1fr}.cc-try{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}.cc-try .cc-label{flex-basis:100%;margin-bottom:0}.cc-say{flex:1 1 220px}}
 @media (max-width:1100px){.cc-nav{display:none}.cc-menu-btn{display:inline-flex}.cc-more-menu .nav-only{display:block}}
 @media (max-width:900px){.cc-tiles{gap:10px}.cc-big{font-size:26px}}
 @media (max-width:760px){
   .cc-top{height:auto;min-height:52px;padding:8px 14px;gap:10px;flex-wrap:wrap}.cc-brand{font-size:15px}.cc-top-r{gap:8px}.cc-env{display:none}.cc-create{padding:7px 10px;font-size:12.5px}
-  .cc-main{padding:0 14px}.cc-date{flex-wrap:wrap;gap:8px}.cc-range{margin-left:0;width:100%;justify-content:space-between}.cc-range button{flex:1}.cc-refresh{margin-left:auto}
+  .cc-main{padding:0 14px}.cc-date{flex-wrap:wrap;gap:8px}.cc-date b{flex-basis:calc(100% - 140px)}.cc-range{margin-left:0;flex:1;justify-content:space-between}.cc-range button{flex:1;padding:6px 6px}.cc-refresh{margin-left:0}
   .cc-tiles{grid-template-columns:1fr}.cc-sub3{grid-template-columns:repeat(3,minmax(0,1fr))}
   .cc-vh{flex-wrap:wrap;padding:12px 14px 4px}.cc-open{margin-left:0;width:100%}
-  .cc-vb{grid-template-columns:1fr;padding:6px 14px 14px}.cc-try{flex-direction:column}.cc-core-scale{width:190px;height:190px}.cc-core-scale .home-core{transform:translate(-50%,-50%) scale(.68)}.cc-inrow{max-width:none}
+  .cc-row{grid-template-rows:auto auto}.cc-vb{grid-template-columns:1fr;padding:6px 14px 14px}.cc-try{flex-direction:column}.cc-core-scale{width:190px;height:190px}.cc-core-scale .home-core{transform:translate(-50%,-50%) scale(.68)}.cc-inrow{max-width:none}
   .cc-ah{padding:12px 14px 6px}.cc-al{padding:0 14px 12px}.cc-ai{grid-template-columns:32px 1fr;gap:10px}.cc-act{grid-column:2;justify-self:start}
 }
 @media (max-width:420px){.cc-brand span+*{display:none}.cc-say{padding:10px 12px;font-size:12.5px}.cc-big{font-size:24px}}

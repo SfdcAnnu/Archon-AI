@@ -41,7 +41,8 @@ export function findRows(v: unknown): { rows: Json[]; meta: Json | null; key: st
   if (arrays.length !== 1) return null;
   const [key, rows] = arrays[0];
   const meta: Json = {};
-  for (const [k, x] of Object.entries(v)) if (k !== key && (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean')) meta[k] = x;
+  // The runtime's spill envelope (artifact id, note) is plumbing, not data.
+  for (const [k, x] of Object.entries(v)) if (k !== key && k !== 'artifact' && k !== 'note' && (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean')) meta[k] = x;
   return { rows: rows as Json[], meta: Object.keys(meta).length ? meta : null, key };
 }
 

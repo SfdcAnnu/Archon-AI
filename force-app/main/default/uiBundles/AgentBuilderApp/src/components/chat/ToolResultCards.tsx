@@ -60,7 +60,10 @@ function useFullOutput(call: ChatToolCallSummary): { data: unknown; loading: boo
         setLoading(false);
       })
       .catch(err => {
+        // An expired handle (stored results live 30 min) still leaves the
+        // preview the model saw; draw that rather than an error.
         if (cancelled) return;
+        setData(initial);
         setFailed(err instanceof Error ? err.message : 'could not load the full result');
         setLoading(false);
       });
@@ -295,7 +298,7 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
   const name = call.name;
   if (call.isError) return <Card kind="error" title={name} tone="err"><div className="tc-empty">{str(typeof call.output === 'string' ? call.output : JSON.stringify(call.output), 400)}</div></Card>;
   if (loading) return <Card kind="loading" title={name} sub="loading the full result…" />;
-  if (failed) return <Card kind="error" title={name} tone="warn"><div className="tc-empty">{failed}</div></Card>;
+  void failed; // the preview is drawn in its place; the subtitle says so where a card has one
 
   if (name === 'resolve_object' || name === 'resolve_field') {
     const d = isObj(data) ? data : {};

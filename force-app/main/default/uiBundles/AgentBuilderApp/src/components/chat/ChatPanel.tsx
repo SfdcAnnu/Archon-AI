@@ -51,7 +51,8 @@ interface DisplayMessage {
   id: string;
   /** 'Build' is a copilot-only card: an Architect build in progress, drawn
    *  stage by stage in the transcript itself. */
-  role: 'User' | 'Assistant' | 'Tool' | 'Build';
+  /** 'Audit' is a decision on an approval, written into the transcript. */
+  role: 'User' | 'Assistant' | 'Tool' | 'Build' | 'Audit';
   content: string;
   toolLabel: string | null;
   createdDate: string;
@@ -139,7 +140,11 @@ function describeBuildOutcome(view: BuildJobView): string {
 }
 
 function toDisplay(m: RawChatMessage): DisplayMessage | null {
-  if (m.Role__c === 'System') return null;
+  if (m.Role__c === 'System') {
+    // An approval decision: who, what, when — drawn as an audit line.
+    if (!/"approvalId"/.test(m.ToolCallsJson__c ?? '')) return null;
+    return { id: m.Id, role: 'Audit', content: m.Content__c ?? '', toolLabel: m.ToolCallsJson__c, createdDate: m.CreatedDate };
+  }
   let toolLabel: string | null = null;
   if (m.Role__c === 'Tool') {
     try {
@@ -523,11 +528,14 @@ export function ChatPanel({
       }
       // A tool result saying PENDING_APPROVAL means the runtime suspended
       // an action this turn — pull the fresh card(s) for this session.
-      const suspended = (result.toolCalls ?? []).some(tc => {
+      // A specialist's own call can be the one that suspended, so look
+      // through nested calls too — and re-read the cards after every turn
+      // regardless, so an approval never lands only on the Approvals page.
+      const suspended = flattenCalls(result.toolCalls).some(tc => {
         const output = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output ?? '');
         return output.includes('PENDING_APPROVAL');
       });
-      if (suspended && session) refreshApprovals(session.Id);
+      if (session) refreshApprovals(session.Id);
       if (suspended) emit({ kind: 'approval' });
       setSending(false);
       scrollToBottom();
@@ -1174,6 +1182,18 @@ export function ChatPanel({
                 isError={m.isError}
                 onSend={queueSend}
               />
+            );
+          }
+          if (m.role === 'Audit') {
+            let a: { status?: string; decision?: string; decidedByName?: string; decidedAt?: string; toolName?: string } = {};
+            try { a = JSON.parse(m.toolLabel ?? '{}'); } catch { /* the content line still reads */ }
+            const ok = a.decision === 'approved' && a.status !== 'Failed';
+            return (
+              <div key={m.id} className={`chat-audit ${a.decision === 'rejected' ? 'no' : ok ? 'ok' : 'warn'}`} title={m.content}>
+                <span className="mark">{a.decision === 'rejected' ? '✕' : ok ? '✓' : '!'}</span>
+                <span className="txt"><b>{a.decision === 'rejected' ? 'Rejected' : 'Approved'}</b> by {a.decidedByName ?? 'unknown'} · {a.toolName ?? 'action'} · {a.status ?? ''}</span>
+                <span className="when">{a.decidedAt ? new Date(a.decidedAt).toLocaleString() : ''}</span>
+              </div>
             );
           }
           if (m.role === 'Tool') {

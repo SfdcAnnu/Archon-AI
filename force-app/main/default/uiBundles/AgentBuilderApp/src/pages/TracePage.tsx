@@ -39,14 +39,17 @@ interface Turn {
   user: SessionDetail['messages'][number] | null;
   calls: Call[];
   assistant: SessionDetail['messages'][number] | null;
+  /** Approval decisions written into the transcript after this turn. */
+  audits: SessionDetail['messages'][number][];
 }
 
 /** Messages come flat and ordered: user, its tool rows, its reply. */
 function toTurns(msgs: SessionDetail['messages']): Turn[] {
   const turns: Turn[] = [];
   let cur: Turn | null = null;
-  const start = (m: SessionDetail['messages'][number] | null, at: string) => { cur = { n: turns.length + 1, at, user: m, calls: [], assistant: null }; turns.push(cur); };
+  const start = (m: SessionDetail['messages'][number] | null, at: string) => { cur = { n: turns.length + 1, at, user: m, calls: [], assistant: null, audits: [] }; turns.push(cur); };
   for (const m of msgs) {
+    if (m.Role__c === 'System') { if (/"approvalId"/.test(m.ToolCallsJson__c ?? '')) (turns[turns.length - 1] ?? (start(null, m.CreatedDate), turns[turns.length - 1])).audits.push(m); continue; }
     if (m.Role__c === 'User') { start(m, m.CreatedDate); continue; }
     if (!cur) start(null, m.CreatedDate);
     if (m.Role__c === 'Tool') {
@@ -170,6 +173,13 @@ export default function TracePage() {
                     </div>
                   )}
                   {!a && t.user && <div className="tr-empty">No reply was recorded for this turn.</div>}
+                  {t.audits.map(m => (
+                    <div key={m.Id} className="tr-msg audit">
+                      <div className="tr-role">Approval decision · {fmtTime(m.CreatedDate)}</div>
+                      <div className="tr-text">{m.Content__c}</div>
+                      <Block title="Decision record" text={pretty(m.ToolCallsJson__c)} open={openAll} />
+                    </div>
+                  ))}
                 </section>
               );
             })}

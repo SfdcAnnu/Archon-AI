@@ -103,7 +103,7 @@ export function ChatApprovalCard({ approval, onChanged }: ChatApprovalCardProps)
         <span className="text-[10px] text-muted-foreground">
           {approval.status === 'Pending'
             ? `Requested ${new Date(approval.createdAt).toLocaleString()} · expires ${new Date(approval.timeoutAt).toLocaleString()}`
-            : `Requested ${new Date(approval.createdAt).toLocaleString()}`}
+            : `Requested ${new Date(approval.createdAt).toLocaleString()}${approval.decidedAt ? ` · ${approval.status === 'Rejected' ? 'rejected' : 'approved'} by ${approval.decidedByName ?? 'unknown'} ${new Date(approval.decidedAt).toLocaleString()}` : ''}`}
         </span>
         {approval.status === 'Pending' && (
           <div className="flex shrink-0 items-center gap-1.5">

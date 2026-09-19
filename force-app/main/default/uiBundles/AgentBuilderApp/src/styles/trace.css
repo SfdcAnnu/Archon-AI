@@ -33,3 +33,4 @@
 .tr-pre{margin:0;padding:10px 12px;border-top:1px solid var(--border);font:11.5px/1.55 var(--font-mono);color:var(--foreground);white-space:pre-wrap;word-break:break-word;max-height:70vh;overflow:auto}
 .tr-actions{display:flex;gap:8px}
 @media (max-width:900px){.tr{padding:12px 14px 32px}.tr-head{grid-template-columns:1fr}.tr-stats div{align-items:flex-start}.tr-meta{margin-left:0;flex-basis:100%}}
+.tr-msg.audit{background:color-mix(in srgb,var(--archon-warning) 7%,transparent)}

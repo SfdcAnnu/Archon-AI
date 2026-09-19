@@ -78,7 +78,7 @@ interface RawChatSession {
 
 interface RawChatMessage {
   Id: string;
-  Role__c: 'User' | 'Assistant' | 'Tool';
+  Role__c: 'User' | 'Assistant' | 'Tool' | 'System';
   Content__c: string | null;
   ToolCallsJson__c: string | null;
   ToolResultsJson__c: string | null;

@@ -60,7 +60,11 @@
 .tc-flow-edge text{font:9px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:var(--muted-foreground);text-anchor:middle}
 .tc-flow-node rect{fill:var(--card);stroke:var(--border);stroke-width:1.2} .tc-flow-node.k-start rect{stroke:var(--primary)} .tc-flow-node.k-decision rect,.tc-flow-node.k-decisions rect{stroke:var(--archon-warning)} .tc-flow-node.k-recordcreate rect,.tc-flow-node.k-recordcreates rect,.tc-flow-node.k-recordupdate rect,.tc-flow-node.k-recordupdates rect{stroke:var(--archon-success)} .tc-flow-node.k-actioncall rect,.tc-flow-node.k-actioncalls rect{stroke:var(--node-purple)}
 .tc-flow-node .k{font:8.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:var(--muted-foreground);letter-spacing:.06em;text-transform:uppercase} .tc-flow-node .n{font:600 11px var(--font-sans,inherit);fill:var(--foreground)}
-.tc-flow-node{animation:tc-in .4s ease-out both}
+/* Fade only: a transform keyframe on an SVG group would override the group's
+   own translate and pile every node at the origin (live: a blank graph with
+   wires). */
+.tc-flow-node{animation:tc-fade .4s ease-out both}
+@keyframes tc-fade{from{opacity:0}to{opacity:1}}
 
 /* deploy timeline */
 .tc-timeline{display:flex;flex-direction:column;gap:8px}
@@ -134,3 +138,11 @@
 .gr-chip{font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:var(--foreground);background:var(--secondary)} .gr-chip.muted{color:var(--muted-foreground)}
 .gr-fold{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .gr-code{margin:0;width:100%;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--secondary);border:1px solid var(--border);border-radius:5px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;color:var(--foreground);max-height:360px;overflow:auto}
+
+/* an approval decision in the transcript: who, what, when */
+.chat-audit{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;max-width:85%;align-self:flex-start;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--foreground);background:var(--secondary)}
+.chat-audit .mark{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font:600 9px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.chat-audit.ok{border-color:color-mix(in srgb,var(--archon-success) 45%,transparent)} .chat-audit.ok .mark{background:color-mix(in srgb,var(--archon-success) 18%,transparent);color:var(--archon-success)}
+.chat-audit.no{border-color:color-mix(in srgb,var(--archon-error) 45%,transparent)} .chat-audit.no .mark{background:color-mix(in srgb,var(--archon-error) 18%,transparent);color:var(--archon-error)}
+.chat-audit.warn{border-color:color-mix(in srgb,var(--archon-warning) 55%,transparent)} .chat-audit.warn .mark{background:color-mix(in srgb,var(--archon-warning) 18%,transparent);color:var(--archon-warning)}
+.chat-audit .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .chat-audit .when{font:10.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground);white-space:nowrap}

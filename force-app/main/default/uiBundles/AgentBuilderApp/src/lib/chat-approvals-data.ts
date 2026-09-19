@@ -16,6 +16,8 @@ export interface ChatApproval {
   status: 'Pending' | 'Approved' | 'Rejected' | 'Executed' | 'Failed' | 'Expired' | string;
   resultText?: string | null;
   decidedBy?: string | null;
+  /** The decider's display name, when the server could resolve it. */
+  decidedByName?: string | null;
   decidedAt?: string | null;
   timeoutAt: string;
   createdAt: string;

@@ -72,6 +72,21 @@ function Transcript({ detail }: { detail: SessionDetail }) {
   return (
     <div className="space-y-3">
       {detail.messages.map(m => {
+        if (m.Role__c === 'System') {
+          // An approval decision written into the transcript: who, what, when.
+          const isAudit = /"approvalId"/.test(m.ToolCallsJson__c ?? '');
+          if (!isAudit) return null;
+          return (
+            <div key={m.Id} className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--archon-warning)]" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11.5px] font-semibold text-foreground">Approval decision</div>
+                <p className="mt-0.5 whitespace-pre-wrap text-[12px] text-foreground">{m.Content__c}</p>
+                <p className="mt-0.5 text-[10.5px] text-[var(--archon-faint)]">{new Date(m.CreatedDate).toLocaleString()}</p>
+              </div>
+            </div>
+          );
+        }
         if (m.Role__c === 'Tool') {
           return (
             <div key={m.Id} className="flex items-start gap-2 rounded-lg bg-muted/40 px-3 py-2">

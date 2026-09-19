@@ -28,7 +28,8 @@ function fmtTime(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export function ConsoleRail({ events, agentName }: { events: ChatActivity[]; agentName: string }) {
+export function ConsoleRail({ events, agentName, traceHref }: { events: ChatActivity[]; agentName: string; traceHref?: string | null }) {
+  const openTrace = () => { if (traceHref) window.open(traceHref, '_blank', 'noopener'); };
   // Everything below is derived from the stream, newest-wins.
   const view = useMemo(() => {
     let phase: ChatPhase = 'ready';
@@ -114,8 +115,8 @@ export function ConsoleRail({ events, agentName }: { events: ChatActivity[]; age
       </div>
 
       <div className="con-panel con-grow">
-        <div className="con-hd"><span className="con-eyebrow">Activity log</span><span className="con-sub">every step, as it happens</span></div>
-        <div className="con-log" ref={logRef}>
+        <div className="con-hd"><span className="con-eyebrow">Activity log</span><span className="con-sub">every step, as it happens</span>{traceHref && <a className="con-trace" href={traceHref} target="_blank" rel="noopener noreferrer" title="The whole conversation, every request and response, in its own tab">Full trace ↗</a>}</div>
+        <div className={`con-log${traceHref ? ' clickable' : ''}`} ref={logRef} onClick={openTrace} title={traceHref ? 'Click to open the full trace in a new tab' : undefined}>
           {events.length === 0 && <div className="sys">SYS: Console ready.</div>}
           {events.map((e, i) => {
             const t = fmtTime(e.at);

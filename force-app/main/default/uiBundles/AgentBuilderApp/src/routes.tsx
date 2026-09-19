@@ -96,6 +96,13 @@ export const routes: RouteObject[] = [
     handle: { showInNavigation: true, label: 'Chat' },
   },
   {
+    // One conversation, every turn's tool calls and payloads in full —
+    // opened in its own tab from the console's activity log.
+    path: '/trace/:sessionId',
+    lazy: page(() => import('./pages/TracePage')),
+    handle: { showInNavigation: false, label: 'Trace' },
+  },
+  {
     path: '*',
     lazy: page(() => import('./pages/NotFound')),
   },

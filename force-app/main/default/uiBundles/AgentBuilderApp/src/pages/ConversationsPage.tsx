@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ChevronDown, ChevronRight, Loader2, MessageSquare, Settings2, ShieldAlert } from 'lucide-react';
+import { useHref } from 'react-router';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageBody } from '@/components/shell/PageBody';
 import { IconSquare, SpecCard, StatusBadge, T } from '@/components/spec/blocks';
@@ -156,6 +157,7 @@ export default function ConversationsPage() {
       .catch(() => { /* approvals are additive — never break the list */ });
   }, []);
 
+  const traceBase = useHref('/trace/');
   const openSession = useCallback((id: string) => {
     setSelectedId(id);
     setDetailLoadState('loading');
@@ -225,6 +227,15 @@ export default function ConversationsPage() {
                     <StatusBadge tone={sessionTone(detail.session.Status__c)}>
                       {detail.session.Status__c}
                     </StatusBadge>
+                    <a
+                      href={traceBase + detail.session.Id}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-[5px] border border-border bg-card px-2.5 py-[5px] text-[11.5px] font-semibold text-primary hover:bg-secondary/60"
+                      title="Every turn's tool calls and payloads in full, in a new tab"
+                    >
+                      Full trace ↗
+                    </a>
                   </>
                 }
               >

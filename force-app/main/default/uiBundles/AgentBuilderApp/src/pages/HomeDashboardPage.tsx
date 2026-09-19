@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useHref, useNavigate } from 'react-router';
 import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
@@ -216,6 +216,8 @@ export default function HomeDashboardPage() {
   const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null } | null>(null);
   const [copilotAgent, setCopilotAgent] = useState<{ apiName: string; name: string }>(COPILOT);
   const [events, setEvents] = useState<ChatActivity[]>([]);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const traceHref = useHref(`/trace/${liveSessionId ?? ''}`);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [leaving, setLeaving] = useState(false);
@@ -243,7 +245,7 @@ export default function HomeDashboardPage() {
   }, [events, focus]);
   useEffect(() => { if (countdown == null) return; if (countdown <= 0) { exitFocus(); return; } const t = setTimeout(() => setCountdown(c => (c == null ? null : c - 1)), 1000); return () => clearTimeout(t); }, [countdown, exitFocus]);
   const handleActivity = useCallback((e: ChatActivity) => { setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e])); }, []);
-  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => { if (info.ended) { setEvents([]); exitFocus(); load(); } }, [load, exitFocus]);
+  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => { if (info.ended) { setEvents([]); setLiveSessionId(null); exitFocus(); load(); } else if (info.sessionId) setLiveSessionId(info.sessionId); }, [load, exitFocus]);
   const submit = () => { const text = input.trim(); if (!text) return; setInput(''); openFocus({ text, how: 'type' }); };
   const talk = () => { setVoicePref(true); openFocus(null); };
 
@@ -391,7 +393,7 @@ export default function HomeDashboardPage() {
         {/* ── focus: the chat fades in over the dashboard ─────────── */}
         {overlayMounted && (
           <div className="home-focus" onPointerDown={() => setCountdown(null)}>
-            <ConsoleRail events={events} agentName={copilotAgent.name} />
+            <ConsoleRail events={events} agentName={copilotAgent.name} traceHref={liveSessionId ? traceHref : null} />
             <div className="home-focus-chat">
               <ChatPanel
                 key={`${copilotAgent.apiName}-${openSeq}`}

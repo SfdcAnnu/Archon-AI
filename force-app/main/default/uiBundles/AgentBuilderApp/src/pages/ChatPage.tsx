@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useHref } from 'react-router';
 import { Loader2, MessageSquarePlus, PanelLeft, PanelRight, Search } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,8 @@ export default function ChatPage() {
   const [active, setActive] = useState<{ sessionId: string | null; agentApiName: string; agentName: string } | null>(null);
   const [events, setEvents] = useState<ChatActivity[]>([]);
   const [drawer, setDrawer] = useState(false);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const traceHref = useHref(`/trace/${liveSessionId ?? ''}`);
   const [rail, setRail] = useState<boolean>(() => {
     try { return localStorage.getItem(RAIL_PREF) !== 'off'; } catch { return true; }
   });
@@ -66,15 +69,18 @@ export default function ChatPage() {
     setShowPicker(false);
     setDrawer(false);
     setEvents([]);
+    setLiveSessionId(null);
     setActive({ sessionId: null, agentApiName: agent.apiName, agentName: agent.name });
   }, []);
   const handlePickSession = useCallback((s: SessionSummary) => {
     setDrawer(false);
     setEvents([]);
+    setLiveSessionId(s.id);
     setActive({ sessionId: s.id, agentApiName: s.agentApiName, agentName: s.agentName });
   }, []);
   const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => {
-    if (info.ended) { setActive(null); setEvents([]); }
+    if (info.ended) { setActive(null); setEvents([]); setLiveSessionId(null); }
+    else if (info.sessionId) setLiveSessionId(info.sessionId);
     refreshSessions();
   }, [refreshSessions]);
   // The log is a window, not an archive: the last 200 events are plenty to
@@ -128,7 +134,7 @@ export default function ChatPage() {
               <button type="button" className="cp-icon" onClick={() => setDrawer(true)} aria-label="Conversations" title="Conversations"><PanelLeft /></button>
               <button type="button" className={`cp-icon${rail ? ' on' : ''}`} onClick={toggleRail} aria-label={rail ? 'Hide console' : 'Show console'} title={rail ? 'Hide console' : 'Show console'}><PanelRight /></button>
             </div>
-            {rail && <ConsoleRail events={events} agentName={active.agentName} />}
+            {rail && <ConsoleRail events={events} agentName={active.agentName} traceHref={liveSessionId ? traceHref : null} />}
             <div className="cp-chat">
               <ChatPanel
                 key={active.sessionId ?? active.agentApiName}

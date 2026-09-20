@@ -45,6 +45,30 @@ export interface ChatTurnMessage {
   /** The turn after an approved action ran: no user text, the tool's result.
    *  The runtime continues the agent's work from it. */
   continuation?: { toolName: string; resultText: string };
+  /** Ask the server to narrate the turn while it runs. Opt-in on purpose:
+   *  a bundle that does not set it receives exactly one frame per turn,
+   *  which is what every deployed bundle before this one expects. */
+  stream?: boolean;
+}
+
+/** Sent while a turn is still running, when `stream` was requested. Frames
+ *  carry a `type`; the terminal turn result never does, which is how the
+ *  two are told apart without changing the shape of the old one. */
+export interface StageFrame {
+  type: 'stage';
+  state: 'start' | 'end';
+  name: string;
+  seq: number;
+  ms?: number;
+  via?: 'specialist';
+  isError?: boolean;
+}
+
+/** Narration, or the turn itself? Narration is advisory and additive, so
+ *  anything without a recognised `type` is treated as the turn result — the
+ *  behaviour this client had before stage frames existed. */
+export function isStageFrame(msg: unknown): msg is StageFrame {
+  return !!msg && typeof msg === 'object' && (msg as { type?: unknown }).type === 'stage';
 }
 
 /** The text a continuation turn runs on — the server composes the same

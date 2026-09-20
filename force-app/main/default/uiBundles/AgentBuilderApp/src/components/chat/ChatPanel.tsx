@@ -14,10 +14,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
 import { renderMarkdown } from '@/lib/render-markdown';
-import { openChatSocket, continuationText, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary } from '@/lib/ws-chat';
+import { openChatSocket, continuationText, isStageFrame, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary, type StageFrame } from '@/lib/ws-chat';
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from './ChatApprovalCard';
 import { ToolResultCards, flattenCalls } from './ToolResultCards';
+import { toolLabel } from '@/lib/tool-label';
 import { BuildWorkspace } from './BuildWorkspace';
 import {
   startChatSession,
@@ -307,6 +308,12 @@ export function ChatPanel({
   // Suspended agent actions for THIS session (approval-as-suspension) —
   // rendered as inline decision cards in the transcript.
   const [approvals, setApprovals] = useState<ChatApproval[]>([]);
+  /** What the agent is doing right now, from the server's stage frames.
+   *  Advisory throughout: if none arrive — an older server, a slow link,
+   *  a turn that runs no tools — the indicator reads exactly as it did
+   *  before, so nothing here can leave the panel looking broken. */
+  const [live, setLive] = useState<{ active: { name: string; via?: string }[]; done: number }>({ active: [], done: 0 });
+  const clearLive = useCallback(() => setLive({ active: [], done: 0 }), []);
 
   const socketRef = useRef<WebSocket | null>(null);
   const historyRef = useRef<ChatHistoryEntry[]>(restored.history);
@@ -548,13 +555,31 @@ export function ChatPanel({
       if (session) refreshApprovals(session.Id);
       if (suspended) emit({ kind: 'approval' });
       setSending(false);
+      clearLive();
       scrollToBottom();
       if (session) reportSessionChange({ sessionId: session.Id, ended: false });
       console.log('[ChatPanel] handleTurnResult done', { sessionId: session?.Id });
     },
-    [session, reportSessionChange, scrollToBottom, refreshApprovals, emit]
+    [session, reportSessionChange, scrollToBottom, refreshApprovals, emit, clearLive]
   );
   useEffect(() => { handleTurnResultRef.current = handleTurnResult; }, [handleTurnResult]);
+
+  /** One stage frame. Tools can run in parallel, so this tracks a set
+   *  rather than a single current step, and matches an end to its start by
+   *  name — the server sends no run id, and the label is all the indicator
+   *  needs. A mismatched end only ever bumps the counter. */
+  const handleStage = useCallback((f: StageFrame) => {
+    setLive(prev => {
+      if (f.state === 'start') return { ...prev, active: [...prev.active, { name: f.name, via: f.via }] };
+      const i = prev.active.findIndex(a => a.name === f.name);
+      return {
+        active: i < 0 ? prev.active : [...prev.active.slice(0, i), ...prev.active.slice(i + 1)],
+        done: prev.done + 1,
+      };
+    });
+  }, []);
+  const handleStageRef = useRef(handleStage);
+  useEffect(() => { handleStageRef.current = handleStage; }, [handleStage]);
 
   // ── Bootstrap: load/start session, open WS ──────────────────────
   useEffect(() => {
@@ -638,8 +663,13 @@ export function ChatPanel({
             setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
           };
           ws.onmessage = ev => {
+            const msg: unknown = JSON.parse(ev.data as string);
+            // Narration is additive and carries a type; the turn result
+            // never does. Anything unrecognised falls through to the result
+            // handler, which is exactly how this client behaved before.
+            if (isStageFrame(msg)) { handleStageRef.current(msg); return; }
             console.log('[ChatPanel] websocket message received', ev.data);
-            handleTurnResult(JSON.parse(ev.data) as ChatTurnResult);
+            handleTurnResult(msg as ChatTurnResult);
           };
         });
       })
@@ -937,7 +967,11 @@ export function ChatPanel({
       ws.onopen = () => { setWsStatus('open'); emit({ kind: 'sys', text: `Reconnected to ${agentName}.` }); ws.send(payload); resolve(); };
       ws.onerror = () => { setWsStatus('error'); reject(new Error('Could not reconnect to the agent. Try again.')); };
       ws.onclose = () => setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
-      ws.onmessage = ev => handleTurnResultRef.current(JSON.parse(ev.data) as ChatTurnResult);
+      ws.onmessage = ev => {
+        const msg: unknown = JSON.parse(ev.data as string);
+        if (isStageFrame(msg)) { handleStageRef.current(msg); return; }
+        handleTurnResultRef.current(msg as ChatTurnResult);
+      };
     }));
   }, [session, agentApiName, agentName, emit]);
 
@@ -955,7 +989,7 @@ export function ChatPanel({
     emit({ kind: 'sys', text: `Approved — ${a.toolName} ran. Continuing.` });
     emit({ kind: 'thinking' });
     historyRef.current = [...historyRef.current, { role: 'user', content: continuationText(a.toolName, resultText) }];
-    sendOverSocket(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText } }))
+    sendOverSocket(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText }, stream: true }))
       .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
     scrollToBottom();
   }, [isCopilot, sending, emit, scrollToBottom, sendOverSocket]);
@@ -1019,7 +1053,7 @@ export function ChatPanel({
         historyLen: historyRef.current.length,
         attachments,
       });
-      sendOverSocket(JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments }))
+      sendOverSocket(JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments, stream: true }))
         .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
     }
 
@@ -1307,7 +1341,18 @@ export function ChatPanel({
         ))}
         {sending && (
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {live.active.length === 0 ? (
+              'Thinking…'
+            ) : live.active.length === 1 ? (
+              <span className="truncate">
+                {live.active[0].via === 'specialist' && <span className="opacity-60">Specialist · </span>}
+                {toolLabel(live.active[0].name)}…
+              </span>
+            ) : (
+              `Running ${live.active.length} things…`
+            )}
+            {live.done > 0 && <span className="opacity-60">· {live.done} done</span>}
           </div>
         )}
       </div>

@@ -73,6 +73,16 @@ export async function updateAgentStatus(agentId: string, status: string): Promis
   });
 }
 
+/** Where this agent's chats start: streaming on or off. Written on its
+ *  own rather than through the graph save, because a checkbox should not
+ *  cost a full rewrite of the agent's nodes. */
+export async function updateAgentStreaming(agentId: string, enabled: boolean): Promise<void> {
+  await apexFetch<{ success: boolean }>(`${AGENTS_BASE}?agentId=${encodeURIComponent(agentId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ streamReplies: enabled }),
+  });
+}
+
 export function slugify(name: string): string {
   const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   return (base || 'new_agent') + '_' + Date.now().toString(36);

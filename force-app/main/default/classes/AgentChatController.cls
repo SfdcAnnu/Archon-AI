@@ -126,8 +126,9 @@ public with sharing class AgentChatController {
         }
 
         SessionWithMessages r = new SessionWithMessages();
-        r.session  = session;
-        r.messages = loadMessages(session.Id);
+        r.session       = session;
+        r.messages      = loadMessages(session.Id);
+        r.streamReplies = agent.StreamReplies__c == true;
         return r;
     }
 
@@ -575,7 +576,7 @@ public with sharing class AgentChatController {
 
     private static AgentDefinition__c loadAgent(String apiName) {
         List<AgentDefinition__c> rows = [
-            SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c
+            SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c, StreamReplies__c
             FROM AgentDefinition__c WHERE ApiName__c = :apiName WITH USER_MODE LIMIT 1
         ];
         // A built-in agent (the Archon Copilot) is created by the server on
@@ -584,7 +585,7 @@ public with sharing class AgentChatController {
         // as not found exactly as before.
         if (rows.isEmpty() && SystemAgentSync.ensure(apiName)) {
             rows = [
-                SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c
+                SELECT Id, ApiName__c, Name, Department__c, Status__c, ExecuteType__c, StreamReplies__c
                 FROM AgentDefinition__c WHERE ApiName__c = :apiName WITH USER_MODE LIMIT 1
             ];
         }
@@ -1060,6 +1061,10 @@ public with sharing class AgentChatController {
     public class SessionWithMessages {
         @AuraEnabled public ChatSession__c       session;
         @AuraEnabled public List<ChatMessage__c> messages;
+        // Where this agent's chats START: streaming on or off. Only the
+        // starting point — whoever is chatting can flip it from the chat
+        // window, and their choice wins for that agent in that browser.
+        @AuraEnabled public Boolean              streamReplies;
     }
 
     public class TurnResult {

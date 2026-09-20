@@ -85,6 +85,7 @@ public with sharing class AgentBuilderController {
                    KnowledgeBase__c, Status__c, Version__c, CanvasJson__c,
                    ExternalServerUrl__c, TotalExecutions__c, SuccessRate__c, AccessMode__c,
                    SetupChecklistJson__c, ExecuteType__c, PostTurnAutomationAgent__c, DebugMode__c,
+                   StreamReplies__c,
                    (SELECT Id, Name, NodeType__c, NodeSubType__c, ConfigJson__c,
                            PositionX__c, PositionY__c, SortOrder__c,
                            IsEnabled__c, McpServer__c, McpTool__c,
@@ -343,6 +344,22 @@ public with sharing class AgentBuilderController {
         update agents;
     }
 
+    /** The chat's starting mode for this agent. Written on its own rather
+     *  than through the graph save, because a checkbox should not cost a
+     *  full node delete-and-reinsert. */
+    @AuraEnabled
+    public static void updateStreamReplies(String agentId, Boolean enabled) {
+        List<AgentDefinition__c> agents = [
+            SELECT Id, StreamReplies__c FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) throw new AuraHandledException('Agent not found');
+        agents[0].StreamReplies__c = enabled == true;
+        update agents;
+    }
+
     @AuraEnabled
     public static void updateDebugMode(String agentId, Boolean enabled) {
         List<AgentDefinition__c> agents = [
@@ -370,7 +387,8 @@ public with sharing class AgentBuilderController {
             CanvasJson__c     = inp.canvasJson,
             SetupChecklistJson__c = inp.setupChecklistJson,
             ExecuteType__c    = inp.executeType != null ? inp.executeType : 'Trigger',
-            PostTurnAutomationAgent__c = inp.postTurnAutomationAgent
+            PostTurnAutomationAgent__c = inp.postTurnAutomationAgent,
+            StreamReplies__c  = inp.streamReplies == true
         );
     }
 
@@ -463,6 +481,10 @@ public with sharing class AgentBuilderController {
         @AuraEnabled public String setupChecklistJson;
         @AuraEnabled public String executeType;
         @AuraEnabled public String postTurnAutomationAgent;
+        // Null means "leave whatever the record already has" — a caller
+        // that does not know about this flag must never reset it, and the
+        // builder's Save posts the whole agent every time.
+        @AuraEnabled public Boolean streamReplies;
     }
 
     public class AutomationAgentOption {

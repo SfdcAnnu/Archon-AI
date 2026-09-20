@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Check, Copy, Loader2, Mic, MicOff, Paperclip, Send, Settings2,
+  Check, Copy, Gauge, Loader2, Mic, MicOff, Paperclip, Send, Settings2,
+  Zap,
   ThumbsDown, ThumbsUp, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react';
 import { askArchon, getArchitectBuild, startArchitectBuild, type BuildJobView } from '@/lib/architect-data';
@@ -18,6 +19,7 @@ import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data'
 import { ChatApprovalCard } from './ChatApprovalCard';
 import { ToolResultCards, flattenCalls } from './ToolResultCards';
 import { toolLabel } from '@/lib/tool-label';
+import { resolveStreaming, setStreamOverride, STREAM_LABEL } from '@/lib/stream-pref';
 import { MessageBody } from './MessageBody';
 import { BuildWorkspace } from './BuildWorkspace';
 import {
@@ -320,6 +322,27 @@ export function ChatPanel({
    *  row keeps this id when the turn lands and becomes the final message,
    *  so the bubble is never torn down and rebuilt in front of the reader. */
   const streamRowRef = useRef<string | null>(null);
+  /** Does this chat stream? The person's own choice for this agent wins;
+   *  failing that the agent's setting; failing that, off. Seeded from the
+   *  browser alone so the panel behaves correctly before the session has
+   *  loaded, then reconciled with the agent's setting once it arrives. */
+  const [streaming, setStreaming] = useState<boolean>(() => resolveStreaming(agentApiName, undefined));
+  const streamingRef = useRef(streaming);
+  useEffect(() => { streamingRef.current = streaming; }, [streaming]);
+  const toggleStreaming = useCallback(() => {
+    setStreaming(prev => {
+      const next = !prev;
+      setStreamOverride(agentApiName, next);
+      // Turning it off mid-turn leaves a half-written bubble behind; the
+      // turn result still replaces it, but the caret should stop now.
+      if (!next) {
+        const id = streamRowRef.current;
+        streamRowRef.current = null;
+        if (id) setMessages(list => list.filter(m => m.id !== id));
+      }
+      return next;
+    });
+  }, [agentApiName]);
   /** Which reply was just copied, so the button can confirm it briefly. */
   const [copied, setCopied] = useState<string | null>(null);
   useEffect(() => {
@@ -692,6 +715,9 @@ export function ChatPanel({
         });
         setSession(result.session);
         lastReportedSessionIdRef.current = result.session.Id;
+        // The agent's own setting is the starting point, and only that: a
+        // person who has already chosen for this agent keeps their choice.
+        setStreaming(resolveStreaming(agentApiName, result.streamReplies));
         const display = foldToolRows(result.messages.map(toDisplay).filter((m): m is DisplayMessage => m != null), result.messages);
         setMessages(display);
         historyRef.current = result.messages
@@ -1068,7 +1094,7 @@ export function ChatPanel({
     emit({ kind: 'sys', text: `Approved — ${a.toolName} ran. Continuing.` });
     emit({ kind: 'thinking' });
     historyRef.current = [...historyRef.current, { role: 'user', content: continuationText(a.toolName, resultText) }];
-    sendOverSocket(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText }, stream: true }))
+    sendOverSocket(JSON.stringify({ newUserMessage: '', history: historyRef.current.slice(0, -1), continuation: { toolName: a.toolName, resultText }, stream: streamingRef.current }))
       .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
     scrollToBottom();
   }, [isCopilot, sending, emit, scrollToBottom, sendOverSocket]);
@@ -1133,7 +1159,7 @@ export function ChatPanel({
         historyLen: historyRef.current.length,
         attachments,
       });
-      sendOverSocket(JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments, stream: true }))
+      sendOverSocket(JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments, stream: streamingRef.current }))
         .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
     }
 
@@ -1279,6 +1305,18 @@ export function ChatPanel({
           >
             {sound === 'off' ? <VolumeX className="h-4 w-4" /> : sound === 'always' ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
           </button>
+          {!isCopilot && (
+            <button
+              type="button"
+              onClick={toggleStreaming}
+              className={`rounded-md p-1 hover:bg-muted ${streaming ? 'text-[var(--archon-success)]' : 'text-muted-foreground'}`}
+              title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+              aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+              aria-pressed={streaming}
+            >
+              {streaming ? <Zap className="h-4 w-4" /> : <Gauge className="h-4 w-4" />}
+            </button>
+          )}
           {(session || (isCopilot && messages.length > 0)) && (
             <button type="button" onClick={handleEnd} className="text-[11px] text-muted-foreground hover:text-destructive">
               {isCopilot ? 'Clear' : 'End chat'}

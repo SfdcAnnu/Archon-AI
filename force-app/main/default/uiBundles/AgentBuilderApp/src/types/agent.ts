@@ -202,6 +202,9 @@ export interface AgentDefinition {
   knowledgeBase: string;
   status: 'Draft' | 'Active' | 'Inactive';
   executeType: 'Trigger' | 'Chat' | 'Both';
+  /** Start chats with this agent in streaming mode. Off by default, and
+   *  only a starting point — the chat window can override it. */
+  streamReplies?: boolean;
   accessMode: 'Org' | 'PerUser';
   setupChecklist: ChecklistItem[];
 }

@@ -215,6 +215,11 @@ export interface ChatPanelProps {
    *  assistant over Apex REST, no session, transcript kept per browser,
    *  and "build me an agent" runs the Architect with its stages drawn here. */
   transport?: 'session' | 'copilot';
+  /** Offered in a build card's header: take this conversation to another
+   *  surface. The session id is handed over so the other side resumes the
+   *  same conversation rather than starting a second one. */
+  onMove?: (sessionId: string | null) => void;
+  moveLabel?: string;
   /** Copilot only: the dashboard's numbers at the moment of asking, so the
    *  answer matches what is on screen. */
   copilotPlatform?: () => Record<string, unknown> | null;
@@ -233,7 +238,7 @@ const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exe
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform, headerNote, onTransfer,
+  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel,
 }: ChatPanelProps) {
   const isFull = variant === 'full' || variant === 'drawer';
   const isDrawer = variant === 'drawer';
@@ -596,6 +601,21 @@ export function ChatPanel({
         refreshApprovals(result.session.Id);
         setLoading(false);
         scrollToBottom();
+
+        // A build carried over from the other surface — the Home dock or
+        // the New agent page — is in this transcript as tool rows. Redraw
+        // its workspace from the last job the conversation touched, so
+        // changing rooms never loses the build in progress.
+        const buildRow = [...result.messages].reverse().find(m => {
+          if (m.Role__c !== 'Tool') return false;
+          let name = '';
+          try { name = String(JSON.parse(m.ToolCallsJson__c || '{}').name ?? ''); } catch { /* not a tool row */ }
+          return BUILD_TOOLS.has(name) && jobIdIn(m.Content__c ?? '') != null;
+        });
+        if (buildRow) {
+          const asked = result.messages.find(m => m.Role__c === 'User')?.Content__c ?? null;
+          followToolBuild(jobIdIn(buildRow.Content__c ?? '')!, true, asked);
+        }
 
         setWsStatus('connecting');
         return openChatSocket(agentApiName, result.session.Id).then(ws => {
@@ -1186,6 +1206,8 @@ export function ChatPanel({
                 interrupted={m.buildInterrupted}
                 isError={m.isError}
                 onSend={queueSend}
+                onMove={onMove ? () => onMove(session?.Id ?? lastReportedSessionIdRef.current) : undefined}
+                moveLabel={moveLabel}
               />
             );
           }

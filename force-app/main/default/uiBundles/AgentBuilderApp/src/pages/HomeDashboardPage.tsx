@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { COPILOT } from '@/lib/copilot';
 import type { VoicePhase } from '@/components/chat/VoiceStrip';
 import type { CorePhase } from '@/components/home/CoreRing';
 import type { ChatActivity } from '@/lib/chat-activity';
@@ -75,7 +76,6 @@ const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-
 const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
 
 const PHASE_COPY: Record<CorePhase, string> = { off: 'Standby', ready: 'Ready · voice on', listen: 'Listening…', think: 'Working on it', speak: 'Answering', build: 'Building the agent' };
-const COPILOT = { apiName: 'archon_copilot', name: 'Archon' } as const;
 
 const NAV: Array<{ label: string; href: string; key: 'command' | 'chat' | 'fleet' | 'inbox' | 'review' | 'log' }> = [
   { label: 'Command Center', href: '/home', key: 'command' },
@@ -216,7 +216,7 @@ export default function HomeDashboardPage() {
   // ── Focus: the chat takes the screen ────────────────────────────────
   const [stage, setStage] = useState<'dark' | 'live'>('dark');
   useEffect(() => { const t = setTimeout(() => setStage('live'), 80); return () => clearTimeout(t); }, []);
-  const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null } | null>(null);
+  const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null; sessionId?: string | null } | null>(null);
   const [copilotAgent, setCopilotAgent] = useState<{ apiName: string; name: string }>(COPILOT);
   const [events, setEvents] = useState<ChatActivity[]>([]);
   const [input, setInput] = useState('');
@@ -230,7 +230,11 @@ export default function HomeDashboardPage() {
   }, []);
   /** Open the drawer, optionally with a first message to send. The dashboard
    *  stays exactly where it is: a drawer is beside the work, not over it. */
-  const openFocus = (message: { text: string; how: 'talk' | 'type' } | null) => { setOpenSeq(n => n + 1); setFocus({ message }); };
+  const openFocus = (message: { text: string; how: 'talk' | 'type' } | null, sessionId?: string | null) => { setOpenSeq(n => n + 1); setFocus({ message, sessionId }); };
+  /** Coming back from the New agent page: reopen the drawer on the same
+   *  conversation, so moving between the two surfaces never costs a turn. */
+  const returned = (useLocation().state as { sessionId?: string | null } | null)?.sessionId;
+  useEffect(() => { if (returned) { setOpenSeq(n => n + 1); setFocus({ message: null, sessionId: returned }); } }, [returned]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setMoreOpen(false); if (focus) exitFocus(); }
@@ -413,7 +417,10 @@ export default function HomeDashboardPage() {
                 agentApiName={copilotAgent.apiName}
                 agentName={copilotAgent.name}
                 initialMessage={focus?.message ?? null}
+                initialSessionId={focus?.sessionId ?? null}
                 onClose={exitFocus}
+                onMove={id => navigate('/new-agent', { state: { sessionId: id } })}
+                moveLabel="Open as page"
                 onSessionChange={handleSessionChange}
                 onActivity={handleActivity}
                 onTransfer={handleTransfer}

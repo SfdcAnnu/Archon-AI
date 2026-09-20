@@ -27,11 +27,16 @@ export interface BuildWorkspaceProps {
   interrupted?: boolean;
   isError?: boolean;
   onSend: (text: string) => void;
+  /** Move this build to the other surface — the drawer offers the page,
+   *  the page offers the dock. Same conversation either way, so it is a
+   *  change of room, not a restart. Omitted where there is nowhere to go. */
+  onMove?: () => void;
+  moveLabel?: string;
 }
 
 const STAGE_SHORT: Record<string, string> = { understand: 'Understand', survey: 'Survey', match: 'Match', design: 'Design', prompts: 'Instructions', review: 'Review', gaps: 'Setup', compile: 'Save' };
 
-export function BuildWorkspace({ requirement, jobId, view, interrupted, isError, onSend }: BuildWorkspaceProps) {
+export function BuildWorkspace({ requirement, jobId, view, interrupted, isError, onSend, onMove, moveLabel }: BuildWorkspaceProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<BuildDetail | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -81,6 +86,11 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
         <span className="bw-ttl">Architect build</span>
         <span className="bw-req" title={requirement}>{requirement}</span>
         {view && <span className="bw-meta">${view.costUsd.toFixed(2)} of ${view.maxCostUsd.toFixed(2)} · {(view.elapsedMs / 1000).toFixed(0)}s</span>}
+        {onMove && (
+          <button type="button" className="bw-move" onClick={onMove} title={moveLabel}>
+            <ExternalLink /> {moveLabel}
+          </button>
+        )}
       </div>
 
       {interrupted ? (

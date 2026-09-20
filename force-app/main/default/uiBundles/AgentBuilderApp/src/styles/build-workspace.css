@@ -8,6 +8,10 @@
 .bw-ttl{font-weight:700;font-size:12.5px;color:var(--foreground);white-space:nowrap}
 .bw-req{flex:1;min-width:0;font-size:11.5px;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bw-meta{font:11px var(--font-mono);color:var(--muted-foreground);white-space:nowrap}
+/* Moving the build between the dock and the page: quiet until wanted. */
+.bw-move{display:inline-flex;align-items:center;gap:4px;flex:none;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--muted-foreground);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.bw-move:hover{color:var(--foreground);border-color:var(--ring)}
+.bw-move svg{width:11px;height:11px}
 .bw-note{display:flex;align-items:center;gap:8px;padding:12px 14px;font:12px var(--font-mono);color:var(--muted-foreground)}
 .bw-note.warn{color:var(--archon-warning)} .bw-note svg{width:14px;height:14px;flex:none}
 .bw-body{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:300px}
@@ -71,7 +75,7 @@
 /* Narrow container (a dock drawer, a phone): the stage rail sits above the
    panel and scrolls sideways, so every stage is still reachable. Wide
    container (the build page): rail beside the panel, as designed. */
-@container bw (max-width:680px){
+@container bw (max-width:680px){ .bw-req{display:none} 
   .bw-body{grid-template-columns:1fr}
   .bw-stages{border-right:0;border-bottom:1px solid var(--border);flex-direction:row;overflow-x:auto;gap:4px;padding:8px}
   .bw-stage{grid-template-columns:18px auto;gap:6px;white-space:nowrap;flex:none}

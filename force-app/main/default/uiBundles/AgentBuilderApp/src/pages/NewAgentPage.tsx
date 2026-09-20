@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Check,
   CircleDot,
-  Loader2,
   Mic,
   Paperclip,
   Plug,
@@ -14,31 +13,30 @@ import {
   X,
 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
+import { ChatPanel } from '@/components/chat/ChatPanel';
 import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
-import { NoteBar, SpecCard, StatusBadge } from '@/components/spec/blocks';
+import { StatusBadge } from '@/components/spec/blocks';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import {
-  startArchitectBuild,
-  resumeArchitectBuild,
   listResumableBuilds,
   discardArchitectBuild,
-  getArchitectBuild,
-  ASSIGNEE_LABEL,
-  type BuildJobView,
   type ResumableBuild,
 } from '@/lib/architect-data';
+import { COPILOT } from '@/lib/copilot';
 
 /**
- * The creation flow: choose → describe → building → review.
+ * The creation flow: choose → describe → build.
  *
- * The happy path deliberately shows NO graph. The agent comes back as
- * numbered sentences with the outstanding setup as a checklist; the canvas
- * lives behind "Open the advanced view" for people who want to verify.
+ * "Build" is not a screen of its own any more. It is the Archon
+ * conversation — the same component, agent and workspace the Home dock
+ * opens — given a page's width. Describing an agent here and asking for
+ * one from the dock now run the identical build; this page only supplies
+ * the examples, the document attachment and the room.
  */
 
-type Phase = 'choose' | 'describe' | 'building' | 'review';
+type Phase = 'choose' | 'describe' | 'building';
 
 const EXAMPLES = [
   'Answer support questions from our help articles',
@@ -57,34 +55,32 @@ export default function NewAgentPage() {
   const [text, setText] = useState('');
   // Home hands over a requirement captured in chat: land on "describe"
   // with it already filled in, instead of making the person retype it.
-  const handoff = (useLocation().state as { requirement?: string } | null)?.requirement;
+  const handoff = useLocation().state as { requirement?: string; sessionId?: string | null } | null;
+  const carried = handoff?.sessionId ?? null;
   useEffect(() => {
-    if (handoff) {
-      setText(handoff);
+    if (handoff?.requirement) {
+      setText(handoff.requirement);
       setPhase('describe');
     }
-  }, [handoff]);
+    // A build moved here from the Home dock: same conversation, more room.
+    if (handoff?.sessionId) setPhase('building');
+  }, [handoff?.requirement, handoff?.sessionId]);
   const [attachment, setAttachment] = useState<{ name: string; content: string } | null>(null);
+  /** What the build session opens with — a requirement to build, or an
+   *  instruction to resume. The Architect runs inside the conversation, so
+   *  this page and the Home dock show the identical workspace. */
+  const [opening, setOpening] = useState<string | null>(null);
+  const [seq, setSeq] = useState(0);
   const [listening, setListening] = useState(false);
-  const [job, setJob] = useState<BuildJobView | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [resuming, setResuming] = useState(false);
   const [resumable, setResumable] = useState<ResumableBuild[]>([]);
   const [discarding, setDiscarding] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<InstanceType<NonNullable<Window['SpeechRecognition']>> | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceSupported =
     typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 
-  useEffect(
-    () => () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
-      recognitionRef.current?.stop();
-    },
-    [],
-  );
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   // Unfinished work is the first thing worth knowing on this screen — a
   // fresh page otherwise invites paying to rebuild what is already saved.
@@ -139,46 +135,26 @@ export default function NewAgentPage() {
     reader.readAsText(file);
   }, []);
 
-  // ── Start + poll ───────────────────────────────────────────────────
-  const poll = useCallback((jobId: string) => {
-    getArchitectBuild(jobId)
-      .then(view => {
-        setJob(view);
-        if (view.status === 'done') {
-          setPhase('review');
-          return;
-        }
-        // `paused` is a resting state with a button, not a step on the way
-        // somewhere — polling it forever would just burn requests.
-        if (view.status === 'failed' || view.status === 'paused') return;
-        pollRef.current = setTimeout(() => poll(jobId), 2500);
-      })
-      .catch(() => {
-        // A transient read failure must not kill the build — keep polling.
-        pollRef.current = setTimeout(() => poll(jobId), 4000);
-      });
-  }, []);
-
+  // ── Start the build ────────────────────────────────────────────────
   const build = useCallback(() => {
     const requirement = text.trim();
     if (requirement.length < 20) {
       toast.info('Tell me a little more', { description: 'A sentence or two about what the agent should do.' });
       return;
     }
-    setStarting(true);
-    startArchitectBuild({ requirement, attachmentText: attachment?.content })
-      .then(jobId => {
-        setPhase('building');
-        setJob(null);
-        poll(jobId);
-      })
-      .catch(err => {
-        toast.error("Couldn't start the build", {
-          description: err instanceof Error ? err.message : undefined,
-        });
-      })
-      .finally(() => setStarting(false));
-  }, [text, attachment, poll]);
+    const doc = attachment?.content?.trim();
+    setOpening(
+      `Build me an agent. Here is what I need:
+
+${requirement}` +
+      (doc ? `
+
+From the attached document "${attachment!.name}":
+${doc.slice(0, 20_000)}` : ''),
+    );
+    setSeq(n => n + 1);
+    setPhase('building');
+  }, [text, attachment]);
 
   /**
    * Continue a build that stopped early. The server restores every finished
@@ -188,26 +164,12 @@ export default function NewAgentPage() {
    */
   const resumeById = useCallback(
     (jobId: string, alreadySpent: number) => {
-      setResuming(true);
-      resumeArchitectBuild(jobId, Number((alreadySpent + 2).toFixed(2)))
-        .then(newJobId => {
-          setPhase('building');
-          setJob(null);
-          poll(newJobId);
-        })
-        .catch(err => {
-          toast.error("Couldn't resume the build", {
-            description: err instanceof Error ? err.message : undefined,
-          });
-        })
-        .finally(() => setResuming(false));
+      setOpening(`Resume the build ${jobId} from where it stopped, with a ceiling of $${(alreadySpent + 2).toFixed(2)}.`);
+      setSeq(n => n + 1);
+      setPhase('building');
     },
-    [poll],
+    [],
   );
-
-  const resume = useCallback(() => {
-    if (job) resumeById(job.jobId, job.costUsd);
-  }, [job, resumeById]);
 
   /** Forget a saved build. Removed from the list immediately — the row is
    *  gone either way, and leaving it on screen after the user asked for it
@@ -272,9 +234,9 @@ export default function NewAgentPage() {
                       size="sm"
                       variant={b.stale ? 'outline' : 'default'}
                       onClick={() => resumeById(b.jobId, b.costUsd)}
-                      disabled={resuming || discarding === b.jobId}
+                      disabled={discarding === b.jobId}
                     >
-                      {resuming ? 'Resuming…' : 'Finish this'}
+                      Finish this
                     </Button>
                     <Button
                       size="sm"
@@ -432,8 +394,7 @@ export default function NewAgentPage() {
               <StatusBadge tone="muted" className="ml-auto">
                 <Plug className="h-3 w-3" /> Salesforce connected
               </StatusBadge>
-              <Button onClick={build} disabled={starting}>
-                {starting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+              <Button onClick={build}>
                 Build it <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             </div>
@@ -460,238 +421,42 @@ export default function NewAgentPage() {
     );
   }
 
-  // ── Building ───────────────────────────────────────────────────────
+  // ── The build session: the same chat and the same workspace the Home
+  // dock shows, given a page's width so the design preview and the diff
+  // are readable. One component, one mechanism, two placements.
   if (phase === 'building') {
-    // A failure the server can still continue from — it kept the design, and
-    // the repair for a late-gate rejection ships in code rather than in the
-    // model's next attempt. Re-buying the survey and the design to pick that
-    // up would be the same waste the checkpoint exists to end.
-    const recoverable = job?.resumable === true;
-    const failed = job?.status === 'failed';
-    const paused = job?.status === 'paused';
-    const canResume = paused || (failed && recoverable);
-    const doneStages = (job?.steps ?? []).filter(s => s.state === 'done' || s.state === 'warn').length;
     return (
-      <AppShell title="Building">
-        <PageBody width="read">
-          <h1 className="text-[26px] font-bold tracking-tight text-foreground">
-            {paused
-              ? 'Paused at your cost ceiling'
-              : failed
-                ? recoverable
-                  ? 'Stopped at the last step'
-                  : "I couldn't finish this one"
-                : 'Building your agent'}
-          </h1>
-          <p className="mb-6 mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
-            {canResume
-              ? `The ${doneStages} stage${doneStages === 1 ? '' : 's'} below are finished and saved. Resuming picks up from there — you won't be charged for them again. If you close this tab, it is waiting for you under New agent.`
-              : failed
-                ? 'Here is what happened, in full.'
-                : 'This takes a couple of minutes and runs in the background — you can leave this page and come back.'}
-          </p>
-
-          <SpecCard>
-            {(job?.steps ?? []).map(s => (
-              <div key={s.key} className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0">
-                <span
-                  className={cn(
-                    'grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[11px] font-bold',
-                    s.state === 'done' && 'bg-[var(--archon-success-tint)] text-[var(--archon-success)]',
-                    s.state === 'warn' && 'bg-[var(--archon-warning-tint)] text-[var(--archon-warning)]',
-                    s.state === 'running' && 'bg-[var(--node-blue-tint)] text-primary',
-                    s.state === 'failed' && 'bg-[var(--archon-error-tint)] text-[var(--archon-error)]',
-                    s.state === 'pending' && 'bg-secondary text-[var(--archon-faint)]',
-                  )}
-                >
-                  {s.state === 'done' || s.state === 'warn' ? (
-                    <Check className="h-3 w-3" />
-                  ) : s.state === 'running' ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : s.state === 'failed' ? (
-                    <X className="h-3 w-3" />
-                  ) : (
-                    <CircleDot className="h-2.5 w-2.5" />
-                  )}
-                </span>
-                <span className="flex-1 text-[13.5px]">{s.label}</span>
-                {/* What this stage cost, so the expensive one is visible
-                    rather than inferred from a single total. A reused stage
-                    says so instead — it is the whole point of resuming. */}
-                {s.reused ? (
-                  <span className="font-mono text-[11px] text-[var(--archon-success)]">already paid</span>
-                ) : s.costUsd != null && s.costUsd > 0 ? (
-                  <span className="font-mono text-[11px] tabular-nums text-[var(--archon-faint)]">
-                    ${s.costUsd.toFixed(3)}
-                    {s.ms != null && s.ms > 1000 ? ` · ${Math.round(s.ms / 1000)}s` : ''}
-                  </span>
-                ) : null}
-                {s.detail && (
-                  <StatusBadge tone={s.state === 'warn' ? 'warn' : 'muted'}>{s.detail}</StatusBadge>
-                )}
-              </div>
-            ))}
-            {!job && (
-              <div className="flex items-center gap-2 px-4 py-6 text-[12.5px] text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting…
-              </div>
-            )}
-            <div className="flex gap-7 border-t border-border bg-secondary px-4 py-3.5">
-              <div>
-                <div className="text-[11px] text-[var(--archon-faint)]">So far</div>
-                <div className="font-mono text-[19px] font-semibold">
-                  {job ? `${Math.floor(job.elapsedMs / 60000)}m ${Math.floor((job.elapsedMs % 60000) / 1000)}s` : '—'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[var(--archon-faint)]">Build cost</div>
-                <div className="font-mono text-[19px] font-semibold">${(job?.costUsd ?? 0).toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[var(--archon-faint)]">Ceiling</div>
-                <div className="font-mono text-[19px] font-semibold">${(job?.maxCostUsd ?? 2).toFixed(2)}</div>
-              </div>
-            </div>
-            {(failed || paused) && job?.error && (
-              <NoteBar tone={canResume ? 'warn' : 'error'}>{job.error}</NoteBar>
-            )}
-          </SpecCard>
-
-          {canResume && (
-            <div className="mt-4 flex flex-wrap items-center gap-2.5">
-              <Button onClick={resume} disabled={resuming}>
-                {resuming ? 'Resuming…' : `Resume · up to $${((job?.costUsd ?? 0) + 2).toFixed(2)} total`}
-              </Button>
-              <Button variant="outline" onClick={() => setPhase('describe')}>
-                Start over with a different description
-              </Button>
-            </div>
-          )}
-
-          {failed && !recoverable && (
-            <div className="mt-4 flex gap-2.5">
-              <Button onClick={() => setPhase('describe')}>Change what I asked for</Button>
-              <Button variant="outline" onClick={build}>
-                Try again
-              </Button>
-            </div>
-          )}
-        </PageBody>
+      <AppShell title="New agent">
+        <div className="flex h-full min-h-0 w-full flex-col">
+          <div className="flex shrink-0 items-center gap-2 overflow-hidden border-b border-border px-5 py-2 text-[12px] text-muted-foreground max-sm:justify-between">
+            <button type="button" className="hover:text-foreground" onClick={() => navigate('/')}>Agents</button>
+            <span>/</span>
+            <span className="font-semibold text-foreground">New agent</span>
+            {/* What is being built, when there is room for it. On a narrow
+                screen the way back matters more than the reminder. */}
+            <span className="ml-auto hidden min-w-0 truncate pl-4 font-mono text-[11px] sm:block" title={text}>
+              {carried ? 'Continued from Home' : text.slice(0, 120)}
+            </span>
+            <button type="button" className="shrink-0 font-semibold text-primary hover:underline" onClick={() => { setOpening(null); setPhase('describe'); }}>
+              Start over
+            </button>
+          </div>
+          <div className="min-h-0 flex-1">
+            <ChatPanel
+              key={`build-${carried ?? seq}`}
+              variant="full"
+              agentApiName={COPILOT.apiName}
+              agentName={COPILOT.name}
+              initialSessionId={carried}
+              initialMessage={carried ? null : opening ? { text: opening, how: 'type' } : null}
+              onClose={() => navigate('/')}
+              onMove={id => navigate('/', { state: { sessionId: id } })}
+              moveLabel="Continue on Home"
+            />
+          </div>
+        </div>
       </AppShell>
     );
   }
-
-  // ── Review ─────────────────────────────────────────────────────────
-  const r = job?.result;
-  if (!r) return null;
-  const blocking = r.prerequisites.filter(p => p.blocking);
-  return (
-    <AppShell title="Review">
-      <PageBody width="read">
-        <h1 className="text-[26px] font-bold tracking-tight text-foreground">Here's what I built</h1>
-        <p className="mb-6 mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
-          Read it in plain English. If anything's wrong, tell me and I'll change it — you don't need to edit
-          anything by hand.
-        </p>
-
-        <SpecCard
-          title={r.apiName}
-          right={
-            blocking.length > 0 ? (
-              <StatusBadge tone="warn">Waiting on {blocking.length}</StatusBadge>
-            ) : (
-              <StatusBadge tone="ok">Ready</StatusBadge>
-            )
-          }
-        >
-          {r.summarySteps.map((s, i) => (
-            <div key={i} className="flex gap-3.5 border-b border-border px-4 py-3 last:border-b-0">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--node-blue-tint)] text-[12px] font-bold text-primary">
-                {i + 1}
-              </span>
-              <span className="text-[13.5px] leading-relaxed">{s}</span>
-            </div>
-          ))}
-          <div className="flex gap-7 border-t border-border bg-secondary px-4 py-3.5">
-            <div>
-              <div className="text-[11px] text-[var(--archon-faint)]">Per conversation</div>
-              <div className="font-mono text-[19px] font-semibold">${r.estimate.costPerRunUsd.toFixed(3)}</div>
-            </div>
-            <div>
-              <div className="text-[11px] text-[var(--archon-faint)]">Replies in</div>
-              <div className="font-mono text-[19px] font-semibold">{r.estimate.latencySeconds}s</div>
-            </div>
-            <div>
-              <div className="text-[11px] text-[var(--archon-faint)]">Build cost</div>
-              <div className="font-mono text-[19px] font-semibold">${(job?.costUsd ?? 0).toFixed(2)}</div>
-            </div>
-            <div>
-              <div className="text-[11px] text-[var(--archon-faint)]">Shape</div>
-              <div className="text-[19px] font-semibold">{r.shape}</div>
-            </div>
-          </div>
-        </SpecCard>
-
-        {r.prerequisites.length > 0 && (
-          <div className="mt-4 overflow-hidden rounded-lg border border-[var(--node-amber)]">
-            <div className="bg-[var(--archon-warning-tint)] px-4 py-3">
-              <div className="text-[14px] font-bold text-[var(--archon-warning)]">
-                {blocking.length > 0
-                  ? `${blocking.length} thing${blocking.length === 1 ? '' : 's'} before this can go live`
-                  : 'Optional setup'}
-              </div>
-              <div className="text-[12px] text-[var(--archon-warning)]">
-                I can't create these for you — your org, your rules
-              </div>
-            </div>
-            {r.prerequisites.map((p, i) => (
-              <div key={p.id} className="flex gap-3.5 border-t border-border bg-card px-4 py-3.5">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--archon-warning-tint)] text-[12px] font-bold text-[var(--archon-warning)]">
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold">{p.title}</div>
-                  <div className="text-[11.5px] text-[var(--archon-faint)]">
-                    {ASSIGNEE_LABEL[p.assignee] ?? p.assignee}
-                    {p.estimatedEffort ? ` · about ${p.estimatedEffort}` : ''}
-                    {p.blocking ? '' : ' · optional'}
-                  </div>
-                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{p.why}</p>
-                  <ol className="mt-2 list-decimal space-y-1 pl-4 text-[12.5px] leading-relaxed text-muted-foreground">
-                    {p.steps.map((st, si) => (
-                      <li key={si}>{st}</li>
-                    ))}
-                  </ol>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(r.assumptions.length > 0 || r.notes.length > 0 || r.confidence) && (
-          <SpecCard className="mt-4" title="What I'm least sure about">
-            <div className="space-y-2 px-4 py-3.5 text-[12.5px] leading-relaxed text-muted-foreground">
-              <p>{r.confidence}</p>
-              {r.assumptions.map((a, i) => (
-                <p key={`a${i}`}>· {a}</p>
-              ))}
-              {r.notes.map((n, i) => (
-                <p key={`n${i}`}>· {n}</p>
-              ))}
-            </div>
-          </SpecCard>
-        )}
-
-        <div className="mt-5 flex items-center gap-2.5">
-          <Button onClick={() => navigate(`/agent/${r.apiName}`)}>Open the advanced view</Button>
-          <Button variant="outline" onClick={() => navigate('/')}>
-            Back to agents
-          </Button>
-          <Button variant="ghost" className="ml-auto" onClick={() => setPhase('describe')}>
-            Change something
-          </Button>
-        </div>
-      </PageBody>
-    </AppShell>
-  );
+  return null;
 }

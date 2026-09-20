@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStageFrame } from './ws-chat';
+import { isStageFrame, isTextDelta, isTextReset } from './ws-chat';
 import { toolLabel } from './tool-label';
 
 /**
@@ -27,6 +27,35 @@ describe('isStageFrame', () => {
     expect(isStageFrame(undefined)).toBe(false);
     expect(isStageFrame('stage')).toBe(false);
     expect(isStageFrame(42)).toBe(false);
+  });
+});
+
+describe('text frames', () => {
+  it('recognises a delta and a reset', () => {
+    expect(isTextDelta({ type: 'text.delta', delta: 'Hello', seq: 3 })).toBe(true);
+    expect(isTextReset({ type: 'text.reset', seq: 4 })).toBe(true);
+  });
+
+  it('refuses a delta with no text, which would append undefined', () => {
+    expect(isTextDelta({ type: 'text.delta', seq: 3 })).toBe(false);
+    expect(isTextDelta({ type: 'text.delta', delta: 42, seq: 3 })).toBe(false);
+  });
+
+  it('keeps the three frame kinds apart', () => {
+    const delta = { type: 'text.delta', delta: 'x', seq: 0 };
+    expect(isStageFrame(delta)).toBe(false);
+    expect(isTextReset(delta)).toBe(false);
+    const stage = { type: 'stage', state: 'start', name: 'soqlQuery', seq: 0 };
+    expect(isTextDelta(stage)).toBe(false);
+    const turn = { status: 'complete', assistantText: 'done' };
+    expect(isTextDelta(turn)).toBe(false);
+    expect(isTextReset(turn)).toBe(false);
+  });
+
+  it('an empty delta is still a delta, not a turn result', () => {
+    // The server can emit one; treating it as a turn result would draw an
+    // error bubble mid-reply.
+    expect(isTextDelta({ type: 'text.delta', delta: '', seq: 9 })).toBe(true);
   });
 });
 

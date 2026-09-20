@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Loader2, Mic, MicOff, Paperclip, Send, Settings2,
+  Check, Copy, Loader2, Mic, MicOff, Paperclip, Send, Settings2,
   ThumbsDown, ThumbsUp, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react';
 import { askArchon, getArchitectBuild, startArchitectBuild, type BuildJobView } from '@/lib/architect-data';
@@ -13,12 +13,12 @@ import type { ChatActivity, ChatActivityInput } from '@/lib/chat-activity';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
-import { renderMarkdown } from '@/lib/render-markdown';
-import { openChatSocket, continuationText, isStageFrame, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary, type StageFrame } from '@/lib/ws-chat';
+import { openChatSocket, continuationText, isStageFrame, isTextDelta, isTextReset, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary, type StageFrame } from '@/lib/ws-chat';
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from './ChatApprovalCard';
 import { ToolResultCards, flattenCalls } from './ToolResultCards';
 import { toolLabel } from '@/lib/tool-label';
+import { MessageBody } from './MessageBody';
 import { BuildWorkspace } from './BuildWorkspace';
 import {
   startChatSession,
@@ -68,6 +68,8 @@ interface DisplayMessage {
   /** The page was left while this build ran — its progress lives on the
    *  New agent page now, not here. */
   buildInterrupted?: boolean;
+  /** Being written into right now: rendered as plain text, not markdown. */
+  isStreaming?: boolean;
 }
 
 // ── Copilot transport: a conversation that lives in this browser ──────
@@ -314,6 +316,17 @@ export function ChatPanel({
    *  before, so nothing here can leave the panel looking broken. */
   const [live, setLive] = useState<{ active: { name: string; via?: string }[]; done: number }>({ active: [], done: 0 });
   const clearLive = useCallback(() => setLive({ active: [], done: 0 }), []);
+  /** The id of the assistant row currently being written into, if any. The
+   *  row keeps this id when the turn lands and becomes the final message,
+   *  so the bubble is never torn down and rebuilt in front of the reader. */
+  const streamRowRef = useRef<string | null>(null);
+  /** Which reply was just copied, so the button can confirm it briefly. */
+  const [copied, setCopied] = useState<string | null>(null);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 1400);
+    return () => clearTimeout(t);
+  }, [copied]);
 
   const socketRef = useRef<WebSocket | null>(null);
   const historyRef = useRef<ChatHistoryEntry[]>(restored.history);
@@ -366,6 +379,31 @@ export function ChatPanel({
       if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
     });
   }, []);
+
+  /** Is the reader still following the bottom of the transcript?
+   *
+   *  Forcing the scroll unconditionally was tolerable when replies landed
+   *  whole. With text arriving continuously it fights anyone reading back
+   *  through the conversation, and it moves the viewport out from under a
+   *  selection. So the panel follows only while the reader is already at
+   *  the bottom, and stops the moment they scroll away or select text. */
+  const followRef = useRef(true);
+  const onListScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+  const hasSelectionInList = () => {
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    if (!sel || sel.isCollapsed || !listRef.current) return false;
+    const node = sel.anchorNode;
+    return !!node && listRef.current.contains(node);
+  };
+  /** Scroll only if the reader has not taken over. */
+  const maybeScrollToBottom = useCallback(() => {
+    if (!followRef.current || hasSelectionInList()) return;
+    scrollToBottom();
+  }, [scrollToBottom]);
 
   const reportSessionChange = useCallback(
     (info: { sessionId: string | null; ended: boolean }) => {
@@ -465,17 +503,26 @@ export function ChatPanel({
           ...historyRef.current,
           { role: 'assistant', content: result.assistantText + toolContext },
         ];
-        setMessages(list => [
-          ...list,
-          {
-            id: `assistant_${Date.now()}`,
-            role: 'Assistant',
-            content: result.assistantText ?? '',
-            toolLabel: null,
-            createdDate: new Date().toISOString(),
-            toolCalls: result.toolCalls?.length ? result.toolCalls : undefined,
-          },
-        ]);
+        // The turn result is the record; anything streamed was only an
+        // accelerant. If a row was being written into, it BECOMES the final
+        // message — same id, so the bubble is never torn down in front of
+        // the reader — and its text is replaced with the authoritative copy,
+        // which is what makes a guard's rewrite land honestly.
+        const streamed = streamRowRef.current;
+        streamRowRef.current = null;
+        const settled = {
+          role: 'Assistant' as const,
+          content: result.assistantText ?? '',
+          toolLabel: null,
+          createdDate: new Date().toISOString(),
+          toolCalls: result.toolCalls?.length ? result.toolCalls : undefined,
+          isStreaming: false,
+        };
+        setMessages(list => (
+          streamed && list.some(m => m.id === streamed)
+            ? list.map(m => (m.id === streamed ? { ...m, ...settled } : m))
+            : [...list, { id: `assistant_${Date.now()}`, ...settled }]
+        ));
         // Answer in kind: aloud if this turn was spoken, unless the sound
         // preference says otherwise. When the reply finishes, the mic re-arms
         // if voice is on, so a spoken conversation keeps flowing.
@@ -556,7 +603,7 @@ export function ChatPanel({
       if (suspended) emit({ kind: 'approval' });
       setSending(false);
       clearLive();
-      scrollToBottom();
+      maybeScrollToBottom();
       if (session) reportSessionChange({ sessionId: session.Id, ended: false });
       console.log('[ChatPanel] handleTurnResult done', { sessionId: session?.Id });
     },
@@ -580,6 +627,34 @@ export function ChatPanel({
   }, []);
   const handleStageRef = useRef(handleStage);
   useEffect(() => { handleStageRef.current = handleStage; }, [handleStage]);
+
+  /** Reply text as it is written. Appends into one row with a stable id,
+   *  the same in-place update the build card has always used. */
+  const handleDelta = useCallback((delta: string) => {
+    setMessages(list => {
+      const id = streamRowRef.current;
+      if (id) return list.map(m => (m.id === id ? { ...m, content: m.content + delta } : m));
+      const fresh = `assistant_${Date.now()}`;
+      streamRowRef.current = fresh;
+      return [...list, {
+        id: fresh, role: 'Assistant' as const, content: delta, toolLabel: null,
+        createdDate: new Date().toISOString(), isStreaming: true,
+      }];
+    });
+    maybeScrollToBottom();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Discard what was streamed. Always safe: the turn result carries the
+   *  complete reply and renders over whatever was shown. */
+  const handleReset = useCallback(() => {
+    const id = streamRowRef.current;
+    if (!id) return;
+    streamRowRef.current = null;
+    setMessages(list => list.filter(m => m.id !== id));
+  }, []);
+  const handleDeltaRef = useRef(handleDelta);
+  const handleResetRef = useRef(handleReset);
+  useEffect(() => { handleDeltaRef.current = handleDelta; handleResetRef.current = handleReset; }, [handleDelta, handleReset]);
 
   // ── Bootstrap: load/start session, open WS ──────────────────────
   useEffect(() => {
@@ -668,6 +743,8 @@ export function ChatPanel({
             // never does. Anything unrecognised falls through to the result
             // handler, which is exactly how this client behaved before.
             if (isStageFrame(msg)) { handleStageRef.current(msg); return; }
+            if (isTextDelta(msg)) { handleDeltaRef.current(msg.delta); return; }
+            if (isTextReset(msg)) { handleResetRef.current(); return; }
             console.log('[ChatPanel] websocket message received', ev.data);
             handleTurnResult(msg as ChatTurnResult);
           };
@@ -858,7 +935,7 @@ export function ChatPanel({
             emit({ kind: 'step', label: s.label, state: s.state, detail: s.detail });
           }
           setMessages(list => list.map(m => (m.id === messageId ? { ...m, build: view } : m)));
-          scrollToBottom();
+          maybeScrollToBottom();
           if (view.status === 'done' || view.status === 'failed' || view.status === 'paused') {
             const stageStop = view.status === 'paused' && /as asked/.test(String((view as { error?: string }).error ?? ''));
             emit({ kind: 'sys', text: view.status === 'done' ? 'Build finished.' : stageStop ? 'Stage finished — waiting for the next step.' : view.status === 'paused' ? 'Build paused at its cost ceiling.' : 'Build failed.' });
@@ -970,6 +1047,8 @@ export function ChatPanel({
       ws.onmessage = ev => {
         const msg: unknown = JSON.parse(ev.data as string);
         if (isStageFrame(msg)) { handleStageRef.current(msg); return; }
+        if (isTextDelta(msg)) { handleDeltaRef.current(msg.delta); return; }
+        if (isTextReset(msg)) { handleResetRef.current(); return; }
         handleTurnResultRef.current(msg as ChatTurnResult);
       };
     }));
@@ -1041,6 +1120,7 @@ export function ChatPanel({
       });
       return next;
     });
+    followRef.current = true;
     scrollToBottom();
 
     historyRef.current = [...historyRef.current, { role: 'user', content: text }];
@@ -1212,6 +1292,7 @@ export function ChatPanel({
 
       <div
         ref={listRef}
+        onScroll={onListScroll}
         className={
           isFull
             ? isDrawer ? 'flex-1 space-y-3 overflow-y-auto px-3 py-3' : 'flex-1 space-y-3 overflow-y-auto px-6 py-5'
@@ -1288,14 +1369,21 @@ export function ChatPanel({
                 {isUser ? (
                   <span className="whitespace-pre-wrap">{m.content}</span>
                 ) : (
-                  <div
-                    className="prose-chat"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}
-                  />
+                  <MessageBody text={m.content} streaming={m.isStreaming} />
                 )}
               </div>
               {!isUser && m.toolCalls?.length ? <ToolResultCards calls={m.toolCalls} /> : null}
               <div className="mt-1 flex items-center gap-1.5 px-1">
+                {!isUser && !m.isError && !m.isStreaming && (
+                  <button
+                    type="button"
+                    onClick={() => { void navigator.clipboard?.writeText(m.content); setCopied(m.id); }}
+                    aria-label="Copy this reply"
+                    className="flex h-5 w-5 items-center justify-center rounded border border-border text-muted-foreground/60 hover:text-foreground"
+                  >
+                    {copied === m.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                )}
                 {!isUser && !m.isError && !isCopilot && (
                   <>
                     <button

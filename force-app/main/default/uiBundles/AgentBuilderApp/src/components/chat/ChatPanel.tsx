@@ -1317,10 +1317,9 @@ export function ChatPanel({
               aria-pressed={streaming}
             >
               {streaming ? <Zap className="h-3.5 w-3.5" /> : <Gauge className="h-3.5 w-3.5" />}
-              {/* A bare icon read as decoration and went unnoticed. The
-                  word is dropped only in the drawer, where the header has
-                  no room for it. */}
-              {!isDrawer && <span>{streaming ? 'Live' : 'Live off'}</span>}
+              {/* A bare icon read as decoration and went unnoticed, so the
+                  word stays in every variant including the narrow drawer. */}
+              <span>{streaming ? 'Live' : 'Live off'}</span>
             </button>
           )}
           {(session || (isCopilot && messages.length > 0)) && (

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send } from 'lucide-react';
+import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send, Zap } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { COPILOT } from '@/lib/copilot';
+import { resolveStreaming, setStreamOverride, STREAM_LABEL } from '@/lib/stream-pref';
 import type { VoicePhase } from '@/components/chat/VoiceStrip';
 import type { CorePhase } from '@/components/home/CoreRing';
 import type { ChatActivity } from '@/lib/chat-activity';
@@ -221,10 +222,24 @@ export default function HomeDashboardPage() {
   const [events, setEvents] = useState<ChatActivity[]>([]);
   const [input, setInput] = useState('');
   const [openSeq, setOpenSeq] = useState(0);
+  /** Streaming, settable BEFORE anything is asked. The drawer reads the
+   *  same per-agent preference when it opens, so choosing here decides how
+   *  the first reply arrives rather than the second. */
+  const [streaming, setStreaming] = useState(() => resolveStreaming(COPILOT.apiName, undefined));
+  const toggleStreaming = () => {
+    setStreaming(prev => {
+      const next = !prev;
+      setStreamOverride(copilotAgent.apiName, next);
+      return next;
+    });
+  };
   const homeRef = useRef<HTMLDivElement>(null);
   const chatPhase = useMemo<VoicePhase>(() => { let p: VoicePhase = 'ready'; for (const e of events) if (e.kind === 'phase') p = e.phase; return p; }, [events]);
   const phase: CorePhase = stage !== 'live' ? 'off' : focus ? chatPhase : 'ready';
   const exitFocus = useCallback(() => { setFocus(null); setCopilotAgent(COPILOT); }, []);
+  // A hand-off changes who the dock is talking to, and streaming is a
+  // per-agent choice: show that agent's, not the one we just left.
+  useEffect(() => { setStreaming(resolveStreaming(copilotAgent.apiName, undefined)); }, [copilotAgent.apiName]);
   const handleTransfer = useCallback((t: { agentApiName: string; agentName: string; message: string }) => {
     setCopilotAgent({ apiName: t.agentApiName, name: t.agentName }); setOpenSeq(n => n + 1); setFocus({ message: { text: t.message, how: 'type' } });
   }, []);
@@ -395,6 +410,16 @@ export default function HomeDashboardPage() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
             />
+            <button
+              type="button"
+              className={`dk-live${streaming ? ' on' : ''}`}
+              onClick={toggleStreaming}
+              aria-pressed={streaming}
+              aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+              title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+            >
+              <Zap /> {streaming ? 'Live' : 'Live off'}
+            </button>
             <button type="button" className="dk-b mic" onClick={talk} aria-label="Talk to Archon" title="Talk"><Mic /></button>
             <button type="button" className="dk-b" onClick={submit} disabled={!input.trim()} aria-label="Send"><Send /></button>
             {pendingCount > 0 && (

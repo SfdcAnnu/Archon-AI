@@ -954,7 +954,7 @@ export function ChatPanel({
           buildPollRef.current = setTimeout(() => pollBuildRef.current(messageId, jobId, seen), 4000);
         });
     },
-    [emit, scrollToBottom],
+    [emit, maybeScrollToBottom],
   );
   useEffect(() => { pollBuildRef.current = pollBuild; }, [pollBuild]);
 

@@ -1309,12 +1309,18 @@ export function ChatPanel({
             <button
               type="button"
               onClick={toggleStreaming}
-              className={`rounded-md p-1 hover:bg-muted ${streaming ? 'text-[var(--archon-success)]' : 'text-muted-foreground'}`}
+              className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-bold uppercase tracking-wide hover:bg-muted ${
+                streaming ? 'text-[var(--archon-success)]' : 'text-muted-foreground'
+              }`}
               title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
               aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
               aria-pressed={streaming}
             >
-              {streaming ? <Zap className="h-4 w-4" /> : <Gauge className="h-4 w-4" />}
+              {streaming ? <Zap className="h-3.5 w-3.5" /> : <Gauge className="h-3.5 w-3.5" />}
+              {/* A bare icon read as decoration and went unnoticed. The
+                  word is dropped only in the drawer, where the header has
+                  no room for it. */}
+              {!isDrawer && <span>{streaming ? 'Live' : 'Live off'}</span>}
             </button>
           )}
           {(session || (isCopilot && messages.length > 0)) && (

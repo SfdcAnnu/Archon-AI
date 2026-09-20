@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Zap } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { NoteBar, SpecCard, StatCard, StatusBadge, T, type BadgeTone } from '@/components/spec/blocks';
 import { cn } from '@/lib/utils';
-import { loadAgents, deleteAgent, createAgent, type AgentSummary } from '@/lib/agents-data';
+import { loadAgents, deleteAgent, createAgent, updateAgentStreaming, type AgentSummary } from '@/lib/agents-data';
 import { loadExecutionLogs, type RawAgentExecution } from '@/lib/executions-data';
 
 /** Approved spec screen 03 — "Which agents are healthy?" Stat row on top,
@@ -159,6 +159,19 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [agents, setAgents] = useState<AgentSummary[]>([]);
+  /** Where each agent's chats start. Flipped from the list because that is
+   *  where someone comparing their agents actually is. The row updates at
+   *  once and the write follows; a failure puts the row back rather than
+   *  leaving the list claiming something the org does not agree with. */
+  const streamOn = (a: AgentSummary) => a.streamReplies === true;
+  const toggleStreaming = (a: AgentSummary) => {
+    const next = !streamOn(a);
+    setAgents(list => list.map(x => (x.id === a.id ? { ...x, streamReplies: next } : x)));
+    updateAgentStreaming(a.id, next).catch(err => {
+      console.error('Streaming change failed:', err);
+      setAgents(list => list.map(x => (x.id === a.id ? { ...x, streamReplies: !next } : x)));
+    });
+  };
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   // undefined = still loading · null = endpoint failed (page degrades honestly)
   const [execs, setExecs] = useState<RawAgentExecution[] | null | undefined>(undefined);
@@ -366,6 +379,7 @@ export default function HomePage() {
                     <th className={T.th}>Health</th>
                     <th className={T.th}>Activity 24h</th>
                     <th className={cn(T.th, 'text-right')}>Runs</th>
+                    <th className={T.th}>Streaming</th>
                     <th className={T.th}>Status</th>
                     <th className={cn(T.th, 'w-10')} />
                   </tr>
@@ -403,6 +417,26 @@ export default function HomePage() {
                         </td>
                         <td className={cn(T.td, 'text-right font-mono')}>
                           {(a.totalExecutions ?? 0).toLocaleString()}
+                        </td>
+                        <td className={T.td}>
+                          {/* Where this agent's chats START. Clicking here
+                              must not also open the agent, hence the stop. */}
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); toggleStreaming(a); }}
+                            aria-pressed={streamOn(a)}
+                            title={streamOn(a)
+                              ? 'Chats start with streaming on. Anyone chatting can still switch it off.'
+                              : 'Chats start with streaming off. Anyone chatting can still switch it on.'}
+                            className={cn(
+                              'flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide',
+                              streamOn(a)
+                                ? 'bg-[var(--archon-success-tint)] text-[var(--archon-success)]'
+                                : 'text-[var(--archon-faint)] hover:bg-secondary hover:text-foreground',
+                            )}
+                          >
+                            <Zap className="h-3 w-3" /> {streamOn(a) ? 'On' : 'Off'}
+                          </button>
                         </td>
                         <td className={T.td}>
                           <StatusBadge tone={statusTone(a.status)}>{a.status}</StatusBadge>

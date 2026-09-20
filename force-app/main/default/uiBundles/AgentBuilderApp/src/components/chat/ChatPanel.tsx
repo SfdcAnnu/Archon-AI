@@ -191,8 +191,12 @@ export interface ChatPanelProps {
   agentName: string;
   /** 'overlay' (default): the 420px slide-over card (canvas test chat).
    *  'full': fills its container — the Chat page's main area — with the
-   *  transcript centered in a readable column. */
-  variant?: 'overlay' | 'full';
+   *  transcript centered in a readable column.
+   *  'drawer': fills its container too, but compact — the Home dock's
+   *  panel, where width is short and every pixel of height counts.
+   *  Layout only: every variant is the same chat, with the same cards,
+   *  approvals, build workspace and voice. */
+  variant?: 'overlay' | 'full' | 'drawer';
   /** Resume a past conversation instead of starting a new one. */
   initialSessionId?: string | null;
   onClose: () => void;
@@ -231,7 +235,8 @@ export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
   transport = 'session', copilotPlatform, headerNote, onTransfer,
 }: ChatPanelProps) {
-  const isFull = variant === 'full';
+  const isFull = variant === 'full' || variant === 'drawer';
+  const isDrawer = variant === 'drawer';
   const isCopilot = transport === 'copilot';
   const copilotPlatformRef = useRef(copilotPlatform);
   useEffect(() => { copilotPlatformRef.current = copilotPlatform; }, [copilotPlatform]);
@@ -1155,7 +1160,7 @@ export function ChatPanel({
         ref={listRef}
         className={
           isFull
-            ? 'flex-1 space-y-3 overflow-y-auto px-6 py-5'
+            ? isDrawer ? 'flex-1 space-y-3 overflow-y-auto px-3 py-3' : 'flex-1 space-y-3 overflow-y-auto px-6 py-5'
             : 'flex-1 space-y-3 overflow-y-auto p-4'
         }
       >
@@ -1296,7 +1301,7 @@ export function ChatPanel({
           </Button>
         </div>
       ) : (
-        <div className={isFull ? 'border-t border-border px-6 py-3' : 'border-t border-border p-3'}>
+        <div className={isFull ? (isDrawer ? 'border-t border-border px-3 py-2.5' : 'border-t border-border px-6 py-3') : 'border-t border-border p-3'}>
           {pendingAttachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {pendingAttachments.map(a => (

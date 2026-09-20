@@ -1,5 +1,5 @@
 /* The build workspace card in the chat — every colour from the theme tokens. */
-.bw{border:1px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden;animation:bw-in .45s ease-out both;width:100%}
+.bw{border:1px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden;animation:bw-in .45s ease-out both;width:100%;container-type:inline-size;container-name:bw}
 @keyframes bw-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .bw .spin{width:12px;height:12px;animation:bw-spin 1s linear infinite}
 @keyframes bw-spin{to{transform:rotate(360deg)}}
@@ -68,5 +68,20 @@
 .bw-final .st{font:600 10.5px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;padding:3px 9px;border-radius:4px;background:color-mix(in srgb,var(--archon-warning) 16%,transparent);color:var(--archon-warning)}
 .bw-final .st.live{background:color-mix(in srgb,var(--archon-success) 16%,transparent);color:var(--archon-success);box-shadow:0 0 18px color-mix(in srgb,var(--archon-success) 35%,transparent)}
 .bw-final .r{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-@media (max-width:900px){.bw-body{grid-template-columns:1fr}.bw-stages{border-right:0;border-bottom:1px solid var(--border)}}
+/* Narrow container (a dock drawer, a phone): the stage rail sits above the
+   panel and scrolls sideways, so every stage is still reachable. Wide
+   container (the build page): rail beside the panel, as designed. */
+@container bw (max-width:680px){
+  .bw-body{grid-template-columns:1fr}
+  .bw-stages{border-right:0;border-bottom:1px solid var(--border);flex-direction:row;overflow-x:auto;gap:4px;padding:8px}
+  .bw-stage{grid-template-columns:18px auto;gap:6px;white-space:nowrap;flex:none}
+  .bw-stage .d,.bw-stage.sel .d{display:none}
+  .bw-stage:not(.sel):not(.run):not(.wait) .l{display:none}
+  .bw-ctl{margin-top:0;flex-direction:row;flex-wrap:wrap;padding-top:0;align-items:center}
+  .bw-ctl .bw-hint{flex-basis:100%}
+  .bw-canvas{height:300px}
+  .bw-final{flex-direction:column;align-items:flex-start} .bw-final .r{margin-left:0;width:100%}
+}
+/* A viewport too small for either shape. */
+@media (max-width:640px){.bw-canvas{height:260px}}
 @media (prefers-reduced-motion:reduce){.bw,.bw-stage.run .m{animation:none!important}}

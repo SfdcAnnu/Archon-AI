@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useHref, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
-import { ConsoleRail } from '@/components/chat/ConsoleRail';
 import type { VoicePhase } from '@/components/chat/VoiceStrip';
-import { CoreRing, type CorePhase } from '@/components/home/CoreRing';
+import type { CorePhase } from '@/components/home/CoreRing';
 import type { ChatActivity } from '@/lib/chat-activity';
-import { getVoicePref, setVoicePref } from '@/lib/voice';
+import { setVoicePref } from '@/lib/voice';
 import { loadAgents, type AgentSummary } from '@/lib/agents-data';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { loadPendingApprovals, type ApprovalDto } from '@/lib/approvals-data';
@@ -75,17 +74,7 @@ function ago(ms: number): string {
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
 
-const PHASE_COPY: Record<CorePhase, string> = { off: 'standby', ready: 'Ready', listen: 'Listening…', think: 'Working on it', speak: 'Answering', build: 'Building' };
-const STATUS_COPY: Record<CorePhase, string> = {
-  off: 'Waking up…',
-  ready: 'Ready — type or talk, the answer comes back the same way.',
-  listen: 'Listening — it sends when you pause.',
-  think: 'Working on it…',
-  speak: 'Speaking — talk or type to interrupt.',
-  build: 'Building…',
-};
-const FOCUS_MS = 1600;
-const SUGGESTIONS = ['What failed today, and why?', 'Which agents need attention?', 'How much did we save this month?', 'Create an agent for lead qualification'];
+const PHASE_COPY: Record<CorePhase, string> = { off: 'Standby', ready: 'Ready · voice on', listen: 'Listening…', think: 'Working on it', speak: 'Answering', build: 'Building the agent' };
 const COPILOT = { apiName: 'archon_copilot', name: 'Archon' } as const;
 
 const NAV: Array<{ label: string; href: string; key: 'command' | 'chat' | 'fleet' | 'inbox' | 'review' | 'log' }> = [
@@ -186,6 +175,20 @@ export default function HomeDashboardPage() {
 
   const agents = data?.agents ?? [];
   const active = agents.filter(a => a.status === 'Active');
+  /** Every agent with what it did today, live first, busiest first — the fleet
+   *  at a glance, from the same aggregate the tiles use. */
+  const agentRows = useMemo(() => {
+    const by = new Map((stats?.byAgent ?? []).map(x => [x.apiName, x]));
+    const rank = (st: string) => (st === 'Active' ? 0 : st === 'Draft' ? 1 : 2);
+    return agents
+      .map(a => {
+        const cnt = by.get(a.apiName);
+        const total = cnt ? cnt.runsToday + cnt.turnsToday : 0;
+        const fail = cnt ? cnt.runsFailedToday + cnt.turnsFailedToday : 0;
+        return { a, total, fail };
+      })
+      .sort((x, y) => rank(x.a.status) - rank(y.a.status) || y.total - x.total || x.a.name.localeCompare(y.a.name));
+  }, [agents, stats]);
   const byDept = useMemo(() => {
     const m = new Map<string, number>();
     for (const a of active) m.set(a.department || 'Other', (m.get(a.department || 'Other') ?? 0) + 1);
@@ -216,36 +219,29 @@ export default function HomeDashboardPage() {
   const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null } | null>(null);
   const [copilotAgent, setCopilotAgent] = useState<{ apiName: string; name: string }>(COPILOT);
   const [events, setEvents] = useState<ChatActivity[]>([]);
-  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
-  const traceHref = useHref(`/trace/${liveSessionId ?? ''}`);
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [input, setInput] = useState('');
-  const [leaving, setLeaving] = useState(false);
   const [openSeq, setOpenSeq] = useState(0);
   const homeRef = useRef<HTMLDivElement>(null);
   const chatPhase = useMemo<VoicePhase>(() => { let p: VoicePhase = 'ready'; for (const e of events) if (e.kind === 'phase') p = e.phase; return p; }, [events]);
   const phase: CorePhase = stage !== 'live' ? 'off' : focus ? chatPhase : 'ready';
-  const exitFocus = useCallback(() => { setFocus(null); setCountdown(null); setLeaving(true); setCopilotAgent(COPILOT); }, []);
+  const exitFocus = useCallback(() => { setFocus(null); setCopilotAgent(COPILOT); }, []);
   const handleTransfer = useCallback((t: { agentApiName: string; agentName: string; message: string }) => {
-    setCopilotAgent({ apiName: t.agentApiName, name: t.agentName }); setCountdown(null); setOpenSeq(n => n + 1); setFocus({ message: { text: t.message, how: 'type' } });
+    setCopilotAgent({ apiName: t.agentApiName, name: t.agentName }); setOpenSeq(n => n + 1); setFocus({ message: { text: t.message, how: 'type' } });
   }, []);
-  useEffect(() => { if (!leaving) return; const t = setTimeout(() => setLeaving(false), FOCUS_MS); return () => clearTimeout(t); }, [leaving]);
-  const openFocus = (message: { text: string; how: 'talk' | 'type' } | null) => {
-    setCountdown(null); setLeaving(false); setOpenSeq(n => n + 1); setFocus({ message });
-    homeRef.current?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  const overlayMounted = !!focus || leaving;
-  useEffect(() => { document.body.classList.toggle('home-lock', !!focus); return () => document.body.classList.remove('home-lock'); }, [focus]);
-  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && focus) exitFocus(); if (e.key === 'Escape') setMoreOpen(false); }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [focus, exitFocus]);
+  /** Open the drawer, optionally with a first message to send. The dashboard
+   *  stays exactly where it is: a drawer is beside the work, not over it. */
+  const openFocus = (message: { text: string; how: 'talk' | 'type' } | null) => { setOpenSeq(n => n + 1); setFocus({ message }); };
   useEffect(() => {
-    if (!focus) return;
-    const last = events[events.length - 1];
-    if (!last) return;
-    if (last.kind === 'reply' && !/\?\s*$/.test(last.text.trim()) && !getVoicePref()) setCountdown(15); else setCountdown(null);
-  }, [events, focus]);
-  useEffect(() => { if (countdown == null) return; if (countdown <= 0) { exitFocus(); return; } const t = setTimeout(() => setCountdown(c => (c == null ? null : c - 1)), 1000); return () => clearTimeout(t); }, [countdown, exitFocus]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMoreOpen(false); if (focus) exitFocus(); }
+      // ⌘J / Ctrl+J is the one keystroke that reaches Archon from anywhere on Home.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') { e.preventDefault(); if (!focus) openFocus(null); document.getElementById('home-ask-input')?.focus(); }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [focus, exitFocus]);
   const handleActivity = useCallback((e: ChatActivity) => { setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e])); }, []);
-  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => { if (info.ended) { setEvents([]); setLiveSessionId(null); exitFocus(); load(); } else if (info.sessionId) setLiveSessionId(info.sessionId); }, [load, exitFocus]);
+  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => { if (info.ended) { setEvents([]); exitFocus(); load(); } }, [load, exitFocus]);
   const submit = () => { const text = input.trim(); if (!text) return; setInput(''); openFocus({ text, how: 'type' }); };
   const talk = () => { setVoicePref(true); openFocus(null); };
 
@@ -255,7 +251,7 @@ export default function HomeDashboardPage() {
 
   return (
     <AppShell hideRail>
-      <div ref={homeRef} className={`home cc ${stage}`} data-focus={focus ? '1' : '0'} data-overlay={overlayMounted ? '1' : '0'}>
+      <div ref={homeRef} className={`home cc ${stage}`}>
         {/* ── top bar ───────────────────────────────────────────────── */}
         <header className="cc-top">
           <div className="cc-brand"><span className="cc-logo"><Layers /></span>Archon</div>
@@ -338,37 +334,26 @@ export default function HomeDashboardPage() {
             </div>
           </div>
 
-          {/* ── voice agent + attention ──────────────────────────────── */}
+          {/* ── fleet + attention ────────────────────────────────────── */}
           <div className="cc-row">
-            <section className="cc-voice">
-              <div className="cc-vh">
-                <span className="cc-vt">Archon voice agent</span>
-                <span className={`cc-pill ${pendingCount ? 'a' : 'g'}`}><i />{pendingCount ? 'Waiting for your OK' : PHASE_COPY[phase]}</span>
-                {pendingCount > 0 ? <button type="button" className="cc-open" onClick={() => navigate('/approvals')}>Open current task</button> : <button type="button" className="cc-open quiet" onClick={() => navigate('/chat')}>Open Agent Chat</button>}
+            <section className="cc-pane">
+              <div className="cc-ah"><span>Agent fleet</span>{agents.length > 0 && <span className="cc-count">{agents.length}</span>}<button type="button" className="link" onClick={() => navigate('/')}>Agents</button></div>
+              <div className="cc-fleet">
+                {loading && !data && <div className="cc-empty"><Loader2 className="spin" /> Loading…</div>}
+                {data?.agentsError && <div className="cc-empty">Couldn't load agents — {data.agentsError}</div>}
+                {data?.agents && agents.length === 0 && <div className="cc-empty">No agents yet — ask Archon to build one.</div>}
+                {agentRows.map(({ a, total, fail }) => (
+                  <button key={a.id} type="button" className="cc-ag" onClick={() => navigate(`/agent/${encodeURIComponent(a.apiName)}`)} title={a.apiName}>
+                    <span className="n"><i className={a.status === 'Active' ? '' : a.status === 'Draft' ? 'd' : 'x'} />{a.name}</span>
+                    <small>{total > 0 ? `${total} today${fail ? ` · ${fail} failed` : ''}` : a.status === 'Draft' ? 'draft · not activated' : a.status === 'Active' ? 'nothing today' : 'switched off'}</small>
+                  </button>
+                ))}
               </div>
-              <div className="cc-vb">
-                <div className="cc-try">
-                  <div className="cc-label">Try saying</div>
-                  {SUGGESTIONS.map(s => <button key={s} type="button" className="cc-say" onClick={() => openFocus({ text: s, how: 'type' })}>“{s}”</button>)}
-                </div>
-                <div className="cc-core">
-                  <div className="cc-core-scale"><CoreRing phase={phase} label="ARCHON" sub={pendingCount ? 'Waiting for your OK' : PHASE_COPY[phase]} burst={0} /></div>
-                  <div className="cc-inrow">
-                    <button type="button" className="home-mic cc-mic" onClick={talk} aria-label="Talk to Archon" title="Talk"><Mic /></button>
-                    <input id="home-ask-input" className="home-in" type="text" placeholder="Or type a request" autoComplete="off" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }} />
-                    <button type="button" className="cc-send" onClick={submit} disabled={!input.trim()} aria-label="Send"><Send /></button>
-                  </div>
-                  <div className="cc-status" data-phase={phase}>{pendingCount ? 'A task is waiting for your OK.' : STATUS_COPY[phase]}</div>
-                </div>
-                <div className="cc-done">
-                  <div className="cc-dh"><span>Done by Archon today</span><span className="n">{data ? `${doneToday.length} ${doneToday.length === 1 ? 'task' : 'tasks'}` : ''}</span></div>
-                  <div className="cc-dl">
-                    {loading && !data && <div className="cc-empty"><Loader2 className="spin" /> Loading…</div>}
-                    {data && doneToday.length === 0 && <div className="cc-empty">Nothing yet today.</div>}
-                    {doneToday.slice(0, 6).map((it, i) => <div key={i} className="cc-di"><i className={it.ok ? 'ok' : 'bad'}>{it.ok ? '✓' : '!'}</i><span>{it.text}</span><small>{timeOf(it.at)}</small></div>)}
-                  </div>
-                  <button type="button" className="link cc-log" onClick={() => navigate('/executions')}>Open Activity Log</button>
-                </div>
+              <div className="cc-ah cc-ah2"><span>Done by Archon today</span>{doneToday.length > 0 && <span className="cc-count">{doneToday.length}</span>}<button type="button" className="link" onClick={() => navigate('/executions')}>Activity Log</button></div>
+              <div className="cc-dl">
+                {loading && !data && <div className="cc-empty"><Loader2 className="spin" /> Loading…</div>}
+                {data && doneToday.length === 0 && <div className="cc-empty">Nothing yet today.</div>}
+                {doneToday.slice(0, 5).map((it, i) => <div key={i} className="cc-di"><i className={it.ok ? 'ok' : 'bad'}>{it.ok ? '✓' : '!'}</i><span>{it.text}</span><small>{timeOf(it.at)}</small></div>)}
               </div>
             </section>
 
@@ -388,17 +373,43 @@ export default function HomeDashboardPage() {
               </div>
             </aside>
           </div>
+
+          {/* ── the dock: Archon is always here, and never covers the page ── */}
+          <div className="dk" data-phase={phase} data-waiting={pendingCount > 0 ? '1' : '0'}>
+            <button type="button" className="dk-core" onClick={() => openFocus(null)} aria-label="Open Archon">
+              <svg viewBox="0 0 60 60" aria-hidden="true"><circle className="tk" cx="30" cy="30" r="26" /><circle className="ar" cx="30" cy="30" r="29" /><circle className="ar b" cx="30" cy="30" r="22" /></svg>
+              <span className="dk-disc"><b>ARCHON</b></span>
+            </button>
+            <div className="dk-who"><b>Archon</b><span><i />{pendingCount > 0 && phase === 'ready' ? `Waiting for your OK · ${pendingCount} task${pendingCount === 1 ? '' : 's'}` : PHASE_COPY[phase]}</span></div>
+            <input
+              id="home-ask-input"
+              className="dk-in"
+              type="text"
+              placeholder="Ask Archon anything — or just start talking"
+              autoComplete="off"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+            />
+            <button type="button" className="dk-b mic" onClick={talk} aria-label="Talk to Archon" title="Talk"><Mic /></button>
+            <button type="button" className="dk-b" onClick={submit} disabled={!input.trim()} aria-label="Send"><Send /></button>
+            {pendingCount > 0 && (
+              <button type="button" className="dk-wait" onClick={() => navigate('/approvals')}>
+                <span className="n">{pendingCount}</span><span className="t">waiting for your OK</span><span className="go">Review</span>
+              </button>
+            )}
+            <span className="dk-kbd">⌘J</span>
+          </div>
         </div>
 
-        {/* ── focus: the chat fades in over the dashboard ─────────── */}
-        {overlayMounted && (
-          <div className="home-focus" onPointerDown={() => setCountdown(null)}>
-            <ConsoleRail events={events} agentName={copilotAgent.name} traceHref={liveSessionId ? traceHref : null} />
-            <div className="home-focus-chat">
+        {/* ── the drawer: the same chat, beside the dashboard ─────── */}
+        {focus && (
+          <>
+            <div className="dk-scrim" onClick={exitFocus} />
+            <aside className="dk-drawer" aria-label={`${copilotAgent.name} chat`}>
               <ChatPanel
                 key={`${copilotAgent.apiName}-${openSeq}`}
-                variant="full"
-                headerNote={countdown != null ? `Answered — back to the dashboard in ${countdown}s. Say or type anything to stay.` : null}
+                variant="drawer"
                 agentApiName={copilotAgent.apiName}
                 agentName={copilotAgent.name}
                 initialMessage={focus?.message ?? null}
@@ -407,8 +418,8 @@ export default function HomeDashboardPage() {
                 onActivity={handleActivity}
                 onTransfer={handleTransfer}
               />
-            </div>
-          </div>
+            </aside>
+          </>
         )}
       </div>
     </AppShell>

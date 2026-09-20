@@ -41,6 +41,9 @@ export interface RawChatMessage {
 export interface SessionWithMessages {
   session: RawChatSession;
   messages: RawChatMessage[];
+  /** Where this agent's chats start: streaming on or off. Absent from an
+   *  org that has not taken the field yet, which resolves to off. */
+  streamReplies?: boolean;
 }
 
 export interface TurnResult {

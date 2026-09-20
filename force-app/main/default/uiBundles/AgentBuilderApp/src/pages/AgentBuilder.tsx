@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles } from 'lucide-react';
+import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/sonner';
@@ -18,7 +18,7 @@ import AutomationReviewView from './AutomationReviewView';
 import { MOCK_AGENT_GRAPH } from '@/data/mock-agent';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import { loadAgentGraph, saveAgentGraph } from '@/lib/salesforce-data';
-import { updateAgentStatus } from '@/lib/agents-data';
+import { updateAgentStatus, updateAgentStreaming } from '@/lib/agents-data';
 import type { DirectoryEntry } from '@/lib/connectors-data';
 import type { AgentGraph, NodeConfig } from '@/types/agent';
 
@@ -426,6 +426,25 @@ export default function AgentBuilder() {
     }
   }, [isActiveStatus, isSystem, graph.agent.id]);
 
+  /** Where this agent's chats start: streaming on or off.
+   *
+   *  Written immediately rather than waiting for Save, for the same reason
+   *  the status switch is: a full save deletes and re-inserts every node,
+   *  which is a heavy price for a checkbox. It stays in local state too so
+   *  a later Save sends the same value back rather than resetting it.
+   *
+   *  A built-in agent is read-only everywhere else in this page, but this
+   *  one is deliberately not: it is the org's choice how its own chats
+   *  behave, exactly like the status switch beside it. */
+  const streamOn = graph.agent.streamReplies === true;
+  const toggleStreaming = useCallback(() => {
+    const next = !streamOn;
+    setGraph(g => ({ ...g, agent: { ...g.agent, streamReplies: next } }));
+    if (graph.agent.id) {
+      updateAgentStreaming(graph.agent.id, next).catch(err => console.error('Streaming change failed:', err));
+    }
+  }, [streamOn, graph.agent.id]);
+
   // Trigger-mode agents use a different node vocabulary the drag-and-drop
   // canvas was never built to author (see AutomationReviewView.tsx's doc
   // comment) — reviewed read-only there instead, edited via the Copilot.
@@ -523,6 +542,23 @@ export default function AgentBuilder() {
                 <Save className="h-3.5 w-3.5" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={toggleStreaming}
+              title={streamOn
+                ? 'Chats with this agent start with live streaming on. Anyone chatting can still switch it off.'
+                : 'Chats with this agent start with live streaming off. Anyone chatting can still switch it on.'}
+              aria-label="Start chats in streaming mode"
+              aria-pressed={streamOn}
+              className={`flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-semibold ${
+                streamOn
+                  ? 'bg-[var(--archon-success-tint)] text-[var(--archon-success)]'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5" /> Streaming
+            </button>
+            <div className="h-5 w-px bg-border" />
             <Switch checked={isActiveStatus} onCheckedChange={toggleActive} />
             <div className="h-5 w-px bg-border" />
             <button

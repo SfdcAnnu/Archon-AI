@@ -47,7 +47,9 @@ global with sharing class AgentListRestService {
         }
     }
 
-    /** Body shape: { "status": "Active" | "Draft" | "Inactive" } */
+    /** Body shape: { "status": "Active" | "Draft" | "Inactive" }
+     *  or { "streamReplies": true | false } — one agent property per call,
+     *  so a checkbox never has to post a whole agent back. */
     @HttpPatch
     global static void updateStatus() {
         RestRequest req = RestContext.request;
@@ -60,9 +62,15 @@ global with sharing class AgentListRestService {
                 return;
             }
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(req.requestBody.toString());
+            if (body.containsKey('streamReplies')) {
+                AgentBuilderController.updateStreamReplies(agentId, (Boolean) body.get('streamReplies'));
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
+                return;
+            }
             String status = (String) body.get('status');
             if (String.isBlank(status)) {
-                writeError(res, 400, 'Body must include "status".');
+                writeError(res, 400, 'Body must include "status" or "streamReplies".');
                 return;
             }
             AgentBuilderController.updateAgentStatus(agentId, status);

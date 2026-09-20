@@ -24,6 +24,7 @@ interface RawAgentDefinition {
   KnowledgeBase__c: string | null;
   Status__c: string;
   ExecuteType__c: string;
+  StreamReplies__c?: boolean;
   AccessMode__c: string;
   CanvasJson__c: string | null;
   SetupChecklistJson__c: string | null;
@@ -124,6 +125,7 @@ function fromRaw(raw: RawAgentWithNodes): AgentGraph {
     knowledgeBase: raw.agent.KnowledgeBase__c ?? '',
     status: raw.agent.Status__c as AgentDefinition['status'],
     executeType: raw.agent.ExecuteType__c as AgentDefinition['executeType'],
+    streamReplies: raw.agent.StreamReplies__c === true,
     accessMode: raw.agent.AccessMode__c as AgentDefinition['accessMode'],
     setupChecklist: parseSetupChecklist(raw.agent.SetupChecklistJson__c),
   };
@@ -164,6 +166,9 @@ export async function saveAgentGraph(graph: AgentGraph): Promise<string> {
       status: graph.agent.status,
       accessMode: graph.agent.accessMode,
       executeType: graph.agent.executeType,
+      // Sent on every save so the graph save cannot quietly reset a flag
+      // the chat header may have changed since this page loaded.
+      streamReplies: graph.agent.streamReplies === true,
       // A built-in's marker travels with its wiring, so a save (the status
       // switch goes through here) never turns a managed agent into an
       // ordinary one.

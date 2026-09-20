@@ -15,7 +15,7 @@ public with sharing class AgentBuilderController {
             return [
                 SELECT Id, Name, ApiName__c, Department__c, Description__c,
                        Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
-                       IsSystem__c, CreatedDate, LastModifiedDate
+                       IsSystem__c, StreamReplies__c, CreatedDate, LastModifiedDate
                 FROM AgentDefinition__c
                 WITH USER_MODE
                 ORDER BY Department__c, Name ASC
@@ -25,7 +25,7 @@ public with sharing class AgentBuilderController {
         return [
             SELECT Id, Name, ApiName__c, Department__c, Description__c,
                    Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
-                   ExecuteType__c, IsSystem__c, CreatedDate, LastModifiedDate
+                   ExecuteType__c, IsSystem__c, StreamReplies__c, CreatedDate, LastModifiedDate
             FROM AgentDefinition__c
             WHERE Department__c = :department
             WITH USER_MODE

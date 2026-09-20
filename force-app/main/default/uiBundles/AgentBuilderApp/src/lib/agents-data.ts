@@ -18,6 +18,7 @@ interface RawAgentSummary {
   TotalExecutions__c: number | null;
   SuccessRate__c: number | null;
   IsSystem__c?: boolean;
+  StreamReplies__c?: boolean;
   CreatedDate: string;
   LastModifiedDate: string;
 }
@@ -25,6 +26,8 @@ interface RawAgentSummary {
 export interface AgentSummary {
   /** Shipped and managed by the platform: read-only, cannot be deleted. */
   isSystem: boolean;
+  /** Chats with this agent start in streaming mode. Off by default. */
+  streamReplies: boolean;
   id: string;
   name: string;
   apiName: string;
@@ -50,6 +53,7 @@ function fromRaw(r: RawAgentSummary): AgentSummary {
     totalExecutions: r.TotalExecutions__c,
     successRate: r.SuccessRate__c,
     isSystem: r.IsSystem__c === true,
+    streamReplies: r.StreamReplies__c === true,
     createdDate: r.CreatedDate,
     lastModifiedDate: r.LastModifiedDate,
   };

@@ -64,6 +64,23 @@ export interface StageFrame {
   isError?: boolean;
 }
 
+/** Reply text as it is written. Never the record: the turn result carries
+ *  the complete reply and is rendered over whatever these built up. */
+export interface TextDeltaFrame { type: 'text.delta'; delta: string; seq: number }
+/** Discard what was streamed for this turn. Sent when the pass turned out
+ *  to be a tool call, or when the server could not deliver text intact. */
+export interface TextResetFrame { type: 'text.reset'; seq: number }
+
+export function isTextDelta(msg: unknown): msg is TextDeltaFrame {
+  return !!msg && typeof msg === 'object'
+    && (msg as { type?: unknown }).type === 'text.delta'
+    && typeof (msg as { delta?: unknown }).delta === 'string';
+}
+
+export function isTextReset(msg: unknown): msg is TextResetFrame {
+  return !!msg && typeof msg === 'object' && (msg as { type?: unknown }).type === 'text.reset';
+}
+
 /** Narration, or the turn itself? Narration is advisory and additive, so
  *  anything without a recognised `type` is treated as the turn result — the
  *  behaviour this client had before stage frames existed. */

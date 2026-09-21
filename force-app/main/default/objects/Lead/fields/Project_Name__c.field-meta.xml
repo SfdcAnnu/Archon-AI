@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Project_Name__c</fullName>
+    <label>Project Name</label>
+    <description>The specific project the lead is interested in. DEPENDENT on Project Type: only the projects belonging to the chosen type are offered, which is what lets a valid project name imply its type. Values here are placeholders in the shape of the requirement's example — replace them with the real project list.</description>
+    <inlineHelpText>Pick the Project Type first. Only that type's projects appear here.</inlineHelpText>
+    <type>Picklist</type>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <valueSet>
+        <controllingField>Project_Type__c</controllingField>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Villa Project A</fullName><default>false</default><label>Villa Project A</label></value>
+            <value><fullName>Villa Project B</fullName><default>false</default><label>Villa Project B</label></value>
+            <value><fullName>Villa Project C</fullName><default>false</default><label>Villa Project C</label></value>
+            <value><fullName>Apartment Project A</fullName><default>false</default><label>Apartment Project A</label></value>
+            <value><fullName>Apartment Project B</fullName><default>false</default><label>Apartment Project B</label></value>
+            <value><fullName>Commercial Project A</fullName><default>false</default><label>Commercial Project A</label></value>
+            <value><fullName>Commercial Project B</fullName><default>false</default><label>Commercial Project B</label></value>
+            <value><fullName>Other Project A</fullName><default>false</default><label>Other Project A</label></value>
+        </valueSetDefinition>
+        <valueSettings>
+            <controllingFieldValue>Villa</controllingFieldValue>
+            <valueName>Villa Project A</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Villa</controllingFieldValue>
+            <valueName>Villa Project B</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Villa</controllingFieldValue>
+            <valueName>Villa Project C</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Apartment</controllingFieldValue>
+            <valueName>Apartment Project A</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Apartment</controllingFieldValue>
+            <valueName>Apartment Project B</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Commercial</controllingFieldValue>
+            <valueName>Commercial Project A</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Commercial</controllingFieldValue>
+            <valueName>Commercial Project B</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Other</controllingFieldValue>
+            <valueName>Other Project A</valueName>
+        </valueSettings>
+    </valueSet>
+</CustomField>

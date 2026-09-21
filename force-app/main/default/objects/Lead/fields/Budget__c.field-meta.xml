@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Budget__c</fullName>
+    <label>Budget</label>
+    <description>The budget band the lead selected. Collected after the project is identified, and never required to qualify a lead.</description>
+    <inlineHelpText>The band the customer chose. A lead can be WhatsApp Qualified without this.</inlineHelpText>
+    <type>Picklist</type>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>50L - 1Cr</fullName><default>false</default><label>₹50L – ₹1Cr</label></value>
+            <value><fullName>1Cr - 2Cr</fullName><default>false</default><label>₹1Cr – ₹2Cr</label></value>
+            <value><fullName>2Cr - 5Cr</fullName><default>false</default><label>₹2Cr – ₹5Cr</label></value>
+            <value><fullName>5Cr+</fullName><default>false</default><label>₹5Cr+</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

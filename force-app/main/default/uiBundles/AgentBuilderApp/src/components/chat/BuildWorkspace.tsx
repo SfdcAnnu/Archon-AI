@@ -64,7 +64,11 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
     return () => { cancelled = true; };
   }, [jobId, view?.status, doneCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const nextStep = steps.find(s => s.state === 'pending');
+  // A stage that FAILED is where the work resumes, not the stage after
+  // it. It is not pending — it ran, it cost money, and it is the thing
+  // that has to happen again — so it is looked for first. Take the first
+  // pending row instead and Continue quietly steps over the fault.
+  const nextStep = steps.find(s => s.state === 'failed') ?? steps.find(s => s.state === 'pending');
   const waiting = !running && !!detail && needsPerson(current, detail, decided);
   const canContinue = !!view && !running && (stageStop || view.status === 'failed') && !!nextStep;
 

@@ -238,7 +238,7 @@ export interface ChatPanelProps {
 
 /** Platform tools that report an Architect build job in their result — the
  *  panel draws the build card and follows the job for each of them. */
-const BUILD_TOOLS = new Set(['analyze_requirement', 'inspect_org', 'find_gaps', 'design_agent', 'write_instructions', 'review_design', 'save_agent', 'resume_build', 'get_build_status']);
+const BUILD_TOOLS = new Set(['build_agent', 'analyze_requirement', 'inspect_org', 'find_gaps', 'design_agent', 'write_instructions', 'review_design', 'save_agent', 'resume_build', 'get_build_status']);
 const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exec(output)?.[1] ?? null;
 
 export function ChatPanel({
@@ -567,7 +567,7 @@ export function ChatPanel({
             const jobId = jobIdIn(output);
             if (jobId) {
               const req = (tc.input as { requirement?: unknown } | undefined)?.requirement;
-              followToolBuild(jobId, tc.name === 'analyze_requirement', typeof req === 'string' ? req : null);
+              followToolBuild(jobId, tc.name === 'analyze_requirement' || tc.name === 'build_agent', typeof req === 'string' ? req : null);
             }
           }
           if (tc.name === 'transfer_to_agent' && !tc.isError) {

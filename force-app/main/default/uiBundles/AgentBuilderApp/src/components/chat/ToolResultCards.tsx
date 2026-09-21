@@ -282,7 +282,7 @@ function AgentTree({ data }: { data: Json }) {
 
 // ── the dispatcher ────────────────────────────────────────────────────
 const LIST_TOOLS: Record<string, string> = { list_runs: 'runs', list_conversations: 'conversations', list_approvals: 'chatApprovals', list_agents: 'agents', list_connectors: 'catalog', connector_tools: 'tools', list_resumable_builds: 'builds', list_metadata: 'items', list_layouts: 'layouts', list_record_types: 'recordTypes', list_value_sets: 'valueSets', list_flow_versions: 'versions', check_dependencies: 'dependencies', search_reusable_actions: 'actions' };
-const BUILD_STAGE = new Set(['analyze_requirement', 'inspect_org', 'find_gaps', 'design_agent', 'write_instructions', 'review_design', 'save_agent', 'resume_build', 'get_build_status']);
+const BUILD_STAGE = new Set(['build_agent', 'analyze_requirement', 'inspect_org', 'find_gaps', 'design_agent', 'write_instructions', 'review_design', 'save_agent', 'resume_build', 'get_build_status']);
 const PIPE_NAMES = new Set(PIPE_STEPS.map(s => s[0]).concat(['get_deploy_status', 'rollback']));
 
 function firstArray(d: unknown, preferred?: string): Json[] {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ChatToolCallSummary } from '@/lib/ws-chat';
 import { loadArtifact } from '@/lib/chat-data';
+import { toolLabel } from '@/lib/tool-label';
 import { GenericBody, describeShape } from './GenericResultCard';
 import '@/styles/chat-cards.css';
 
@@ -387,8 +388,49 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
  *  the call that produced it already shows the whole thing. */
 const isPlumbing = (c: ChatToolCallSummary) => c.name === 'read_artifact';
 
+/** What the turn did, for the row that stays shut.
+ *
+ *  A reader who is not debugging wants to know that work happened and
+ *  whether it went wrong — not to scroll past a describe payload to
+ *  reach the next sentence of the conversation. So the summary carries
+ *  the count, the first few tool names and any failures, and the cards
+ *  themselves wait behind it. */
+function summarise(flat: ChatToolCallSummary[]): { label: string; failed: number } {
+  const names: string[] = [];
+  for (const c of flat) {
+    const l = toolLabel(c.name);
+    if (!names.includes(l)) names.push(l);
+  }
+  const shown = names.slice(0, 3).join(', ');
+  const rest = names.length - 3;
+  return {
+    label: rest > 0 ? `${shown} +${rest} more` : shown,
+    failed: flat.filter(c => c.isError).length,
+  };
+}
+
+/**
+ * TOOL RESULTS ARE CLOSED UNTIL SOMEBODY ASKS FOR THEM.
+ *
+ * These cards used to open with the message. One turn of an intake agent
+ * draws a 1,500-line object describe, two record writes and a search, all
+ * between one reply and the next — so reading the conversation meant
+ * scrolling past the machinery, and on a phone the reply itself was off
+ * the screen. The work is still worth showing; it is not worth showing
+ * first.
+ *
+ * Open state is per message and deliberately not remembered. Somebody
+ * who opened one turn's tools to check a value is not asking to see
+ * every turn's tools for the rest of the session.
+ *
+ * A failure is named in the summary rather than sprung open: the reader
+ * learns something went wrong without the row deciding for them that
+ * they want to read it.
+ */
 export function ToolResultCards({ calls }: { calls: ChatToolCallSummary[] | undefined }) {
   const flat = useMemo(() => flattenCalls(calls).filter(c => !isPlumbing(c)), [calls]);
+  const [open, setOpen] = useState(false);
+  const { label, failed } = useMemo(() => summarise(flat), [flat]);
   if (!flat.length) return null;
   // Specialist calls are grouped under the ask_* that made them.
   const groups: Array<{ owner: ChatToolCallSummary | null; calls: ChatToolCallSummary[] }> = [];
@@ -399,9 +441,20 @@ export function ToolResultCards({ calls }: { calls: ChatToolCallSummary[] | unde
   }
   return (
     <div className="tc-cards">
-      {groups.map((g, gi) => (
+      <button
+        type="button"
+        className={`tc-toggle${open ? ' is-open' : ''}${failed ? ' has-err' : ''}`}
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="tc-chev" aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <span className="tc-toggle-n">{flat.length} tool{flat.length === 1 ? '' : 's'} run</span>
+        <span className="tc-toggle-l">{label}</span>
+        {failed > 0 && <span className="tc-toggle-e">{failed} failed</span>}
+      </button>
+      {open && groups.map((g, gi) => (
         <div key={gi} className={g.owner ? 'tc-group' : undefined}>
-          {g.owner && <div className="tc-group-hd">{g.owner.name.replace(/^ask_/, '').replace(/_[a-z0-9]{6}$/, '').replace(/_/g, ' ')} · what it did</div>}
+          {g.owner && <div className="tc-group-hd">{toolLabel(g.owner.name)} · what it did</div>}
           {g.calls.map((c, i) => <ToolCard key={c.id || `${gi}-${i}`} call={c} all={g.calls} />)}
         </div>
       ))}

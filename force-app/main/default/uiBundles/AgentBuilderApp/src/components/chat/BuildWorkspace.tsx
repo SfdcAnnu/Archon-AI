@@ -116,14 +116,14 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
               {running && <div className="bw-hint"><Loader2 className="spin" /> {steps.find(s => s.state === 'running')?.label ?? 'Working'}…</div>}
               {canContinue && (
                 <>
-                  <button type="button" className="bw-btn p" disabled={waiting} onClick={() => onSend('Continue to the next stage.')}>Next stage → {nextStep ? STAGE_SHORT[nextStep.key] ?? nextStep.label : ''}</button>
-                  <button type="button" className="bw-btn" disabled={waiting} onClick={() => onSend('Run all the remaining stages without stopping between them. Only stop if you need something from me.')}>Run to the end</button>
+                  <button type="button" className="bw-btn p" disabled={waiting} onClick={() => onSend(`Build ${jobId}: continue to the next stage.`)}>Next stage → {nextStep ? STAGE_SHORT[nextStep.key] ?? nextStep.label : ''}</button>
+                  <button type="button" className="bw-btn" disabled={waiting} onClick={() => onSend(`Build ${jobId}: run all the remaining stages without stopping between them. Only stop if you need something from me.`)}>Run to the end</button>
                   <div className="bw-hint">{waiting ? 'Waiting for you — answer in the panel.' : 'Pauses only when something needs you.'}</div>
                 </>
               )}
               {costStop && (
                 <>
-                  <button type="button" className="bw-btn p" onClick={() => onSend('Resume the build from where it paused.')}>Resume the build</button>
+                  <button type="button" className="bw-btn p" onClick={() => onSend(`Build ${jobId}: resume from where it paused.`)}>Resume the build</button>
                   <div className="bw-hint">Paused at its cost ceiling — everything finished is saved.</div>
                 </>
               )}
@@ -135,12 +135,12 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
           {/* ── the selected stage's panel ────────────────────────── */}
           <div className="bw-panel">
             {!detail && <div className="bw-note"><Loader2 className="spin" /> Reading the build…</div>}
-            {detail && current === 'understand' && <Understand d={detail} answers={answers} setAnswers={setAnswers} onSend={onSend} running={running} />}
+            {detail && current === 'understand' && <Understand d={detail} answers={answers} setAnswers={setAnswers} onSend={onSend} running={running} jobId={jobId ?? ''} />}
             {detail && current === 'survey' && <Survey d={detail} />}
-            {detail && current === 'match' && <Match d={detail} decided={decided} setDecided={setDecided} onSend={onSend} running={running} />}
+            {detail && current === 'match' && <Match d={detail} decided={decided} setDecided={setDecided} onSend={onSend} running={running} jobId={jobId ?? ''} />}
             {detail && current === 'design' && <Design d={detail} />}
             {detail && current === 'prompts' && <Prompts d={detail} />}
-            {detail && current === 'review' && <Review d={detail} onSend={onSend} running={running} decided={decided} setDecided={setDecided} />}
+            {detail && current === 'review' && <Review d={detail} onSend={onSend} running={running} decided={decided} setDecided={setDecided} jobId={jobId ?? ''} />}
             {detail && current === 'gaps' && <Setup prereqs={prereqs} ticked={ticked} setTicked={setTicked} onSend={onSend} />}
             {detail && current === 'compile' && (
               <Saved view={view} result={result} blockingOpen={blockingOpen.length} activated={activated} activateError={activateError} onActivate={activate} onOpen={() => result && navigate(`/agent/${encodeURIComponent(result.apiName)}`)} onSetup={() => setPicked('gaps')} />
@@ -166,7 +166,7 @@ function Head({ n, title, pill, tone }: { n: number; title: string; pill?: strin
   return <div className="bw-sb-hd"><span className="k">stage {n} of 8</span><h3>{title}</h3>{pill && <span className={`bw-pill ${tone ?? 'c'}`}>{pill}</span>}</div>;
 }
 
-function Understand({ d, answers, setAnswers, onSend, running }: { d: BuildDetail; answers: Record<number, string>; setAnswers: (a: Record<number, string>) => void; onSend: (t: string) => void; running: boolean }) {
+function Understand({ d, answers, setAnswers, onSend, running, jobId }: { d: BuildDetail; answers: Record<number, string>; setAnswers: (a: Record<number, string>) => void; onSend: (t: string) => void; running: boolean; jobId: string }) {
   const r = d.requirement;
   if (!r) return <Head n={1} title="Understood what you want" pill="pending" />;
   const qs = r.openQuestions ?? [];
@@ -187,7 +187,7 @@ function Understand({ d, answers, setAnswers, onSend, running }: { d: BuildDetai
             </div>
           ))}
           <div className="bw-foot">
-            <button type="button" className="bw-btn p" disabled={running || filled.length === 0} onClick={() => onSend(`Answers to your questions:\n${qs.map((q, i) => `${i + 1}. ${q}\n   → ${(answers[i] ?? '').trim() || 'You decide'}`).join('\n')}\nFold these into the requirement and continue.`)}>Answer and continue</button>
+            <button type="button" className="bw-btn p" disabled={running || filled.length === 0} onClick={() => onSend(`Build ${jobId} — answers to your questions:\n${qs.map((q, i) => `${i + 1}. ${q}\n   → ${(answers[i] ?? '').trim() || 'You decide'}`).join('\n')}\nFold these into the requirement and continue.`)}>Answer and continue</button>
             <span className="hint">or type the answers in the chat</span>
           </div>
         </>
@@ -217,7 +217,7 @@ function Survey({ d }: { d: BuildDetail }) {
   );
 }
 
-function Match({ d, decided, setDecided, onSend, running }: { d: BuildDetail; decided: Record<number, string>; setDecided: (x: Record<number, string>) => void; onSend: (t: string) => void; running: boolean }) {
+function Match({ d, decided, setDecided, onSend, running, jobId }: { d: BuildDetail; decided: Record<number, string>; setDecided: (x: Record<number, string>) => void; onSend: (t: string) => void; running: boolean; jobId: string }) {
   const m = d.match;
   if (!m) return <Head n={3} title="Matched what you need to what you have" pill="pending" />;
   const gaps = m.gaps ?? [];
@@ -246,7 +246,7 @@ function Match({ d, decided, setDecided, onSend, running }: { d: BuildDetail; de
           </div>
         </div>
       ))}
-      {gaps.length > 0 && <div className="bw-foot"><button type="button" className="bw-btn p" disabled={running || open > 0} onClick={() => onSend('Every gap is decided. Continue to the design.')}>Continue to the design</button><span className="hint">{open ? `${open} still to decide` : 'nothing is deployed without your approval'}</span></div>}
+      {gaps.length > 0 && <div className="bw-foot"><button type="button" className="bw-btn p" disabled={running || open > 0} onClick={() => onSend(`Build ${jobId}: every gap is decided, continue to the design.`)}>Continue to the design</button><span className="hint">{open ? `${open} still to decide` : 'nothing is deployed without your approval'}</span></div>}
     </>
   );
 }
@@ -294,7 +294,7 @@ function Prompts({ d }: { d: BuildDetail }) {
   );
 }
 
-function Review({ d, onSend, running, decided, setDecided }: { d: BuildDetail; onSend: (t: string) => void; running: boolean; decided: Record<number, string>; setDecided: (x: Record<number, string>) => void }) {
+function Review({ d, onSend, running, decided, setDecided, jobId }: { d: BuildDetail; onSend: (t: string) => void; running: boolean; decided: Record<number, string>; setDecided: (x: Record<number, string>) => void; jobId: string }) {
   const r = d.review;
   if (!r) return <Head n={6} title="Checked it against what you asked for" pill="pending" />;
   const pass = r.verdict === 'pass';
@@ -314,8 +314,8 @@ function Review({ d, onSend, running, decided, setDecided }: { d: BuildDetail; o
       </div>
       {!pass && !settled && (
         <div className="bw-foot">
-          <button type="button" className="bw-btn p" disabled={running} onClick={() => { setDecided({ ...decided, [-1]: 'fix' }); onSend(`Fix what the review found${uncovered.length ? `: ${uncovered.join('; ')}` : ''}. Repair the design and instructions for the missing pieces only, then re-check.`); }}>Fix these</button>
-          <button type="button" className="bw-btn" disabled={running} onClick={() => { setDecided({ ...decided, [-1]: 'accept' }); onSend('Accept the review risk as it is and continue.'); }}>Accept the risk</button>
+          <button type="button" className="bw-btn p" disabled={running} onClick={() => { setDecided({ ...decided, [-1]: 'fix' }); onSend(`Build ${jobId}: fix what the review found${uncovered.length ? `: ${uncovered.join('; ')}` : ''}. Repair the design and instructions for the missing pieces only, then re-check.`); }}>Fix these</button>
+          <button type="button" className="bw-btn" disabled={running} onClick={() => { setDecided({ ...decided, [-1]: 'accept' }); onSend(`Build ${jobId}: accept the review risk as it is and continue.`); }}>Accept the risk</button>
           <span className="hint">a fix re-runs design and instructions for the missing piece only</span>
         </div>
       )}

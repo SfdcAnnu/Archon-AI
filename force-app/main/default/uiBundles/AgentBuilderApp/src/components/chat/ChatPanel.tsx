@@ -1473,7 +1473,9 @@ export function ChatPanel({
         {sending && (
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
-            {live.active.length === 0 ? (
+            {live.active.some(a => a.name === 'build_agent' || a.name === 'resume_build') ? (
+              'Building the agent — the card above fills in as each stage finishes…'
+            ) : live.active.length === 0 ? (
               'Thinking…'
             ) : live.active.length === 1 ? (
               <span className="truncate">

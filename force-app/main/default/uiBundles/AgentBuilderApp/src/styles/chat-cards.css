@@ -1,6 +1,23 @@
 /* Result cards under an assistant reply — every colour from the theme
    tokens so they read in both the Salesforce-light and HUD themes. */
 .tc-cards{display:flex;flex-direction:column;gap:8px;margin-top:8px;max-width:85%;align-self:flex-start;width:100%}
+/* The closed row. Tool results wait behind this: a turn can draw a
+   1,500-line describe and two writes, and a reader following the
+   conversation should meet the next reply, not the machinery. Quiet by
+   default, and never louder than the message above it. */
+.tc-toggle{display:flex;align-items:baseline;gap:8px;width:100%;padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:var(--secondary);color:var(--muted-foreground);font:500 11px var(--font-sans,inherit);text-align:left;cursor:pointer}
+.tc-toggle:hover{color:var(--foreground);border-color:color-mix(in srgb,var(--primary) 40%,var(--border))}
+.tc-toggle:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.tc-chev{font-size:9px;line-height:1;color:var(--muted-foreground);flex:none}
+.tc-toggle-n{font-weight:600;color:var(--foreground);flex:none}
+/* The tool names give way first: on a narrow screen the count and any
+   failure still have to fit. */
+.tc-toggle-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tc-toggle-e{margin-left:auto;flex:none;color:var(--archon-error);font-weight:600}
+.tc-toggle.has-err{border-color:color-mix(in srgb,var(--archon-error) 45%,var(--border))}
+/* Open: the row becomes the head of what it opened. */
+.tc-toggle.is-open{border-bottom-left-radius:0;border-bottom-right-radius:0;margin-bottom:-8px;border-bottom-color:transparent}
+
 .tc-group{border-left:2px solid color-mix(in srgb,var(--node-purple) 45%,transparent);padding-left:10px;display:flex;flex-direction:column;gap:8px}
 .tc-group-hd{font:600 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--node-purple)}
 .tc-card{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;animation:tc-in .35s ease-out both}

@@ -30,6 +30,19 @@ Every metadata API name gets prefixed with `synpsai__` after packaging. **Re-che
 
 Strip `LeadAgentTrigger` + its handler + test from the package, OR namespace the trigger to an internal SObject the package owns.
 
+### Edition features to avoid
+
+| Feature | Why | Status |
+|---|---|---|
+| **Platform Events** (`AgentExecutionResult__e`) | Not available in Professional Edition. Every publish failed there, the error was swallowed, and the Execution Log stayed on `QUEUED`/`WAITING_APPROVAL` forever. | **Removed from the path** — the server upserts `AgentExecution__c` on `CorrelationId__c` directly (`salesforce/callback.ts`). The event, `AgentExecutionResultTrigger` and `AgentExecutionResultHandler` are now unused; decide whether to ship them. |
+| **CDC / Streaming API / `lightning/empApi`** | Same edition limits. | Not used anywhere. Keep it that way — anything that needs a push to the browser should use the WebSocket, which Salesforce is not part of. |
+
+**API access is the real PE gate.** Everything the server writes back
+(`ChatSession__c`, `ChatMessage__c`, `AgentExecution__c`) goes over REST,
+which Professional Edition does not include by default. That needs the
+ISV partner grant for the managed package — so it depends on §1
+(namespace) and §4 (security review) landing first.
+
 ## 3. Code coverage
 
 Run before each beta upload:

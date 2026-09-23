@@ -3,7 +3,7 @@
     <canAccessCamera>false</canAccessCamera>
     <canAccessMicrophone>false</canAccessMicrophone>
     <context>All</context>
-    <endpointUrl>wss://archon-server-d31n.onrender.com</endpointUrl>
+    <endpointUrl>wss://aeventra-ai-agent-server.onrender.com</endpointUrl>
     <isActive>true</isActive>
     <isApplicableToConnectSrc>true</isApplicableToConnectSrc>
     <isApplicableToFontSrc>false</isApplicableToFontSrc>

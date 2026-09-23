@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Archon Node server endpoint. Must match ServerUrl__c on ArchonConfig.Default.</description>
-    <disableProtocolSecurity>false</disableProtocolSecurity>
-    <isActive>true</isActive>
-    <url>https://archon-server-d31n.onrender.com</url>
-</RemoteSiteSetting>

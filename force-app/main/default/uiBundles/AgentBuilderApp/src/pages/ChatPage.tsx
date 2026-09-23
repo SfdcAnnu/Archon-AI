@@ -1,40 +1,55 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHref } from 'react-router';
-import { Loader2, MessageSquarePlus, PanelLeft, PanelRight, Search } from 'lucide-react';
+import { ChevronDown, Loader2, PanelRight, Plus, Search } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
-import { Input } from '@/components/ui/input';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ConsoleRail } from '@/components/chat/ConsoleRail';
+import { SessionTranscript } from '@/components/chat/SessionTranscript';
 import type { ChatActivity } from '@/lib/chat-activity';
 import { listChatEnabledAgents, type ChatAgentSummary } from '@/lib/chat-data';
+import { loadAgents } from '@/lib/agents-data';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
+import { agentStats, formatLastTurn, groupSessionsByDay, initials, sessionsForAgent, sortAgentsForPicker } from '@/lib/chat-list';
 import '@/styles/chat-page.css';
 
 /**
- * The full-page chat, for every agent, in the same shape as the Home
- * copilot's focus screen: the console on the left (core ring, this turn,
- * the log), the conversation taking everything else. The list of recent
- * conversations is the entry point; once one is open it folds into a
- * drawer so the transcript has the screen.
+ * The Chat page, agent first.
  *
- * The console is a reading of events the ChatPanel emits, nothing more.
- * The panel is the same component the canvas test-chat and Home use;
- * giving it a narrator here rather than a second implementation is what
- * keeps the surfaces from drifting apart.
+ * Opening Chat asks who you want to talk to. Once an agent is chosen the
+ * page belongs to it: the sidebar is that agent's conversations, newest
+ * first, each with its status and the time of its last turn, with New
+ * chat on top — the sidebar people know from Claude and ChatGPT, scoped
+ * to one agent. The app's own navigation folds to its icon rail while an
+ * agent is chosen so the conversation has the width.
+ *
+ * The live conversation is the same ChatPanel the canvas test-chat and
+ * Home use, with the console rail as its narrator. An ended conversation
+ * is read back as a transcript: the panel has no read-only mode and Apex
+ * refuses a turn on an ended session, so a composer there could not send.
  */
 const RAIL_PREF = 'archon.chat.console';
+const AGENT_PREF = 'archon.chat.agent';
+
+interface PickerAgent extends ChatAgentSummary {
+  isSystem: boolean;
+  status: string;
+}
+
+type Active =
+  | { kind: 'live'; sessionId: string | null }
+  | { kind: 'ended'; session: SessionSummary };
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export default function ChatPage() {
+  const [agents, setAgents] = useState<PickerAgent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(true);
+  const [filter, setFilter] = useState('');
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [showPicker, setShowPicker] = useState(false);
-  const [agents, setAgents] = useState<ChatAgentSummary[]>([]);
-  const [agentFilter, setAgentFilter] = useState('');
-  const [agentsLoading, setAgentsLoading] = useState(false);
-
-  const [active, setActive] = useState<{ sessionId: string | null; agentApiName: string; agentName: string } | null>(null);
+  const [agent, setAgent] = useState<PickerAgent | null>(null);
+  const [active, setActive] = useState<Active | null>(null);
   const [events, setEvents] = useState<ChatActivity[]>([]);
-  const [drawer, setDrawer] = useState(false);
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const traceHref = useHref(`/trace/${liveSessionId ?? ''}`);
   const [rail, setRail] = useState<boolean>(() => {
@@ -44,39 +59,60 @@ export default function ChatPage() {
 
   const refreshSessions = useCallback(() => {
     setSessionsLoading(true);
-    listMySessions(30)
+    listMySessions(200)
       .then(list => { setSessions(list); setSessionsLoading(false); })
       .catch(err => { console.error('Failed to load sessions:', err); setSessionsLoading(false); });
   }, []);
-  useEffect(() => { refreshSessions(); }, [refreshSessions]);
-
-  const openPicker = useCallback(() => {
-    setShowPicker(true);
+  // The chat endpoint says which agents can be chatted with; the agents
+  // endpoint says which are built-in and what state they are in. Joined
+  // here so the picker needs no new Apex.
+  const refreshAgents = useCallback(() => {
     setAgentsLoading(true);
-    listChatEnabledAgents('')
-      .then(list => { setAgents(list); setAgentsLoading(false); })
+    Promise.all([listChatEnabledAgents(''), loadAgents().catch(() => [])])
+      .then(([chat, all]) => {
+        const byApi = new Map(all.map(a => [a.apiName, a]));
+        setAgents(chat.map(a => ({ ...a, isSystem: byApi.get(a.apiName)?.isSystem ?? false, status: byApi.get(a.apiName)?.status ?? 'Active' })));
+        setAgentsLoading(false);
+      })
       .catch(err => { console.error('Failed to load agents:', err); setAgentsLoading(false); });
   }, []);
-  useEffect(() => {
-    if (!showPicker) return;
-    const t = setTimeout(() => {
-      listChatEnabledAgents(agentFilter).then(setAgents).catch(err => console.error('Failed to search agents:', err));
-    }, 200);
-    return () => clearTimeout(t);
-  }, [agentFilter, showPicker]);
+  useEffect(() => { refreshSessions(); refreshAgents(); }, [refreshSessions, refreshAgents]);
 
-  const handlePickAgent = useCallback((agent: ChatAgentSummary) => {
-    setShowPicker(false);
-    setDrawer(false);
-    setEvents([]);
-    setLiveSessionId(null);
-    setActive({ sessionId: null, agentApiName: agent.apiName, agentName: agent.name });
+  // Come back to the agent you were talking to last time. A per-viewer
+  // convenience: it lives in this browser and nowhere else.
+  useEffect(() => {
+    if (agent || agents.length === 0) return;
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(AGENT_PREF); } catch { /* fine */ }
+    if (!saved) return;
+    const found = agents.find(a => a.apiName === saved);
+    if (found) setAgent(found);
+  }, [agents, agent]);
+
+  const stats = useMemo(() => agentStats(sessions), [sessions]);
+  const picker = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    const hit = q ? agents.filter(a => `${a.name} ${a.department} ${a.description ?? ''}`.toLowerCase().includes(q)) : agents;
+    return sortAgentsForPicker(hit, stats);
+  }, [agents, filter, stats]);
+  const mine = useMemo(() => (agent ? sessionsForAgent(sessions, agent.apiName) : []), [sessions, agent]);
+  const groups = useMemo(() => groupSessionsByDay(mine), [mine]);
+
+  const pickAgent = useCallback((a: PickerAgent) => {
+    setAgent(a); setActive(null); setEvents([]); setLiveSessionId(null);
+    try { localStorage.setItem(AGENT_PREF, a.apiName); } catch { /* fine */ }
   }, []);
-  const handlePickSession = useCallback((s: SessionSummary) => {
-    setDrawer(false);
+  const switchAgent = useCallback(() => {
+    setAgent(null); setActive(null); setEvents([]); setLiveSessionId(null); setFilter('');
+    try { localStorage.removeItem(AGENT_PREF); } catch { /* fine */ }
+  }, []);
+  const newChat = useCallback(() => {
+    setEvents([]); setLiveSessionId(null); setActive({ kind: 'live', sessionId: null });
+  }, []);
+  const pickSession = useCallback((s: SessionSummary) => {
     setEvents([]);
-    setLiveSessionId(s.id);
-    setActive({ sessionId: s.id, agentApiName: s.agentApiName, agentName: s.agentName });
+    if (s.status === 'Active') { setLiveSessionId(s.id); setActive({ kind: 'live', sessionId: s.id }); }
+    else { setLiveSessionId(null); setActive({ kind: 'ended', session: s }); }
   }, []);
   const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => {
     if (info.ended) { setActive(null); setEvents([]); setLiveSessionId(null); }
@@ -88,95 +124,137 @@ export default function ChatPage() {
   const handleActivity = useCallback((e: ChatActivity) => {
     setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e]));
   }, []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && drawer) setDrawer(false); };
-    addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
-  }, [drawer]);
 
-  const list = (
-    <>
-      <div className="cp-list-hd">
-        <span>Chat</span>
-        <button type="button" onClick={openPicker} className="cp-icon" aria-label="New chat" title="New chat"><MessageSquarePlus /></button>
-      </div>
-      <div className="cp-list">
-        {sessionsLoading && <div className="cp-muted"><Loader2 className="spin" /> Loading…</div>}
-        {!sessionsLoading && sessions.length === 0 && <p className="cp-muted">No conversations yet — start a new chat.</p>}
-        {sessions.map(s => (
-          <button key={s.id} type="button" onClick={() => handlePickSession(s)} className={`cp-session${active?.sessionId === s.id ? ' on' : ''}`}>
-            <div className="t">{s.title || s.agentName}</div>
-            <div className="s">{s.agentName}{s.totalTurns ? ` · ${s.totalTurns} turns` : ''}{s.status !== 'Active' ? ` · ${s.status}` : ''}</div>
-          </button>
-        ))}
-      </div>
-    </>
-  );
+  const activeSessionId =
+    active?.kind === 'live' ? (liveSessionId ?? active.sessionId)
+    : active?.kind === 'ended' ? active.session.id
+    : null;
 
   return (
-    <AppShell title="Chat" hideRail={!!active}>
-      <div className="cp" data-focus={active ? '1' : '0'} data-rail={rail ? '1' : '0'}>
-        {/* ── no conversation open: the list and an invitation ────── */}
-        {!active && (
-          <div className="cp-home">
-            <aside className="cp-side">{list}</aside>
-            <div className="cp-empty">
-              <p>Pick a conversation or start a new one — then type, or just talk.</p>
-              <button type="button" onClick={openPicker} className="cp-primary">New chat</button>
-            </div>
-          </div>
-        )}
+    <AppShell title="Chat" forceCollapsed={!!agent} onRefresh={() => { refreshSessions(); refreshAgents(); }}>
+      <div className="cp">
 
-        {/* ── a conversation open: the focus screen ───────────────── */}
-        {active && (
-          <div className="cp-focus">
-            <div className="cp-strip">
-              <button type="button" className="cp-icon" onClick={() => setDrawer(true)} aria-label="Conversations" title="Conversations"><PanelLeft /></button>
-              <button type="button" className={`cp-icon${rail ? ' on' : ''}`} onClick={toggleRail} aria-label={rail ? 'Hide console' : 'Show console'} title={rail ? 'Hide console' : 'Show console'}><PanelRight /></button>
+        {/* ── 1 · who do you want to chat with? ─────────────────── */}
+        {!agent && (
+          <section className="cp-pick" aria-labelledby="cp-pick-title">
+            <div className="cp-pick-hd">
+              <h2 id="cp-pick-title">Who do you want to chat with?</h2>
+              <p>Pick an agent. Its conversations and a new chat are one step away.</p>
             </div>
-            {rail && <ConsoleRail events={events} agentName={active.agentName} traceHref={liveSessionId ? traceHref : null} />}
-            <div className="cp-chat">
-              <ChatPanel
-                key={active.sessionId ?? active.agentApiName}
-                variant="full"
-                agentApiName={active.agentApiName}
-                agentName={active.agentName}
-                initialSessionId={active.sessionId}
-                onClose={() => setActive(null)}
-                onSessionChange={handleSessionChange}
-                onActivity={handleActivity}
-              />
+            <div className="cp-pick-search">
+              <Search className="ico" aria-hidden="true" />
+              <label htmlFor="cp-agent-search" className="sr-only">Search agents</label>
+              <input id="cp-agent-search" type="search" placeholder="Search agents" value={filter} onChange={e => setFilter(e.target.value)} autoComplete="off" />
             </div>
-            {drawer && (
-              <>
-                <div className="cp-scrim" onClick={() => setDrawer(false)} />
-                <aside className="cp-side cp-drawer">{list}</aside>
-              </>
+            {agentsLoading && <div className="cp-muted"><Loader2 className="spin" /> Loading agents…</div>}
+            {!agentsLoading && picker.length === 0 && (
+              <p className="cp-muted">{filter ? 'No agent matches that.' : 'No chat-enabled agents yet.'}</p>
             )}
-          </div>
+            <div className="cp-cards">
+              {picker.map(a => {
+                const st = stats.get(a.apiName);
+                return (
+                  <button key={a.apiName} type="button" className="cp-card" onClick={() => pickAgent(a)}>
+                    <div className="cp-card-hd">
+                      <div className="cp-avatar" aria-hidden="true">{initials(a.name)}</div>
+                      <div className="who">
+                        <div className="n">{a.name}</div>
+                        <div className="d">{a.department}</div>
+                      </div>
+                      {a.isSystem && <span className="cp-tag">Built-in</span>}
+                    </div>
+                    <p>{a.description || 'No description yet.'}</p>
+                    <div className="cp-card-ft">
+                      <span className={`cp-dot${a.status === 'Active' ? ' on' : ''}`} aria-hidden="true" />
+                      {a.status}
+                      <span className="r">
+                        {st ? `${plural(st.count, 'chat')}${st.last ? ` · last ${formatLastTurn(st.last)}` : ''}` : 'No chats yet'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         )}
 
-        {showPicker && (
-          <>
-            <div className="cp-scrim" onClick={() => setShowPicker(false)} />
-            <div className="cp-picker">
-              <div className="cp-list-hd"><span>Start a new chat</span></div>
-              <div className="cp-search">
-                <Search className="ico" />
-                <Input className="h-8 pl-8 text-xs" placeholder="Search agents…" value={agentFilter} onChange={e => setAgentFilter(e.target.value)} autoFocus />
+        {/* ── 2 · an agent chosen: its chats, and the chat ───────── */}
+        {agent && (
+          <div className="cp-agent">
+            <aside className="cp-side" aria-label={`Chats with ${agent.name}`}>
+              <div className="cp-side-hd">
+                <div className="cp-avatar" aria-hidden="true">{initials(agent.name)}</div>
+                <div className="who">
+                  <div className="n">{agent.name}</div>
+                  <div className="d">{agent.department}{mine.length ? ` · ${plural(mine.length, 'chat')}` : ''}</div>
+                </div>
+                <button type="button" className="cp-switch" onClick={switchAgent} aria-label="Switch agent" title="Switch agent"><ChevronDown /></button>
               </div>
+              <button type="button" className="cp-new" onClick={newChat}><Plus />New chat</button>
               <div className="cp-list">
-                {agentsLoading && <div className="cp-muted"><Loader2 className="spin" /> Loading…</div>}
-                {!agentsLoading && agents.length === 0 && <p className="cp-muted">No chat-enabled agents found.</p>}
-                {agents.map(a => (
-                  <button key={a.apiName} type="button" onClick={() => handlePickAgent(a)} className="cp-session">
-                    <div className="t">{a.name}</div>
-                    <div className="s">{a.department}</div>
-                  </button>
+                {sessionsLoading && mine.length === 0 && <div className="cp-muted"><Loader2 className="spin" /> Loading…</div>}
+                {!sessionsLoading && mine.length === 0 && <p className="cp-muted">No chats with this agent yet.</p>}
+                {groups.map(g => (
+                  <div key={g.label}>
+                    <div className="cp-group">{g.label}</div>
+                    {g.sessions.map(s => {
+                      const on = activeSessionId === s.id;
+                      return (
+                        <button key={s.id} type="button" className={`cp-session${on ? ' on' : ''}`} onClick={() => pickSession(s)} aria-current={on ? 'true' : undefined}>
+                          <div className="row">
+                            <span className="t">{s.title || 'New chat'}</span>
+                            <span className="w">{formatLastTurn(s.lastActivityAt)}</span>
+                          </div>
+                          <div className="s">
+                            <span className={`cp-dot${s.status === 'Active' ? ' on' : ''}`} aria-hidden="true" />
+                            {s.status}
+                            {s.totalTurns ? <><span>·</span><span>{plural(s.totalTurns, 'turn')}</span></> : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 ))}
               </div>
+            </aside>
+
+            <div className="cp-main" data-rail={rail ? '1' : '0'}>
+              {!active && (
+                <div className="cp-empty">
+                  <div className="cp-avatar" aria-hidden="true">{initials(agent.name)}</div>
+                  <h2>{agent.name}</h2>
+                  {agent.description && <p>{agent.description}</p>}
+                  <p className="hint">Type or talk — both are live.</p>
+                  <button type="button" className="cp-primary" onClick={newChat}><Plus />New chat</button>
+                </div>
+              )}
+
+              {active?.kind === 'live' && (
+                <div className="cp-focus">
+                  <div className="cp-strip">
+                    <button type="button" className={`cp-icon${rail ? ' on' : ''}`} onClick={toggleRail} aria-label={rail ? 'Hide console' : 'Show console'} title={rail ? 'Hide console' : 'Show console'}><PanelRight /></button>
+                  </div>
+                  {rail && <ConsoleRail events={events} agentName={agent.name} traceHref={liveSessionId ? traceHref : null} />}
+                  <div className="cp-chat">
+                    <ChatPanel
+                      key={active.sessionId ?? `new:${agent.apiName}`}
+                      variant="full"
+                      agentApiName={agent.apiName}
+                      agentName={agent.name}
+                      initialSessionId={active.sessionId}
+                      onClose={() => setActive(null)}
+                      onSessionChange={handleSessionChange}
+                      onActivity={handleActivity}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {active?.kind === 'ended' && (
+                <SessionTranscript session={active.session} agentName={agent.name} onNewChat={newChat} />
+              )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </AppShell>

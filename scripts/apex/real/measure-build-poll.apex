@@ -1,5 +1,5 @@
 // Reads one Architect build with the per-call records the server keeps since bf50a15.
-HttpResponse r = ArchonServerClient.callout('GET', '/api/architect/build/086f2954-3a85-44c1-ac36-648a579f1a5a', null, 60000);
+HttpResponse r = ArchonServerClient.callout('GET', '/api/architect/build/b88a8a32-ab12-4504-bc8e-8c2bd71eed02', null, 60000);
 Map<String,Object> j = (Map<String,Object>) JSON.deserializeUntyped(r.getBody());
 System.debug('MB_JOB status=' + j.get('status') + ' cost=' + j.get('costUsd') + ' elapsedMs=' + j.get('elapsedMs') + ' error=' + (j.get('error') == null ? '' : String.valueOf(j.get('error')).left(400)));
 for (Object so : (List<Object>) j.get('steps')) { Map<String,Object> s = (Map<String,Object>) so;

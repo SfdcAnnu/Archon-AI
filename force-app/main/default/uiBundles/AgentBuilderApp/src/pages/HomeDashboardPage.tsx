@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send, Zap } from 'lucide-react';
-import { AppShell } from '@/components/shell/AppShell';
+import { AppShell, NAV_ICON_BY_HREF } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { COPILOT } from '@/lib/copilot';
 import { resolveStreaming, setStreamOverride, STREAM_LABEL } from '@/lib/stream-pref';
@@ -274,13 +274,21 @@ export default function HomeDashboardPage() {
         {/* ── top bar ───────────────────────────────────────────────── */}
         <header className="cc-top">
           <div className="cc-brand"><span className="cc-logo"><Layers /></span>Archon</div>
-          <nav className="cc-nav">
-            {NAV.map(n => (
-              <button key={n.key} type="button" className={n.key === 'command' ? 'on' : ''} onClick={() => navigate(n.href)}>
-                {n.label}{n.key === 'review' && pendingCount > 0 && <span className="cc-badge">{pendingCount}</span>}
-              </button>
-            ))}
-            <MoreMenu open={moreOpen} setOpen={setMoreOpen} pending={pendingCount} onGo={navigate} />
+          {/* Every section as the icon the navigation rail draws it with,
+              its name as the tooltip: twelve icons fit where six words and
+              a More menu did not. */}
+          <nav className="cc-nav" aria-label="Sections">
+            {[...NAV, ...MORE].map(n => {
+              const Icon = NAV_ICON_BY_HREF[n.href];
+              const on = n.href === '/home';
+              const badge = n.href === '/approvals' && pendingCount > 0;
+              return (
+                <button key={n.href} type="button" className={on ? 'on' : ''} onClick={() => navigate(n.href)} aria-label={n.label} title={n.label} aria-current={on ? 'page' : undefined}>
+                  {Icon ? <Icon /> : n.label}
+                  {badge && <span className="cc-badge">{pendingCount}</span>}
+                </button>
+              );
+            })}
           </nav>
           {/* On a narrow screen the sections fold into one menu. */}
           <div className="cc-more cc-menu-btn"><MoreMenu open={moreOpen} setOpen={setMoreOpen} pending={pendingCount} onGo={navigate} label="Menu" /></div>

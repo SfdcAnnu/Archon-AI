@@ -227,8 +227,12 @@ div:has(> .home.cc){display:flex;flex-direction:column}
 .cc-nav{display:flex;align-items:center;gap:2px;height:100%;min-width:0}
 .cc-menu-btn{display:none}
 .cc-more-menu .nav-only{display:none}
-.cc-nav>button,.cc-more>button{position:relative;height:58px;padding:0 13px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted-foreground);font:500 13.5px var(--font-sans);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-.cc-nav>button:hover,.cc-more>button:hover{color:var(--foreground)} .cc-nav>button.on{color:var(--foreground);border-bottom-color:var(--primary)}
+.cc-more>button{position:relative;height:58px;padding:0 13px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted-foreground);font:500 13.5px var(--font-sans);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.cc-nav>button{position:relative;width:40px;height:40px;padding:0;margin:0 1px;border:0;border-radius:10px;background:none;color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer}
+.cc-nav>button svg{width:18px;height:18px}
+.cc-nav>button .cc-badge{position:absolute;top:3px;right:1px;min-width:16px;height:16px;padding:0 4px;font-size:10px;line-height:16px}
+.cc-nav>button:hover,.cc-more>button:hover{color:var(--foreground)} .cc-nav>button:hover{background:var(--secondary)} .cc-nav>button.on{color:var(--primary);background:var(--secondary);box-shadow:inset 0 -2px 0 var(--primary)}
+.cc-nav>button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .cc-more>button svg{width:14px;height:14px}
 .cc-badge{min-width:18px;height:18px;border-radius:9px;background:var(--archon-warning);color:var(--card);font:600 10.5px/18px var(--font-mono);text-align:center;padding:0 5px}
 .cc-more{position:relative;height:100%}
@@ -292,9 +296,9 @@ div:has(> .home.cc){display:flex;flex-direction:column}
 .cc-ai .t{min-width:0} .cc-ai .t b{display:block;font:600 13px var(--font-sans);color:var(--foreground)} .cc-ai .t small{display:block;font-size:11.5px;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cc-act{border:1px solid var(--border);background:var(--secondary);color:var(--foreground);font:600 12px var(--font-sans);padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap} .cc-act:hover{border-color:var(--primary)}
 /* ── responsive: laptops, tablets, phones ─────────────────── */
-@media (max-width:1380px){.cc-nav>button,.cc-more>button{padding:0 9px;font-size:13px}.cc-top{gap:14px}}
+@media (max-width:1380px){.cc-more>button{padding:0 9px;font-size:13px}.cc-top{gap:14px}}
 @media (max-width:1240px){.cc-tiles{grid-template-columns:1fr 1fr}.cc-row{grid-template-columns:1fr;grid-template-rows:minmax(0,2fr) minmax(0,1fr)}.cc-vb{grid-template-columns:1fr 1fr}.cc-try{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}.cc-try .cc-label{flex-basis:100%;margin-bottom:0}.cc-say{flex:1 1 220px}}
-@media (max-width:1100px){.cc-nav{display:none}.cc-menu-btn{display:inline-flex}.cc-more-menu .nav-only{display:block}}
+@media (max-width:900px){.cc-nav{display:none}.cc-menu-btn{display:inline-flex}.cc-more-menu .nav-only{display:block}}
 @media (max-width:900px){.cc-tiles{gap:10px}.cc-big{font-size:26px}}
 @media (max-width:760px){
   .cc-top{height:auto;min-height:52px;padding:8px 14px;gap:10px;flex-wrap:wrap}.cc-brand{font-size:15px}.cc-top-r{gap:8px}.cc-env{display:none}.cc-create{padding:7px 10px;font-size:12.5px}

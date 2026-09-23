@@ -142,6 +142,7 @@
     <fieldPermissions><field>ChatMessage__c.CachedTokens__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.LatencyMs__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.UsageJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>ChatMessage__c.PhaseMsJson__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Sensitive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.Feedback__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>ChatMessage__c.TurnStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>

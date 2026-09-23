@@ -165,9 +165,52 @@ public with sharing class AgentChatController {
      * sessions are returned as-is, never re-anchored.
      */
     public static ChatSession__c findOrCreateAutomatedSession(String agentApiName, String recordContextId, String recordContextType, Id anchorUserId) {
+        return findOrCreateAutomatedSession(agentApiName, recordContextId, recordContextType, anchorUserId, null, null);
+    }
+
+    /**
+     * Keyed by the SENDER when a phone is given, by the record otherwise.
+     *
+     * An automated conversation on a messaging channel belongs to the
+     * person writing in, and for an unknown number there is no record yet.
+     * Matched on (agent, record) alone, every stranger writing to a number
+     * shared one session (a null anchor matches a null anchor), and the
+     * moment the Lead was created and linked, the next message opened a
+     * second session and forgot the first. With the phone as the key the
+     * conversation stays whole, and the record anchor is filled in the
+     * moment it is known.
+     *
+     * A session opened WITHOUT a phone -- proactive outreach anchored to a
+     * record -- is still found by that record when the reply comes in, and
+     * takes the phone then, so outreach and reply stay one conversation.
+     * The phone and channel land on the session so the runtime can tell
+     * the agent the number it may use.
+     */
+    public static ChatSession__c findOrCreateAutomatedSession(String agentApiName, String recordContextId, String recordContextType, Id anchorUserId, String senderPhone, String channel) {
         AgentDefinition__c agent = loadAgent(agentApiName);
         DateTime nowTs = System.now();
-        List<ChatSession__c> existing = [
+        List<ChatSession__c> existing = new List<ChatSession__c>();
+        if (String.isNotBlank(senderPhone)) {
+            existing = [
+            SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
+                   User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
+                   LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
+                   TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
+                   PendingApprovalToken__c, ActiveTopic__c
+            FROM ChatSession__c
+            WHERE AgentDefinition__c = :agent.Id
+              AND SenderPhone__c = :senderPhone
+              AND Status__c = 'Active'
+              AND ExpiresAt__c > :nowTs
+            WITH USER_MODE
+            ORDER BY LastActivityAt__c DESC
+            LIMIT 1
+            ];
+        }
+        // By record only when there IS a record: a blank anchor would match
+        // every other blank-anchored session of this agent.
+        if (existing.isEmpty() && String.isNotBlank(recordContextId)) {
+            existing = [
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
                    User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
@@ -181,14 +224,37 @@ public with sharing class AgentChatController {
             WITH USER_MODE
             ORDER BY LastActivityAt__c DESC
             LIMIT 1
-        ];
-        if (!existing.isEmpty()) return existing[0];
+            ];
+        }
+        if (!existing.isEmpty()) {
+            ChatSession__c found = existing[0];
+            ChatSession__c patch = new ChatSession__c(Id = found.Id);
+            Boolean changed = false;
+            if (String.isBlank(found.RecordContextId__c) && String.isNotBlank(recordContextId)) {
+                patch.RecordContextId__c = recordContextId;
+                patch.RecordContextType__c = recordContextType;
+                found.RecordContextId__c = recordContextId;
+                found.RecordContextType__c = recordContextType;
+                changed = true;
+            }
+            if (String.isBlank(found.SenderPhone__c) && String.isNotBlank(senderPhone)) {
+                patch.SenderPhone__c = senderPhone;
+                patch.Channel__c = channel;
+                found.SenderPhone__c = senderPhone;
+                found.Channel__c = channel;
+                changed = true;
+            }
+            if (changed) update patch;
+            return found;
+        }
 
         ChatSession__c session = new ChatSession__c(
             AgentDefinition__c   = agent.Id,
             User__c              = anchorUserId,
             RecordContextId__c   = recordContextId,
             RecordContextType__c = recordContextType,
+            SenderPhone__c       = senderPhone,
+            Channel__c           = channel,
             Status__c            = 'Active',
             LastActivityAt__c    = nowTs,
             ExpiresAt__c         = nowTs.addHours(EXPIRY_HOURS),
@@ -202,7 +268,8 @@ public with sharing class AgentChatController {
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                    TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                    PendingApprovalToken__c, ActiveTopic__c
-            FROM ChatSession__c WHERE Id = :session.Id WITH USER_MODE LIMIT 1
+            FROM ChatSession__c
+            WHERE Id = :session.Id WITH USER_MODE LIMIT 1
         ];
     }
 

@@ -103,6 +103,47 @@ private class AgentChatControllerTest {
     }
 
     @IsTest
+    static void findOrCreateAutomatedSession_keys_by_sender_phone_and_fills_the_anchor_later() {
+        // A stranger writes in: no record yet, only a phone.
+        ChatSession__c first = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', null, null, null, '+919999900001', 'whatsapp');
+        System.assertEquals('+919999900001', first.SenderPhone__c);
+        System.assertEquals('whatsapp', first.Channel__c);
+        System.assertEquals(null, first.RecordContextId__c);
+
+        Test.startTest();
+        // Their next message arrives linked to the Lead the SMS package created.
+        ChatSession__c second = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', '00Q000000000001AAA', 'Lead', null, '+919999900001', 'whatsapp');
+        Test.stopTest();
+
+        System.assertEquals(first.Id, second.Id, 'Same phone, same conversation');
+        System.assertEquals('00Q000000000001AAA', second.RecordContextId__c, 'The anchor is filled in once known');
+        ChatSession__c stored = [SELECT RecordContextId__c, RecordContextType__c FROM ChatSession__c WHERE Id = :first.Id];
+        System.assertEquals('00Q000000000001AAA', stored.RecordContextId__c);
+        System.assertEquals('Lead', stored.RecordContextType__c);
+    }
+
+    @IsTest
+    static void findOrCreateAutomatedSession_two_strangers_never_share_a_session() {
+        ChatSession__c a = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', null, null, null, '+919999900002', 'whatsapp');
+        Test.startTest();
+        ChatSession__c b = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', null, null, null, '+919999900003', 'whatsapp');
+        Test.stopTest();
+        System.assertNotEquals(a.Id, b.Id, 'A blank record anchor must never match another stranger');
+    }
+
+    @IsTest
+    static void findOrCreateAutomatedSession_reply_finds_the_outreach_session_by_record_and_takes_the_phone() {
+        // Proactive outreach opened the session on the record, without a phone...
+        ChatSession__c outreach = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', '006000000000003AAA', 'Opportunity', null);
+        Test.startTest();
+        // ...and the customer's reply, keyed by phone, must still land in it.
+        ChatSession__c reply = AgentChatController.findOrCreateAutomatedSession('TestChatAgent', '006000000000003AAA', 'Opportunity', null, '+919999900004', 'whatsapp');
+        Test.stopTest();
+        System.assertEquals(outreach.Id, reply.Id, 'The reply lands in the outreach session');
+        System.assertEquals('+919999900004', [SELECT SenderPhone__c FROM ChatSession__c WHERE Id = :outreach.Id].SenderPhone__c);
+    }
+
+    @IsTest
     static void sendTurn_complete_inserts_user_and_assistant_messages() {
         AgentChatController.SessionWithMessages sess = AgentChatController.startSession('TestChatAgent', null, null);
 

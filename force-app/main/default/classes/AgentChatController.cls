@@ -684,7 +684,7 @@ public with sharing class AgentChatController {
     private static List<ChatMessage__c> loadMessages(Id sessionId) {
         return [
             SELECT Id, Name, Role__c, Content__c, ToolCallsJson__c, ToolResultsJson__c,
-                   ModelUsed__c, TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMs__c, UsageJson__c,
+                   ModelUsed__c, TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMs__c, UsageJson__c, PhaseMsJson__c,
                    SequenceNumber__c,
                    Sensitive__c, RequiredApproval__c, ApprovedAt__c, ApprovalStatus__c,
                    AttachedContentDocumentIds__c, RequestPayload__c, ResponsePayload__c,
@@ -884,6 +884,18 @@ public with sharing class AgentChatController {
         Integer tokensIn  = body.get('tokensIn')  == null ? 0 : Integer.valueOf(body.get('tokensIn'));
         Integer tokensOut = body.get('tokensOut') == null ? 0 : Integer.valueOf(body.get('tokensOut'));
         Integer latencyMs = body.get('latencyMs') == null ? null : Integer.valueOf(body.get('latencyMs'));
+        // Where the server-side time went. latencyMs is the model loop only;
+        // it starts after setup, MCP tool loading and prompt building have
+        // already run, so on its own it hides most of a slow turn.
+        Object phaseMs = body.get('phaseMs');
+        Object turnMs  = body.get('turnMs');
+        String phaseJson = null;
+        if (phaseMs != null || turnMs != null) {
+            Map<String, Object> phases = phaseMs instanceof Map<String, Object>
+                ? ((Map<String, Object>) phaseMs).clone() : new Map<String, Object>();
+            if (turnMs != null) phases.put('turnMs', turnMs);
+            phaseJson = truncateForField(JSON.serialize(phases), 4096);
+        }
         // Per-model breakdown of the SAME totals — a turn can span the
         // router's model, a specialist's, and utility passes, so modelUsed
         // alone cannot attribute tokens correctly (see ModelUsage on the
@@ -921,6 +933,7 @@ public with sharing class AgentChatController {
             CachedTokens__c   = cachedTokens,
             LatencyMs__c      = latencyMs,
             UsageJson__c      = usage == null ? null : truncateForField(JSON.serialize(usage), 32768),
+            PhaseMsJson__c    = phaseJson,
             SequenceNumber__c = seq++,
             ApprovalStatus__c = 'NotRequired'
         );

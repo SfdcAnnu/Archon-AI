@@ -300,6 +300,7 @@ export function ChatPanel({
   const emit = useCallback((e: ChatActivityInput) => {
     onActivityRef.current?.({ ...e, at: Date.now() } as ChatActivity);
   }, []);
+
   const turnStartRef = useRef(0);
   const initialSentRef = useRef(false);
   const pendingSendRef = useRef<string | null>(null);
@@ -352,6 +353,38 @@ export function ChatPanel({
   }, [copied]);
 
   const socketRef = useRef<WebSocket | null>(null);
+  // Whether a turn is in flight, readable from the socket's close handler.
+  // `sending` itself is state and the handler closes over its first value.
+  const sendingRef = useRef(false);
+
+  /**
+   * The socket went away while a turn was still running.
+   *
+   * The turn itself is NOT lost: the server finishes it whatever happens
+   * to the connection, and writes it to ChatMessage__c. What is lost is
+   * this screen's only way of hearing about it — so before this, the
+   * spinner simply ran forever and the reply sat in Salesforce unread.
+   *
+   * A phone suspending its webview on app-switch does this every time, as
+   * does a laptop sleeping or a network handing over from wifi to
+   * cellular. The server's heartbeat now notices within thirty seconds and
+   * drops its side; this is the other half.
+   *
+   * Deliberately NOT re-reading the transcript here. Merging messages that
+   * arrived while disconnected into a live message list risks showing them
+   * twice, and a duplicate reply is worse than a clear prompt to reopen.
+   * Sending again reconnects by itself (see sendOverSocket).
+   */
+  const dropWhileWaiting = useCallback(() => {
+    if (!sendingRef.current) return;
+    sendingRef.current = false;
+    setSending(false);
+    clearLive();
+    emit({
+      kind: 'sys',
+      text: 'The connection dropped while the agent was still working. Its reply was saved — reopen this conversation to see it.',
+    });
+  }, [emit, clearLive]);
   const historyRef = useRef<ChatHistoryEntry[]>(restored.history);
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -625,6 +658,7 @@ export function ChatPanel({
       if (session) refreshApprovals(session.Id);
       if (suspended) emit({ kind: 'approval' });
       setSending(false);
+      sendingRef.current = false;
       clearLive();
       maybeScrollToBottom();
       if (session) reportSessionChange({ sessionId: session.Id, ended: false });
@@ -762,6 +796,7 @@ export function ChatPanel({
           ws.onclose = () => {
             console.log('[ChatPanel] websocket closed');
             setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
+            dropWhileWaiting();
           };
           ws.onmessage = ev => {
             const msg: unknown = JSON.parse(ev.data as string);
@@ -1069,7 +1104,10 @@ export function ChatPanel({
       socketRef.current = ws;
       ws.onopen = () => { setWsStatus('open'); emit({ kind: 'sys', text: `Reconnected to ${agentName}.` }); ws.send(payload); resolve(); };
       ws.onerror = () => { setWsStatus('error'); reject(new Error('Could not reconnect to the agent. Try again.')); };
-      ws.onclose = () => setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
+      ws.onclose = () => {
+        setWsStatus(prev => (prev === 'open' ? 'closed' : prev));
+        dropWhileWaiting();
+      };
       ws.onmessage = ev => {
         const msg: unknown = JSON.parse(ev.data as string);
         if (isStageFrame(msg)) { handleStageRef.current(msg); return; }
@@ -1089,6 +1127,7 @@ export function ChatPanel({
     if (isCopilot || sending) return;
     const resultText = (a.resultText ?? '').trim();
     setSending(true);
+    sendingRef.current = true;
     turnVoiceRef.current = false;
     turnStartRef.current = Date.now();
     emit({ kind: 'sys', text: `Approved — ${a.toolName} ran. Continuing.` });
@@ -1120,6 +1159,7 @@ export function ChatPanel({
     const attachedThisTurn = pendingAttachments;
     setPendingAttachments([]);
     setSending(true);
+    sendingRef.current = true;
     turnVoiceRef.current = lastInputVoiceRef.current;
     lastInputVoiceRef.current = false;
     turnStartRef.current = Date.now();

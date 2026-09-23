@@ -56,6 +56,21 @@ public with sharing class AgentChatController {
 
     @AuraEnabled
     public static SessionWithMessages startSession(String agentApiName, String recordContextId, String recordContextType) {
+        return startChannelSession(agentApiName, recordContextId, recordContextType, null, null);
+    }
+
+    /**
+     * Opens (or resumes) a session for a channel that knows who is messaging.
+     *
+     * A WhatsApp integration knows the sender's number and, usually, the
+     * record it matched; the Testing tab knows neither. Both are stored on
+     * the session and forwarded to the agent on every turn as a plain fact
+     * -- the number, or that there is none -- so the model never guesses a
+     * phone and never searches a name in phone fields. Pass channel as
+     * 'whatsapp', 'sms', 'web' or 'test'; null is treated as unknown.
+     */
+    @AuraEnabled
+    public static SessionWithMessages startChannelSession(String agentApiName, String recordContextId, String recordContextType, String senderPhone, String channel) {
         if (String.isBlank(agentApiName)) {
             throw new ChatException('agentApiName is required.');
         }
@@ -96,7 +111,7 @@ public with sharing class AgentChatController {
         if (!existing.isEmpty()) {
             session = [
                 SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
-                       User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                       User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                        LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                        TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                        PendingApprovalToken__c, ActiveTopic__c
@@ -108,6 +123,8 @@ public with sharing class AgentChatController {
                 User__c              = userId,
                 RecordContextId__c   = recordContextId,
                 RecordContextType__c = recordContextType,
+                SenderPhone__c       = senderPhone,
+                Channel__c           = channel,
                 Status__c            = 'Active',
                 LastActivityAt__c    = System.now(),
                 ExpiresAt__c         = System.now().addHours(EXPIRY_HOURS),
@@ -117,7 +134,7 @@ public with sharing class AgentChatController {
             insert session;
             session = [
                 SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
-                       User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                       User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                        LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                        TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                        PendingApprovalToken__c, ActiveTopic__c
@@ -152,7 +169,7 @@ public with sharing class AgentChatController {
         DateTime nowTs = System.now();
         List<ChatSession__c> existing = [
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
-                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                    TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                    PendingApprovalToken__c, ActiveTopic__c
@@ -181,7 +198,7 @@ public with sharing class AgentChatController {
         insert session;
         return [
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
-                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                    TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                    PendingApprovalToken__c, ActiveTopic__c
@@ -600,7 +617,7 @@ public with sharing class AgentChatController {
     private static ChatSession__c loadActiveSession(Id sessionId, Boolean throwIfExpired) {
         List<ChatSession__c> rows = [
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
-                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                    TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                    PendingApprovalToken__c, ActiveTopic__c
@@ -622,7 +639,7 @@ public with sharing class AgentChatController {
     private static ChatSession__c loadSessionForViewing(Id sessionId) {
         List<ChatSession__c> rows = [
             SELECT Id, Name, AgentDefinition__c, AgentDefinition__r.ApiName__c, AgentDefinition__r.Name,
-                   User__c, RecordContextId__c, RecordContextType__c, Title__c, Status__c,
+                   User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                    TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
                    PendingApprovalToken__c, ActiveTopic__c
@@ -758,7 +775,12 @@ public with sharing class AgentChatController {
             'context'        => new Map<String, Object>{
                 'userId'            => UserInfo.getUserId(),
                 'recordContextId'   => session.RecordContextId__c,
-                'recordContextType' => session.RecordContextType__c
+                'recordContextType' => session.RecordContextType__c,
+                // Where the customer is messaging from, when the integration
+                // that opened the session said. The agent is told either the
+                // number or that there is none -- so it never guesses one.
+                'senderPhone'       => session.SenderPhone__c,
+                'channel'           => session.Channel__c
             }
         };
     }

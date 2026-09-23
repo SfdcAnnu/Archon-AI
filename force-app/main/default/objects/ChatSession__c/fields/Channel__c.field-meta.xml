@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Channel__c</fullName>
+    <label>Channel</label>
+    <description>Where this conversation is happening: whatsapp, sms, web, test. Forwarded to the agent so channel-specific instructions (e.g. a phone lookup) apply only where they can. Null means unknown; the agent is told no sender phone is available.</description>
+    <type>Text</type>
+    <length>40</length>
+    <required>false</required>
+</CustomField>

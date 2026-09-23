@@ -107,6 +107,7 @@ export function AppShell({
   actions,
   onRefresh,
   hideRail = false,
+  forceCollapsed,
 }: {
   children: ReactNode;
   /** No navigation rail at all — for a page that carries its own launcher
@@ -126,8 +127,13 @@ export function AppShell({
   actions?: ReactNode;
   /** Refresh handler for the top bar — defaults to a full reload. */
   onRefresh?: () => void;
+  /** Controlled collapse: a page that needs the icon rail while it is in
+   *  one state (Chat, once an agent is chosen) drives this; undefined
+   *  leaves the toggle to the person, as before. */
+  forceCollapsed?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  useEffect(() => { if (forceCollapsed !== undefined) setCollapsed(forceCollapsed); }, [forceCollapsed]);
   const [theme, setTheme] = useTheme();
   const navigate = useNavigate();
   const location = useLocation();

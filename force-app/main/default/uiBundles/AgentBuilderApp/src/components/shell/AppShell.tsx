@@ -19,6 +19,23 @@ import {
   RotateCw,
   Plus,
 } from 'lucide-react';
+
+/** One icon per section, shared with the Home page's top bar so the two
+ *  never drift: a section is drawn the same way wherever it is offered. */
+export const NAV_ICON_BY_HREF: Record<string, typeof Home> = {
+  '/home': Home,
+  '/ai-connections': Layers,
+  '/': Bot,
+  '/knowledge': BookOpen,
+  '/connectors': Plug,
+  '/templates': LayoutGrid,
+  '/chat': MessageCircle,
+  '/executions': Activity,
+  '/conversations': MessageSquare,
+  '/approvals': CheckSquare,
+  '/cost': CircleDollarSign,
+  '/setup': Sun,
+};
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { loadPendingApprovals } from '@/lib/approvals-data';
@@ -139,23 +156,23 @@ export function AppShell({
   const location = useLocation();
   const approvals = usePendingApprovals();
 
-  const HOME_ITEMS: NavItem[] = [{ icon: Home, label: 'Home', href: '/home' }];
+  const HOME_ITEMS: NavItem[] = [{ icon: NAV_ICON_BY_HREF['/home'], label: 'Home', href: '/home' }];
   const BUILD_ITEMS: NavItem[] = [
-    { icon: Layers, label: 'AI Models', href: '/ai-connections' },
-    { icon: Bot, label: 'Agents', href: '/' },
-    { icon: BookOpen, label: 'Knowledge', href: '/knowledge' },
-    { icon: Plug, label: 'Connectors', href: '/connectors' },
-    { icon: LayoutGrid, label: 'Templates', href: '/templates' },
-    { icon: MessageCircle, label: 'Chat', href: '/chat' },
+    { icon: NAV_ICON_BY_HREF['/ai-connections'], label: 'AI Models', href: '/ai-connections' },
+    { icon: NAV_ICON_BY_HREF['/'], label: 'Agents', href: '/' },
+    { icon: NAV_ICON_BY_HREF['/knowledge'], label: 'Knowledge', href: '/knowledge' },
+    { icon: NAV_ICON_BY_HREF['/connectors'], label: 'Connectors', href: '/connectors' },
+    { icon: NAV_ICON_BY_HREF['/templates'], label: 'Templates', href: '/templates' },
+    { icon: NAV_ICON_BY_HREF['/chat'], label: 'Chat', href: '/chat' },
   ];
   const MONITOR_ITEMS: NavItem[] = [
-    { icon: Activity, label: 'Runs', href: '/executions' },
-    { icon: MessageSquare, label: 'Conversations', href: '/conversations' },
-    { icon: CheckSquare, label: 'Approvals', href: '/approvals', badge: approvals },
+    { icon: NAV_ICON_BY_HREF['/executions'], label: 'Runs', href: '/executions' },
+    { icon: NAV_ICON_BY_HREF['/conversations'], label: 'Conversations', href: '/conversations' },
+    { icon: NAV_ICON_BY_HREF['/approvals'], label: 'Approvals', href: '/approvals', badge: approvals },
   ];
   const MANAGE_ITEMS: NavItem[] = [
-    { icon: CircleDollarSign, label: 'Cost', href: '/cost' },
-    { icon: Sun, label: 'Setup', href: '/setup' },
+    { icon: NAV_ICON_BY_HREF['/cost'], label: 'Cost', href: '/cost' },
+    { icon: NAV_ICON_BY_HREF['/setup'], label: 'Setup', href: '/setup' },
   ];
   const ALL_ITEMS = [...HOME_ITEMS, ...BUILD_ITEMS, ...MONITOR_ITEMS, ...MANAGE_ITEMS];
 

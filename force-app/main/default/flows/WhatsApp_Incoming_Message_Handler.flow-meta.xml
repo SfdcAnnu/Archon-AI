@@ -12,7 +12,7 @@
             <name>agentApiName</name>
             <value>
                 <inputConfiguratorMode>Custom</inputConfiguratorMode>
-                <stringValue>salesforce_opportunity_revival_win_back_ai_agent_mtx0d8d9</stringValue>
+                <stringValue>whatsapp_lead_intake_qualifier</stringValue>
             </value>
         </inputParameters>
         <inputParameters>

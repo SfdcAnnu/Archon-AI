@@ -128,8 +128,11 @@ public with sharing class WhatsAppAgentBridge {
         Id sessionId;
         try {
             Id ownerId = resolveOwnerId(recordContextType, recordContextId);
+            // The sender's number keys the conversation and reaches the agent
+            // as the phone it may use; the record anchor follows when known.
             ChatSession__c session = AgentChatController.findOrCreateAutomatedSession(
-                agentApiName, recordContextId, recordContextType, ownerId
+                agentApiName, recordContextId, recordContextType, ownerId,
+                msg.tdc_tsw__Sender_Number__c, 'whatsapp'
             );
             sessionId = session.Id;
         } catch (Exception e) {

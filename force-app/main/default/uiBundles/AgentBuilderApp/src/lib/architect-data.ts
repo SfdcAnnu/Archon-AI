@@ -15,6 +15,22 @@ export interface BuildStep {
   ms?: number;
   /** Restored from an earlier run's checkpoint: done, and free. */
   reused?: boolean;
+  /** When the stage began (epoch ms), so the card can count while it runs. */
+  startedAt?: number;
+  /** Every model call the stage made, in order — the empty ones too. */
+  calls?: BuildCall[];
+  tokensIn?: number;
+  tokensOut?: number;
+}
+
+export interface BuildCall {
+  specialist: string;
+  model: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  ms: number;
+  failed?: string;
 }
 
 export interface BuildPrerequisite {

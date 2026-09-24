@@ -21,6 +21,8 @@
 .bw-stage .m{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--archon-faint);display:grid;place-items:center;font:600 9px var(--font-mono)}
 .bw-stage .l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .bw-stage .l small{color:var(--muted-foreground)}
 .bw-stage .d{font:10.5px var(--font-mono);color:var(--archon-faint)}
+.bw-live{grid-column:2 / -1;font:10.5px var(--font-mono);color:var(--muted-foreground);white-space:normal;line-height:1.35;margin-top:-2px}
+.bw-stage.run .bw-live{color:var(--primary)} .bw-live.quiet{color:var(--archon-faint)}
 .bw-stage.done,.bw-stage.warn{color:var(--foreground)} .bw-stage.done .m{border-color:var(--archon-success);background:var(--archon-success-tint,color-mix(in srgb,var(--archon-success) 14%,transparent));color:var(--archon-success)}
 .bw-stage.warn .m{border-color:var(--archon-warning);color:var(--archon-warning);background:color-mix(in srgb,var(--archon-warning) 14%,transparent)}
 .bw-stage.failed{color:var(--archon-error)} .bw-stage.failed .m{border-color:var(--archon-error);color:var(--archon-error)}

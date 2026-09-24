@@ -49,6 +49,15 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
   const steps: BuildStep[] = view?.steps ?? [];
   const doneCount = steps.filter(s => s.state === 'done' || s.state === 'warn').length;
   const running = view?.status === 'running' || view?.status === 'queued';
+  // A 90-second design call was a spinner and nothing else. While a stage
+  // runs, its row shows what it is doing (the server narrates every
+  // sub-step) and a counter from the moment it began.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running]);
   const stageStop = view?.status === 'paused' && /as asked/.test(view.error ?? '');
   const costStop = view?.status === 'paused' && !stageStop;
   const lastDone = [...steps].reverse().find(s => s.state === 'done' || s.state === 'warn' || s.state === 'failed')?.key ?? null;
@@ -112,12 +121,17 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
                 <button key={s.key} type="button" className={`bw-stage ${cls}${current === s.key ? ' sel' : ''}${wait ? ' wait' : ''}`} onClick={() => setPicked(s.key)} disabled={s.state === 'pending'}>
                   <span className="m">{s.state === 'running' ? <Loader2 className="spin" /> : s.state === 'done' ? '✓' : s.state === 'warn' || s.state === 'failed' ? '!' : wait ? '?' : i + 1}</span>
                   <span className="l">{s.label}{s.reused && <small> · kept</small>}</span>
-                  <span className="d">{s.ms != null ? `${(s.ms / 1000).toFixed(1)}s` : ''}</span>
+                  <span className="d">{s.ms != null ? `${(s.ms / 1000).toFixed(1)}s` : s.state === 'running' && s.startedAt ? `${Math.max(0, Math.round((now - s.startedAt) / 1000))}s` : ''}</span>
+                  {s.state === 'running' && (s.detail || s.calls?.length) ? (
+                    <span className="bw-live">{s.detail || `${s.calls!.length} model call${s.calls!.length === 1 ? '' : 's'} so far`}</span>
+                  ) : (s.state === 'done' || s.state === 'warn' || s.state === 'failed') && s.calls?.length ? (
+                    <span className="bw-live quiet">{s.calls.length} model call{s.calls.length === 1 ? '' : 's'}{s.calls.some(c => c.failed) ? ` (${s.calls.filter(c => c.failed).length} empty)` : ''} · ${(s.calls.reduce((a, c) => a + c.costUsd, 0)).toFixed(3)}{s.detail ? ` · ${s.detail}` : ''}</span>
+                  ) : null}
                 </button>
               );
             })}
             <div className="bw-ctl">
-              {running && <div className="bw-hint"><Loader2 className="spin" /> {steps.find(s => s.state === 'running')?.label ?? 'Working'}…</div>}
+              {running && <div className="bw-hint"><Loader2 className="spin" /> {steps.find(s => s.state === 'running')?.detail || steps.find(s => s.state === 'running')?.label || 'Working'}…</div>}
               {canContinue && (
                 <>
                   <button type="button" className="bw-btn p" disabled={waiting} onClick={() => onSend(`Build ${jobId}: continue to the next stage.`)}>Next stage → {nextStep ? STAGE_SHORT[nextStep.key] ?? nextStep.label : ''}</button>

@@ -1,4 +1,6 @@
 import { Info } from 'lucide-react';
+import { agentKindOf } from '@/lib/agent-kind';
+import { AgentKindBadge } from '@/components/AgentKindBadge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { AgentGraph } from '@/types/agent';
 
@@ -38,7 +40,8 @@ export function AgentInfoPopover({ graph }: { graph: AgentGraph }) {
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80">
-        <div className="mb-1 text-[13px] font-bold text-foreground">{graph.agent.name}</div>
+        <div className="mb-1 flex items-center gap-2 text-[13px] font-bold text-foreground">{graph.agent.name}<AgentKindBadge executeType={graph.agent.executeType} /></div>
+        <p className="mb-2 text-xs leading-relaxed text-muted-foreground">{agentKindOf(graph.agent.executeType).blurb}</p>
         <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{graph.agent.description}</p>
         <div className="grid grid-cols-2 gap-2">
           {stats.map(([label, count]) => (

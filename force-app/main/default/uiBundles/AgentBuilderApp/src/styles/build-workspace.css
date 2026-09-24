@@ -91,3 +91,7 @@
 /* A viewport too small for either shape. */
 @media (max-width:640px){.bw-canvas{height:260px}}
 @media (prefers-reduced-motion:reduce){.bw,.bw-stage.run .m{animation:none!important}}
+.bw-kind{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 10px}
+.bw-kind .bw-label{margin-right:4px}
+.bw-kind .bw-btn.s{display:inline-flex;align-items:center;gap:5px}
+.bw-kind .hint{font:11px var(--font-mono);color:var(--muted-foreground)}

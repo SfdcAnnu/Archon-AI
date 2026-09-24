@@ -5,6 +5,7 @@ import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ConsoleRail } from '@/components/chat/ConsoleRail';
 import { SessionTranscript } from '@/components/chat/SessionTranscript';
+import { AgentKindBadge } from '@/components/AgentKindBadge';
 import type { ChatActivity } from '@/lib/chat-activity';
 import { listChatEnabledAgents, type ChatAgentSummary } from '@/lib/chat-data';
 import { loadAgents } from '@/lib/agents-data';
@@ -33,6 +34,7 @@ const AGENT_PREF = 'archon.chat.agent';
 interface PickerAgent extends ChatAgentSummary {
   isSystem: boolean;
   status: string;
+  executeType: string;
 }
 
 type Active =
@@ -71,7 +73,7 @@ export default function ChatPage() {
     Promise.all([listChatEnabledAgents(''), loadAgents().catch(() => [])])
       .then(([chat, all]) => {
         const byApi = new Map(all.map(a => [a.apiName, a]));
-        setAgents(chat.map(a => ({ ...a, isSystem: byApi.get(a.apiName)?.isSystem ?? false, status: byApi.get(a.apiName)?.status ?? 'Active' })));
+        setAgents(chat.map(a => ({ ...a, isSystem: byApi.get(a.apiName)?.isSystem ?? false, status: byApi.get(a.apiName)?.status ?? 'Active', executeType: byApi.get(a.apiName)?.executeType ?? 'Chat' })));
         setAgentsLoading(false);
       })
       .catch(err => { console.error('Failed to load agents:', err); setAgentsLoading(false); });
@@ -161,7 +163,7 @@ export default function ChatPage() {
                         <div className="n">{a.name}</div>
                         <div className="d">{a.department}</div>
                       </div>
-                      {a.isSystem && <span className="cp-tag">Built-in</span>}
+                      {a.isSystem ? <span className="cp-tag">Built-in</span> : <AgentKindBadge executeType={a.executeType} showLabel={false} />}
                     </div>
                     <p>{a.description || 'No description yet.'}</p>
                     <div className="cp-card-ft">

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AGENT_KINDS, executeTypeOfKind, type AgentKindKey } from '@/lib/agent-kind';
+import { AgentKindBadge } from '@/components/AgentKindBadge';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Loader2, Plus, Search, Trash2, Zap } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
@@ -179,6 +181,7 @@ export default function HomePage() {
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDepartment, setNewDepartment] = useState('Sales');
+  const [newKind, setNewKind] = useState<AgentKindKey>('communication');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -258,7 +261,7 @@ export default function HomePage() {
     const name = newName.trim();
     if (!name) return;
     setCreating(true);
-    createAgent(name, newDepartment.trim() || 'Sales')
+    createAgent(name, newDepartment.trim() || 'Sales', executeTypeOfKind(newKind))
       .then(apiName => {
         setShowNewAgent(false);
         setNewName('');
@@ -268,7 +271,7 @@ export default function HomePage() {
         console.error('Failed to create agent:', err);
         setCreating(false);
       });
-  }, [newName, newDepartment, navigate]);
+  }, [newName, newDepartment, newKind, navigate]);
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, agent: AgentSummary) => {
@@ -376,6 +379,7 @@ export default function HomePage() {
                   <tr>
                     <th className={cn(T.th, 'w-10')} />
                     <th className={T.th}>Agent</th>
+                    <th className={T.th}>Type</th>
                     <th className={T.th}>Health</th>
                     <th className={T.th}>Activity 24h</th>
                     <th className={cn(T.th, 'text-right')}>Runs</th>
@@ -408,6 +412,9 @@ export default function HomePage() {
                             {a.department || 'No department'}
                             {a.version != null && ` · v${a.version}`}
                           </div>
+                        </td>
+                        <td className={T.td}>
+                          <AgentKindBadge executeType={a.executeType} />
                         </td>
                         <td className={T.td}>
                           <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
@@ -489,6 +496,30 @@ export default function HomePage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>What kind of agent?</Label>
+              <div className="grid gap-2" role="radiogroup" aria-label="Kind of agent">
+                {AGENT_KINDS.map(k => (
+                  <button
+                    key={k.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={newKind === k.key}
+                    onClick={() => setNewKind(k.key)}
+                    className={cn(
+                      'flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
+                      newKind === k.key ? 'border-primary bg-primary/10' : 'border-border hover:bg-secondary/60',
+                    )}
+                  >
+                    <k.Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block text-[12.5px] font-semibold text-foreground">{k.label}</span>
+                      <span className="block text-[11.5px] leading-snug text-muted-foreground">{k.blurb}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="new-agent-name">Name</Label>
               <Input

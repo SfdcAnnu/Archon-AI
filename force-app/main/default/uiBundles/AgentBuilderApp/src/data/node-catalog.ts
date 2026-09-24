@@ -27,12 +27,38 @@ const PROVIDER_ICON_CLASS: Record<string, string> = {
 export const NODE_PALETTE: PaletteCategory[] = [
   {
     category: 'Triggers',
+    // One per executor the automation runtime registers (server/src/nodes/trigger.ts).
+    // A run starts at the Trigger node; without one it stops before it begins.
     items: [
+      {
+        nodeType: 'trigger',
+        nodeSubType: 'record',
+        label: 'Record / Flow',
+        sub: 'Run from a Flow or Apex on a record',
+        iconClass: 'bg-secondary text-muted-foreground',
+        defaultConfig: {},
+      },
+      {
+        nodeType: 'trigger',
+        nodeSubType: 'schedule',
+        label: 'Schedule',
+        sub: 'Run on a schedule',
+        iconClass: 'bg-secondary text-muted-foreground',
+        defaultConfig: {},
+      },
       {
         nodeType: 'trigger',
         nodeSubType: 'webhook',
         label: 'Webhook',
-        sub: 'Trigger',
+        sub: 'Run when an HTTP call arrives',
+        iconClass: 'bg-secondary text-muted-foreground',
+        defaultConfig: {},
+      },
+      {
+        nodeType: 'trigger',
+        nodeSubType: 'platform_event',
+        label: 'Platform event',
+        sub: 'Run when a platform event fires',
         iconClass: 'bg-secondary text-muted-foreground',
         defaultConfig: {},
       },

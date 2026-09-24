@@ -192,7 +192,7 @@ function Understand({ d, answers, setAnswers, onSend, running, jobId }: { d: Bui
   const filled = qs.filter((_, i) => (answers[i] ?? '').trim());
   // The kind the Analyst decided, shown where it can be corrected before a
   // design is paid for. A change travels with the answers and the compiler
-  // writes it as the agent's Execute Type.
+  // writes it as the agent's Agent Type.
   const kind = (answers[-2] as AgentKindKey | undefined) ?? r.agentType ?? 'communication';
   const kindChanged = !!answers[-2] && answers[-2] !== (r.agentType ?? 'communication');
   const kindLine = `Agent type: ${kind}`;

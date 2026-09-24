@@ -10,7 +10,7 @@
  * repeated calls about the same record continue one conversation).
  * Trigger/Automation agents run through the orchestrator (same path as
  * AgentRunner) with the query/reference data folded into the run's input
- * payload. Blank Agent Type = whatever the agent's own Execute Type says.
+ * payload. Blank Agent type = whatever the agent's own Agent Type says.
  *
  * Callout rules: this action makes a callout, so from a record-triggered
  * Flow it must be called on the "Run Asynchronously" path (Salesforce
@@ -45,8 +45,8 @@ public with sharing class AgentInvokeAction {
         public String referenceData;
 
         @InvocableVariable(
-            label='Agent Type (Chat or Trigger)'
-            description='Optional override. Leave blank to use the Execute Type saved on the agent.'
+            label='Agent type (Communication or Automation)'
+            description='Optional override: Communication runs a chat turn in a conversation; Automation runs the agent in one go and returns a result. Leave blank to use the Agent Type saved on the agent.'
         )
         public String agentType;
 
@@ -233,9 +233,12 @@ public with sharing class AgentInvokeAction {
         return rows.isEmpty() ? null : rows[0];
     }
 
+    // The words a Flow builder types map onto the picklist's API values:
+    // Communication (Chat), Automation (Trigger), Both.
     private static String normalizeType(String raw) {
         String t = raw.trim().toLowerCase();
-        if (t == 'chat') return 'Chat';
+        if (t == 'chat' || t == 'communication' || t == 'conversation') return 'Chat';
+        if (t == 'both') return 'Both';
         // 'trigger', 'automation', anything else automation-flavored
         return 'Trigger';
     }

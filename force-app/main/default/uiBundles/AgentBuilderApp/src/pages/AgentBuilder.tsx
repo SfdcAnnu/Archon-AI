@@ -15,7 +15,6 @@ import { KnowledgeBaseModal } from '@/components/agent-builder/KnowledgeBaseModa
 import { SetupChecklistPanel } from '@/components/agent-builder/SetupChecklistPanel';
 import { ArchonCopilot, applyCopilotOperations } from '@/components/agent-builder/ArchonCopilot';
 import type { CopilotOperation } from '@/lib/architect-data';
-import AutomationReviewView from './AutomationReviewView';
 import { MOCK_AGENT_GRAPH } from '@/data/mock-agent';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import { loadAgentGraph, saveAgentGraph } from '@/lib/salesforce-data';
@@ -447,15 +446,18 @@ export default function AgentBuilder() {
   }, [streamOn, graph.agent.id]);
 
   // Trigger-mode agents use a different node vocabulary the drag-and-drop
-  // canvas was never built to author (see AutomationReviewView.tsx's doc
-  // comment) — reviewed read-only there instead, edited via the Copilot.
-  const isAutomationMode = graph.agent.executeType === 'Trigger';
+  // Both kinds are edited on this canvas by whoever may edit agents (the
+  // Archon Admin permission set, or a System Administrator). The automation
+  // kind used to open read-only, pointing at an editor that had been
+  // deleted: nobody could add the Trigger node a run starts from.
+  const isAutomationKind = graph.agent.executeType === 'Trigger' || graph.agent.executeType === 'Both';
+  const needsTrigger = isAutomationKind && !graph.nodes.some(n => n.nodeType === 'trigger');
 
   return (
     <AppShell
       defaultCollapsed
       railExtra={
-        isAutomationMode || isSystem ? undefined : (
+        isSystem ? undefined : (
           <button
             ref={addRailBtnRef}
             type="button"
@@ -469,14 +471,6 @@ export default function AgentBuilder() {
         )
       }
     >
-      {isAutomationMode ? (
-        <AutomationReviewView
-          graph={graph}
-          saveState={saveState}
-          justSaved={justSaved}
-          onSave={handleSave}
-        />
-      ) : (
       <div className="relative flex h-full w-full flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -608,6 +602,12 @@ export default function AgentBuilder() {
             </Button>
           </div>
         </header>
+        {needsTrigger && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-[color-mix(in_srgb,var(--archon-warning)_12%,transparent)] px-5 py-2 text-[12px] text-foreground" role="status">
+            <Zap className="h-3.5 w-3.5 shrink-0 text-[var(--archon-warning)]" aria-hidden="true" />
+            <span>An automation agent starts at a <b>Trigger</b> node — a run without one stops before it begins. Drag a Trigger from the palette and connect it to the AI node.</span>
+          </div>
+        )}
         {isSystem && (
           <div className="flex shrink-0 items-center gap-2 border-b border-border bg-[var(--node-purple-tint)] px-5 py-1.5 text-[11.5px] text-[var(--node-purple)]">
             <Sparkles className="h-3.5 w-3.5" />
@@ -688,7 +688,6 @@ export default function AgentBuilder() {
           <SetupChecklistPanel items={graph.agent.setupChecklist} onClose={() => setChecklistOpen(false)} />
         )}
       </div>
-      )}
     </AppShell>
   );
 }

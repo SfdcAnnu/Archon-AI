@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/sonner';
 import { AppShell } from '@/components/shell/AppShell';
 import { NodeQuickAdd } from '@/components/agent-builder/NodeQuickAdd';
 import { AgentInfoPopover } from '@/components/agent-builder/AgentInfoPopover';
+import { AgentKindBadge } from '@/components/AgentKindBadge';
 import { Canvas } from '@/components/agent-builder/Canvas';
 import { PropertiesPanel } from '@/components/agent-builder/PropertiesPanel';
 import { ChatPanel } from '@/components/chat/ChatPanel';
@@ -489,6 +490,7 @@ export default function AgentBuilder() {
               </button>
               <span className="truncate text-[14px] font-bold text-foreground">{graph.agent.name}</span>
             </div>
+            <AgentKindBadge executeType={graph.agent.executeType} />
             <span className="shrink-0 rounded-full bg-[var(--node-blue-tint)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--node-blue)]">
               {graph.agent.department}
             </span>

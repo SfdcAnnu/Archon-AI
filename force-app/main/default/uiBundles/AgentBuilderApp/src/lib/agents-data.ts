@@ -18,6 +18,7 @@ interface RawAgentSummary {
   TotalExecutions__c: number | null;
   SuccessRate__c: number | null;
   IsSystem__c?: boolean;
+  ExecuteType__c?: string | null;
   StreamReplies__c?: boolean;
   CreatedDate: string;
   LastModifiedDate: string;
@@ -26,6 +27,8 @@ interface RawAgentSummary {
 export interface AgentSummary {
   /** Shipped and managed by the platform: read-only, cannot be deleted. */
   isSystem: boolean;
+  /** Chat (communication), Trigger (automation) or Both -- see lib/agent-kind. */
+  executeType: string;
   /** Chats with this agent start in streaming mode. Off by default. */
   streamReplies: boolean;
   id: string;
@@ -53,6 +56,7 @@ function fromRaw(r: RawAgentSummary): AgentSummary {
     totalExecutions: r.TotalExecutions__c,
     successRate: r.SuccessRate__c,
     isSystem: r.IsSystem__c === true,
+    executeType: r.ExecuteType__c ?? 'Chat',
     streamReplies: r.StreamReplies__c === true,
     createdDate: r.CreatedDate,
     lastModifiedDate: r.LastModifiedDate,
@@ -98,7 +102,7 @@ export function slugify(name: string): string {
  *  catalog node) — then saves it via the existing saveAgentGraph path.
  *  Returns the generated apiName (not the Salesforce Id) — that's what
  *  the canvas route navigates by. */
-export async function createAgent(name: string, department: string): Promise<string> {
+export async function createAgent(name: string, department: string, executeType: 'Chat' | 'Trigger' | 'Both' = 'Chat'): Promise<string> {
   const apiName = slugify(name);
   const graph: AgentGraph = {
     agent: {
@@ -109,7 +113,7 @@ export async function createAgent(name: string, department: string): Promise<str
       description: '',
       knowledgeBase: '',
       status: 'Draft',
-      executeType: 'Chat',
+      executeType,
       accessMode: 'Org',
       setupChecklist: [],
     },

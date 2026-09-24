@@ -146,7 +146,7 @@ export interface BuildDetail {
   jobId: string;
   status: BuildJobView['status'];
   stoppedAfter: string | null;
-  requirement: { goal: string; capabilities: string[]; openQuestions: string[]; successCriteria: string[]; riskLevel: string | null; trigger: string | null } | null;
+  requirement: { goal: string; capabilities: string[]; openQuestions: string[]; successCriteria: string[]; riskLevel: string | null; trigger: string | null; agentType?: 'communication' | 'automation' | 'both'; clarifications?: string[] } | null;
   survey: Record<string, { count: number; sample: string[] } | { keys: string[] } | string> | null;
   match: { coverage: number | null; matched: string[]; gaps: Array<{ state: 'partial' | 'missing'; capability: string; why: string; have: string; need: string }> } | null;
   design: {

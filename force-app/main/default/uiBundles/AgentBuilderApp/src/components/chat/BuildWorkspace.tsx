@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AGENT_KINDS, type AgentKindKey } from '@/lib/agent-kind';
 import { useNavigate } from 'react-router';
 import { AlertTriangle, Check, ExternalLink, Loader2, Sparkles } from 'lucide-react';
 import { Canvas } from '@/components/agent-builder/Canvas';
@@ -189,10 +190,25 @@ function Understand({ d, answers, setAnswers, onSend, running, jobId }: { d: Bui
   if (!r) return <Head n={1} title="Understood what you want" pill="pending" />;
   const qs = r.openQuestions ?? [];
   const filled = qs.filter((_, i) => (answers[i] ?? '').trim());
+  // The kind the Analyst decided, shown where it can be corrected before a
+  // design is paid for. A change travels with the answers and the compiler
+  // writes it as the agent's Execute Type.
+  const kind = (answers[-2] as AgentKindKey | undefined) ?? r.agentType ?? 'communication';
+  const kindChanged = !!answers[-2] && answers[-2] !== (r.agentType ?? 'communication');
+  const kindLine = `Agent type: ${kind}`;
   return (
     <>
       <Head n={1} title="Understood what you want" pill={qs.length ? `${qs.length} question${qs.length === 1 ? '' : 's'}` : `${r.capabilities.length} capabilities`} tone={qs.length ? 'a' : 'g'} />
       {r.goal && <p className="bw-p">{r.goal}</p>}
+      <div className="bw-kind">
+        <span className="bw-label">Kind of agent</span>
+        {AGENT_KINDS.map(k => (
+          <button key={k.key} type="button" className={`bw-btn s${kind === k.key ? ' on' : ''}`} disabled={running} title={k.blurb} onClick={() => setAnswers({ ...answers, [-2]: k.key })}>
+            <k.Icon className="h-3 w-3" aria-hidden="true" /> {k.short}
+          </button>
+        ))}
+        <span className="hint">{kindChanged ? 'changed — sent with your answers' : 'decided from the requirement; change it if wrong'}</span>
+      </div>
       <div className="bw-chips">{r.capabilities.map((c, i) => <span key={i} className="bw-chip">{c}</span>)}{r.riskLevel && <span className={`bw-chip ${r.riskLevel === 'high' ? 'r' : r.riskLevel === 'medium' ? 'a' : 'g'}`}>risk {r.riskLevel}</span>}</div>
       {qs.length > 0 && (
         <>
@@ -205,11 +221,17 @@ function Understand({ d, answers, setAnswers, onSend, running, jobId }: { d: Bui
             </div>
           ))}
           <div className="bw-foot">
-            <button type="button" className="bw-btn p" disabled={running || filled.length === 0} onClick={() => onSend(`Build ${jobId} — answers to your questions:\n${qs.map((q, i) => `${i + 1}. ${q}\n   → ${(answers[i] ?? '').trim() || 'You decide'}`).join('\n')}\nFold these into the requirement and continue.`)}>Answer and continue</button>
+            <button type="button" className="bw-btn p" disabled={running || (filled.length === 0 && !kindChanged)} onClick={() => onSend(`Build ${jobId} — answers to your questions:\n${kindLine}\n${qs.map((q, i) => `${i + 1}. ${q}\n   → ${(answers[i] ?? '').trim() || 'You decide'}`).join('\n')}\nFold these into the requirement and continue.`)}>Answer and continue</button>
             <span className="hint">or type the answers in the chat</span>
           </div>
         </>
       )}
+      {qs.length === 0 && kindChanged && (
+        <div className="bw-foot">
+          <button type="button" className="bw-btn p" disabled={running} onClick={() => onSend(`Build ${jobId} — answers to your questions:\n${kindLine}\nFold these into the requirement and continue.`)}>Use this kind and continue</button>
+        </div>
+      )}
+      {(r.clarifications?.length ?? 0) > 0 && <div><div className="bw-label">Your clarifications</div><ul className="bw-ul">{r.clarifications!.map((c, i) => <li key={i}>{c}</li>)}</ul></div>}
       {r.successCriteria?.length > 0 && <div><div className="bw-label">Success looks like</div><ul className="bw-ul">{r.successCriteria.map((s, i) => <li key={i}>{s}</li>)}</ul></div>}
     </>
   );

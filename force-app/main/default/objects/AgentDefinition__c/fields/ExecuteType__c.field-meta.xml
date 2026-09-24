@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>ExecuteType__c</fullName>
-    <description>How this agent can be invoked. Trigger = only from Apex callouts (today&apos;s behavior). Chat = listed in the Archon Chat picker. Both = available in both modes.</description>
-    <label>Execute Type</label>
+    <description>What kind of agent this is. Communication (API value Chat): talks with a person over web chat, WhatsApp or the Home copilot, keeps the conversation and stops at every reply. Automation (API value Trigger): runs in one go from a Flow, Apex or a schedule on a record and a payload, works until the goal is met and returns a result. Both: the same agent does both. The API values are unchanged so existing automations keep working.</description>
+    <label>Agent Type</label>
     <required>false</required>
     <trackTrending>false</trackTrending>
     <type>Picklist</type>
@@ -12,17 +12,17 @@
             <value>
                 <fullName>Trigger</fullName>
                 <default>true</default>
-                <label>Trigger</label>
+                <label>Automation</label>
             </value>
             <value>
                 <fullName>Chat</fullName>
                 <default>false</default>
-                <label>Chat</label>
+                <label>Communication</label>
             </value>
             <value>
                 <fullName>Both</fullName>
                 <default>false</default>
-                <label>Both</label>
+                <label>Communication + Automation</label>
             </value>
         </valueSetDefinition>
     </valueSet>

@@ -87,6 +87,8 @@ export interface ToolNodeConfig {
   connectorId: string;
   parameterSchema?: Record<string, unknown>;
   requiresApproval: boolean;
+  /** The reply does not wait for this tool; it is queued and runs right after. Never with approval. */
+  runInBackground?: boolean;
   /** Prebuilt Salesforce action (actionType 'Prebuilt') — executed by the
    *  generic server runtime (server-langchain/src/lc/prebuilt-tools.ts). */
   operation?: 'create' | 'update' | 'get' | 'search';
@@ -102,6 +104,8 @@ export interface CatalogNodeConfig {
   connectorId: string;
   provider?: string;
   allowedTools: string[];
+  /** Allowed tools whose calls run in the background -- writes the reply does not wait for. */
+  backgroundTools?: string[];
 }
 
 /** ONE rule inside the agent's single Guardrails node — a line of control

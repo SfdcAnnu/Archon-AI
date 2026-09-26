@@ -858,7 +858,15 @@ export function ChatPanel({
       .catch(err => {
         if (cancelled) return;
         console.error('Failed to start chat:', err);
-        setLoadError(err instanceof Error ? err.message : 'Could not start chat.');
+        const msg = err instanceof Error ? err.message : 'Could not start chat.';
+        // The session itself starts in Apex in a tenth of a second; what
+        // fails here is almost always the socket ticket, a callout to the
+        // Archon server while it is waking up. Leave the panel able to send:
+        // the next send reopens the socket with a fresh ticket.
+        setWsStatus('error');
+        setLoadError(/timed out|starting up|waking|50[234]|ECONN|fetch failed/i.test(msg)
+          ? 'The Archon server is taking longer than usual to answer — it may be waking up. Send your message again in a few seconds.'
+          : msg);
         setLoading(false);
       });
 
@@ -1200,6 +1208,7 @@ export function ChatPanel({
       }));
 
     setInput('');
+    setLoadError(null);
     const attachedThisTurn = pendingAttachments;
     setPendingAttachments([]);
     setSending(true);

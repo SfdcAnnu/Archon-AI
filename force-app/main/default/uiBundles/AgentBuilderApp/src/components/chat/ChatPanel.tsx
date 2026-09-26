@@ -19,6 +19,7 @@ import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data'
 import { ChatApprovalCard } from './ChatApprovalCard';
 import { ToolResultCards, flattenCalls } from './ToolResultCards';
 import { toolLabel } from '@/lib/tool-label';
+import { parseScreen, type ScreenRequest } from '@/lib/archon-screen';
 import { resolveStreaming, setStreamOverride, STREAM_LABEL } from '@/lib/stream-pref';
 import { MessageBody } from './MessageBody';
 import { BuildWorkspace } from './BuildWorkspace';
@@ -212,6 +213,9 @@ export interface ChatPanelProps {
    *  transcript keeps a one-line card per build and this is called with
    *  the newest build's state every time it changes (null: no build). */
   buildHost?: (b: HostedBuild | null) => void;
+  /** The agent called show_on_screen: the host draws that view beside the
+   *  conversation. Fired as the reply that describes it lands. */
+  onShow?: (s: ScreenRequest) => void;
   /** Resume a past conversation instead of starting a new one. */
   initialSessionId?: string | null;
   onClose: () => void;
@@ -265,7 +269,7 @@ const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exe
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel, command, buildHost,
+  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel, command, buildHost, onShow,
 }: ChatPanelProps) {
   const isStudio = variant === 'studio';
   const isFull = variant === 'full' || variant === 'drawer' || isStudio;
@@ -284,6 +288,9 @@ export function ChatPanel({
   // moving forward as each stage tool resumes the job under a new id.
   const toolBuildsRef = useRef<{ jobs: Set<string>; seen: Record<string, Record<string, string>>; lastMessageId: string | null }>({ jobs: new Set(), seen: {}, lastMessageId: null });
   const pendingTransferRef = useRef<{ agentApiName: string; agentName: string; message: string } | null>(null);
+  const pendingShowRef = useRef<ScreenRequest | null>(null);
+  const onShowRef = useRef(onShow);
+  useEffect(() => { onShowRef.current = onShow; }, [onShow]);
   useEffect(
     () => () => {
       unmountedRef.current = true;
@@ -630,6 +637,10 @@ export function ChatPanel({
             const m = /"agentApiName"\s*:\s*"([^"]+)"[\s\S]*?"agentName"\s*:\s*"([^"]*)"[\s\S]*?"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(output);
             if (m) pendingTransferRef.current = { agentApiName: m[1], agentName: m[2] || m[1], message: JSON.parse(`"${m[3]}"`) };
           }
+          if (tc.name === 'show_on_screen' && !tc.isError) {
+            const s = parseScreen(output);
+            if (s) pendingShowRef.current = s;
+          }
         }
         emit({
           kind: 'reply',
@@ -647,6 +658,13 @@ export function ChatPanel({
           pendingTransferRef.current = null;
           emit({ kind: 'sys', text: `Transferring to ${t.agentName}.` });
           setTimeout(() => onTransferRef.current?.(t), 700);
+        }
+        // The agent put a view on the screen: the host draws it now, as
+        // the words that describe it land.
+        if (pendingShowRef.current) {
+          const s = pendingShowRef.current;
+          pendingShowRef.current = null;
+          onShowRef.current?.(s);
         }
         const rearm = () => {
           if (!getVoicePref()) return;

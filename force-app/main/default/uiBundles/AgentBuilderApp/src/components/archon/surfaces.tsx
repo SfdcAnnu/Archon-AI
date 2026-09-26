@@ -4,8 +4,9 @@ import { AgentKindBadge } from '@/components/AgentKindBadge';
 import { decideApproval } from '@/lib/approvals-data';
 import { decideChatApproval } from '@/lib/chat-approvals-data';
 import {
-  agentHealth, costByAgent, failedRunsToday, runsByHour, todayEvents, todayTotals, type ArchonData,
+  agentHealth, costByAgent, failedRunsToday, runsByHour, todayEvents, todayTotals, USD_PER_M_IN, USD_PER_M_OUT, type ArchonData,
 } from '@/lib/archon-data';
+import type { UsageReport, UsageRow } from '@/lib/archon-screen';
 
 /**
  * The shapes an answer can take beside the conversation. Each is a pure
@@ -17,6 +18,9 @@ export interface SurfaceProps {
   data: ArchonData | null;
   loading: boolean;
   now: Date;
+  /** The usage report for a period: the rows the copilot sent, or the
+   *  org's aggregate when the person asked in their own words. */
+  report: UsageReport | null;
   onGo: (href: string) => void;
   /** Put words in the person's mouth: sent into the conversation. */
   onAsk: (text: string) => void;
@@ -26,6 +30,8 @@ export interface SurfaceProps {
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const money = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n).toLocaleString()}`;
+const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
+const usdOf = (r: Pick<UsageRow, 'tokensIn' | 'tokensOut'>) => (r.tokensIn / 1e6) * USD_PER_M_IN + (r.tokensOut / 1e6) * USD_PER_M_OUT;
 
 function Wait({ text }: { text: string }) {
   return <div className="ax-empty"><Loader2 className="spin" /> {text}</div>;
@@ -39,6 +45,7 @@ export function DashboardSurface({ data, loading, now, onGo }: SurfaceProps) {
   const health = useMemo(() => agentHealth(data?.stats ?? null, data?.runs ?? [], now), [data, now]);
   const pending = (data?.approvals.length ?? 0) + (data?.chatApprovals.length ?? 0);
   if (loading && !data) return <Wait text="Reading today…" />;
+  const sampled = hours.reduce((a, [o, b]) => a + o + b, 0);
   const max = Math.max(1, ...hours.map(([ok, bad]) => ok + bad));
   const W = 560;
   const bw = 18;
@@ -47,33 +54,37 @@ export function DashboardSurface({ data, loading, now, onGo }: SurfaceProps) {
     <div className="ax-scroll">
       <div className="ax-dtiles">
         <div className="ax-dt in"><div className="k">Runs today</div><div className="v">{totals.runs.toLocaleString()}</div><div className={`s${totals.runsFailed ? ' err' : ''}`}>{totals.runsFailed ? `${totals.runsFailed} failed` : 'no failures'}</div></div>
-        <div className="ax-dt in"><div className="k">Chat turns</div><div className="v">{totals.turns.toLocaleString()}</div><div className="s">{conversationsToday} conversation{conversationsToday === 1 ? '' : 's'} today</div></div>
+        <div className="ax-dt in"><div className="k">Chat turns</div><div className="v">{totals.turns.toLocaleString()}</div><div className={`s${totals.turnsFailed ? ' err' : ''}`}>{totals.turnsFailed ? `${totals.turnsFailed} failed · ` : ''}{conversationsToday} conversation{conversationsToday === 1 ? '' : 's'} today</div></div>
         <div className="ax-dt in"><div className="k">Approvals waiting</div><div className="v">{pending}</div><div className={`s${pending ? ' wn' : ''}`}>{pending ? 'waiting on you' : 'nothing waiting'}</div></div>
         <div className="ax-dt in"><div className="k">Spend today</div><div className="v">{money(totals.spendUsd)}</div><div className="s">estimate from tokens</div></div>
       </div>
       <div className="ax-dgrid">
         <div className="ax-dcard in">
-          <div className="hd">Runs by hour <span className="m">failures in red · {hours.reduce((a, [o, b]) => a + o + b, 0)} sampled</span></div>
-          <div className="ax-chart">
-            <svg viewBox={`0 0 ${W} 150`} role="img" aria-label="Runs by hour today">
-              <line className="gl" x1="14" y1="118" x2={W - 6} y2="118" />
-              <line className="gl" x1="14" y1="68" x2={W - 6} y2="68" strokeDasharray="3 4" />
-              {hours.map(([ok, bad], i) => {
-                const x = 14 + i * 22.5;
-                const hOk = (ok / max) * 100;
-                const hBad = (bad / max) * 100;
-                return (
-                  <g key={i}>
-                    {ok > 0 && <rect className="bar" x={x} y={118 - hOk} width={bw} height={hOk} rx="2" />}
-                    {bad > 0 && <rect className="bar er" x={x} y={118 - hOk - hBad} width={bw} height={hBad} rx="2" />}
-                  </g>
-                );
-              })}
-              {[0, 6, 12, 18, 23].map(h => <text key={h} className="ax" x={14 + h * 22.5 + bw / 2} y="134" textAnchor="middle">{String(h).padStart(2, '0')}:00</text>)}
-              <text className="ax" x={W - 6} y="64" textAnchor="end">{Math.round(max / 2)}</text>
-              <text className="ax" x={W - 6} y="16" textAnchor="end">{max}</text>
-            </svg>
-          </div>
+          <div className="hd">Runs by hour <span className="m">{sampled ? `failures in red · ${sampled} sampled` : 'automation only'}</span></div>
+          {sampled === 0 ? (
+            <div className="ax-empty">No automation runs today. Today's activity is chat: {totals.turns.toLocaleString()} turn{totals.turns === 1 ? '' : 's'} across {conversationsToday} conversation{conversationsToday === 1 ? '' : 's'}.</div>
+          ) : (
+            <div className="ax-chart">
+              <svg viewBox={`0 0 ${W} 150`} role="img" aria-label="Runs by hour today">
+                <line className="gl" x1="14" y1="118" x2={W - 6} y2="118" />
+                <line className="gl" x1="14" y1="68" x2={W - 6} y2="68" strokeDasharray="3 4" />
+                {hours.map(([ok, bad], i) => {
+                  const x = 14 + i * 22.5;
+                  const hOk = (ok / max) * 100;
+                  const hBad = (bad / max) * 100;
+                  return (
+                    <g key={i}>
+                      {ok > 0 && <rect className="bar" x={x} y={118 - hOk} width={bw} height={hOk} rx="2" />}
+                      {bad > 0 && <rect className="bar er" x={x} y={118 - hOk - hBad} width={bw} height={hBad} rx="2" />}
+                    </g>
+                  );
+                })}
+                {[0, 6, 12, 18, 23].map(h => <text key={h} className="ax" x={14 + h * 22.5 + bw / 2} y="134" textAnchor="middle">{String(h).padStart(2, '0')}:00</text>)}
+                <text className="ax" x={W - 6} y="64" textAnchor="end">{Math.round(max / 2)}</text>
+                <text className="ax" x={W - 6} y="16" textAnchor="end">{max}</text>
+              </svg>
+            </div>
+          )}
         </div>
         <div className="ax-dcard in">
           <div className="hd">What happened <span className="m">latest first</span></div>
@@ -97,6 +108,49 @@ export function DashboardSurface({ data, loading, now, onGo }: SurfaceProps) {
         ))}
       </div>
       {data?.errors.length ? <div className="ax-empty">Some numbers are missing — {data.errors.join(' · ')}</div> : null}
+    </div>
+  );
+}
+
+// ── the usage report: who used what over a period ─────────────────────
+export function UsageSurface({ report, onGo }: SurfaceProps) {
+  if (!report) return <Wait text="Reading usage…" />;
+  const rows = report.rows;
+  const maxTok = Math.max(1, ...rows.map(r => r.tokensIn + r.tokensOut));
+  const totalIn = rows.reduce((a, r) => a + r.tokensIn, 0);
+  const totalOut = rows.reduce((a, r) => a + r.tokensOut, 0);
+  const turnsKnown = rows.length > 0 && rows.every(r => r.turns != null);
+  const totalTurns = turnsKnown ? rows.reduce((a, r) => a + (r.turns ?? 0), 0) : null;
+  const spend = rows.reduce((a, r) => a + usdOf(r), 0);
+  const period = `last ${report.days} day${report.days === 1 ? '' : 's'}`;
+  return (
+    <div className="ax-scroll">
+      <div className="ax-dtiles">
+        <div className="ax-dt in"><div className="k">Agents used</div><div className="v">{rows.length}</div><div className="s">{period}</div></div>
+        <div className="ax-dt in"><div className="k">Turns</div><div className="v">{totalTurns != null ? totalTurns.toLocaleString() : '—'}</div><div className="s">{totalTurns != null ? 'chat turns answered' : 'not in the org aggregate for this period'}</div></div>
+        <div className="ax-dt in"><div className="k">Tokens</div><div className="v">{tokens(totalIn + totalOut)}</div><div className="s">{tokens(totalIn)} in · {tokens(totalOut)} out</div></div>
+        <div className="ax-dt in"><div className="k">Spend</div><div className="v">{money(spend)}</div><div className="s">estimate from tokens at blended rates</div></div>
+      </div>
+      <div className="ax-dcard in">
+        <div className="hd">Usage by agent <span className="m">{period} · {report.source === 'archon' ? 'the figures Archon reported' : 'read from the org'}</span><button type="button" className="ax-link" onClick={() => onGo('/cost')}>Cost <ExternalLink /></button></div>
+        {rows.length === 0 ? <div className="ax-empty">No usage in this period.</div> : (
+          <div className="ax-tablewrap"><table className="ax-table">
+            <thead><tr><th>Agent</th><th>Turns</th><th>Tokens in</th><th>Tokens out</th><th>Spend</th><th>Share</th></tr></thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.apiName}>
+                  <td>{r.name}<span className="sub">{r.apiName}</span></td>
+                  <td className="mono">{r.turns != null ? r.turns.toLocaleString() : '—'}</td>
+                  <td className="mono">{r.tokensIn.toLocaleString()}</td>
+                  <td className="mono">{r.tokensOut.toLocaleString()}</td>
+                  <td className="mono">{money(usdOf(r))}</td>
+                  <td style={{ minWidth: 140 }}><span className="tr ax-share"><i style={{ width: `${Math.max(2, ((r.tokensIn + r.tokensOut) / maxTok) * 100)}%` }} /></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        )}
+      </div>
     </div>
   );
 }
@@ -222,17 +276,21 @@ function summariseArgs(args: unknown): string {
   } catch { return ''; }
 }
 
-// ── a chart made for the question ──────────────────────────────────────
-export function ChartSurface({ data, loading, onGo }: SurfaceProps) {
-  const rows = useMemo(() => costByAgent(data?.stats ?? null), [data]);
-  if (loading && !data) return <Wait text="Reading spend…" />;
+// ── a chart made for the question: spend per agent ─────────────────────
+export function ChartSurface({ data, loading, report, onGo }: SurfaceProps) {
+  const rows = useMemo(
+    () => (report ? report.rows.map(r => ({ name: r.name, usd: usdOf(r) })).filter(r => r.usd > 0).sort((a, b) => b.usd - a.usd) : costByAgent(data?.stats ?? null)),
+    [report, data],
+  );
+  if (loading && !data && !report) return <Wait text="Reading spend…" />;
   const max = rows[0]?.usd ?? 1;
   const total = rows.reduce((a, r) => a + r.usd, 0);
+  const period = report ? `last ${report.days} day${report.days === 1 ? '' : 's'}` : 'today';
   return (
     <div className="ax-scroll">
       <div className="ax-dcard in">
-        <div className="hd">Cost by agent <span className="m">today · {money(total)} · estimate from tokens at blended rates</span><button type="button" className="ax-link" onClick={() => onGo('/cost')}>Cost <ExternalLink /></button></div>
-        {rows.length === 0 ? <div className="ax-empty">No spend recorded today.</div> : rows.slice(0, 10).map(r => (
+        <div className="hd">Cost by agent <span className="m">{period} · {money(total)} · estimate from tokens at blended rates</span><button type="button" className="ax-link" onClick={() => onGo('/cost')}>Cost <ExternalLink /></button></div>
+        {rows.length === 0 ? <div className="ax-empty">No spend recorded in this period.</div> : rows.slice(0, 10).map(r => (
           <div className="ax-hbar" key={r.name}><span>{r.name}</span><span className="tr"><i style={{ width: `${Math.max(2, (r.usd / max) * 100)}%` }} /></span><span className="n">{money(r.usd)}</span></div>
         ))}
       </div>

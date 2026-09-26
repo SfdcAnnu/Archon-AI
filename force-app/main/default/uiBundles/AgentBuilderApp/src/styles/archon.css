@@ -132,6 +132,7 @@
 .ax-table{width:100%;border-collapse:collapse} .ax-table th{font:600 10.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground);text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)}
 .ax-table td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px;vertical-align:middle;color:var(--foreground)} .ax-table tr:last-child td{border-bottom:0} .ax-table td .sub{display:block;font:11px var(--font-mono);color:var(--archon-faint)}
 .ax-table td .ax-btn{margin-right:6px}
+.ax-share{display:block;height:10px;border-radius:5px;background:var(--secondary);overflow:hidden} .ax-share i{display:block;height:100%;background:var(--primary)}
 .ax-st{display:inline-flex;height:20px;padding:0 8px;border-radius:999px;font:500 11px var(--font-mono);align-items:center;border:1px solid var(--border);color:var(--muted-foreground)}
 .ax-st.ok{color:var(--archon-success);background:color-mix(in srgb,var(--archon-success) 14%,transparent);border-color:transparent} .ax-st.er{color:var(--archon-error);background:color-mix(in srgb,var(--archon-error) 14%,transparent);border-color:transparent} .ax-st.wn{color:var(--archon-warning);background:color-mix(in srgb,var(--archon-warning) 14%,transparent);border-color:transparent}
 .ax-apv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border)} .ax-apv:last-child{border-bottom:0}

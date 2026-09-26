@@ -98,6 +98,7 @@ const FAKE_WS = `
       const msg = JSON.parse(payload); const text = String(msg.newUserMessage || '').toLowerCase();
       let reply = 'Sure — what would you like to know?'; let toolCalls = [];
       if (/build|create/.test(text)) { reply = 'On it. I have handed the requirement to the Architect — it is reading your requirement now, then your org, before it designs anything. I will bring the graph up beside us when the design starts.'; toolCalls = [{ name: 'build_agent', input: { requirement: msg.newUserMessage }, output: JSON.stringify({ jobId: 'job1', status: 'running' }) }]; }
+      else if (/usage|report/.test(text)) { reply = 'Here is the usage report for the last 31 days, on the screen beside us. The WhatsApp Lead Intake Qualifier is far ahead: 173 turns and 984,403 input tokens, about $2.90. The Archon Copilot took 58 turns and 203,576 tokens; the Metadata Expert 48 turns and 213,307.'; toolCalls = [{ name: 'show_on_screen', input: { view: 'usage', days: 31 }, output: JSON.stringify({ screen: { view: 'usage', days: 31, agentApiName: null }, usage: { days: 31, turns: 279, tokensIn: 1401286, tokensOut: 96400, byAgent: [{ apiName: 'whatsapp_lead_intake_qualifier', name: 'WhatsApp Lead Intake Qualifier', turns: 173, tokensIn: 984403, tokensOut: 61200 }, { apiName: 'archon_metadata_expert', name: 'Metadata Expert', turns: 48, tokensIn: 213307, tokensOut: 16800 }, { apiName: 'archon_copilot', name: 'Archon Copilot', turns: 58, tokensIn: 203576, tokensOut: 18400 }] } }) + '\\nSHOWN: the usage view is on the screen.' }]; }
       else if (/today|happened/.test(text)) reply = 'Here is today. 40 runs and 79 chat turns, three failed — the two run failures are both the Deal Risk Scorer, the same field error at 10:42 and 10:47. One approval is waiting on you: the renewal proposal to Acme. Spend is about $4.09, most of it the risk scorer.';
       else if (/fail/.test(text)) reply = 'Both failures are the Deal Risk Scorer: Risk_Score__c is not writable by the running user. Grant the field to the Archon Runtime permission set and re-run the two records.';
       setTimeout(() => { this.onmessage && this.onmessage({ data: JSON.stringify({ status: 'complete', assistantText: reply, toolCalls, tokensIn: 120, tokensOut: 80, modelUsed: 'mock' }) }); }, 700);
@@ -179,6 +180,18 @@ const FAKE_WS = `
   await page.waitForSelector('.ax-area[data-layout="full"]', { timeout: 10000 });
   await settle(900);
   await shot('4-archon-closed');
+
+  // 4b · the copilot itself puts a view on the screen (show_on_screen)
+  await page.fill('.ax-composer textarea', 'Show me the usage report for all my agents');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.ax-surface[data-mode="usage"]', { timeout: 20000 });
+  await page.waitForFunction(() => /as Archon reported it/.test(document.querySelector('.ax-shd .meta')?.textContent || ''), null, { timeout: 20000 });
+  await settle(1500);
+  await shot('4b-usage-from-copilot');
+  console.log('usage rows:', await page.locator('.ax-table tbody tr').count(), '| meta:', await page.locator('.ax-shd .meta').innerText());
+  await page.click('.ax-shd button');
+  await page.waitForSelector('.ax-area[data-layout="full"]', { timeout: 10000 });
+  await settle(600);
 
   // 5 · a build: words first, the graph only when the design starts
   await page.fill('.ax-composer textarea', 'Build a WhatsApp lead intake agent for property customers');

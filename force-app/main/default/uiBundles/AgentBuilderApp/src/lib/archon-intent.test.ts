@@ -14,6 +14,11 @@ describe('intentOf', () => {
     expect(intentOf('what is waiting for approval')).toBe('approvals');
     expect(intentOf('Cost by agent as a chart')).toBe('chart');
   });
+  it('reads a usage or token report', () => {
+    expect(intentOf('show me a report of all my agents and how much each has used till now')).toBe('usage');
+    expect(intentOf('too many tokens taken by the lead intake qualifier')).toBe('usage');
+    expect(intentOf('Cost by agent as a chart')).toBe('chart');
+  });
   it('does not mistake a booking approval for the approvals list', () => {
     expect(intentOf('Book the meeting only after a human approves')).toBe(null);
   });

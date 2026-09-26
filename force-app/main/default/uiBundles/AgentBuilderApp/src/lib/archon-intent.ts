@@ -14,6 +14,7 @@ export type ArchonIntent =
   | 'drafts'     // agents still in Draft
   | 'approvals'  // what is waiting for a decision
   | 'chart'      // a chart of cost or usage
+  | 'usage'      // the usage report: turns, tokens and spend per agent
   | 'dash'       // today as a dashboard
   | 'build'      // build a new agent (the Architect)
   | 'build-back' // show the build / the graph again
@@ -32,13 +33,16 @@ export function intentOf(text: string): ArchonIntent {
   const t = text.trim().toLowerCase();
   if (!t) return null;
   if (/^(close|done|that'?s all|thanks|thank you|go back|back to the conversation|clear|nothing else|dismiss)\b/.test(t)) return 'close';
+  // A request for a new agent first: what it should do may mention
+  // failures, reports or approvals without asking to see them.
+  if (/\b(build|create|design|make)\b.*\b(agent|bot|assistant|copilot|component|workflow|automation)\b|\bnew (agent|component)\b/.test(t)) return 'build';
   if (/\b(fail|failed|failure|failures|error|errors|broke|broken|went wrong)\b/.test(t)) return 'failures';
   if (/\bdrafts?\b/.test(t)) return 'drafts';
   if (/\bapprov/.test(t) && !/\b(meeting|event|book|booking)\b/.test(t)) return 'approvals';
   if (/\b(chart|graph of|cost by|compare|breakdown|spend|spending|usage by)\b/.test(t)) return 'chart';
+  if (/\b(usage|report|tokens?|token usage|consumption)\b|\bhow much\b.*\b(used|spent|cost|consumed)\b/.test(t)) return 'usage';
   if (/\b(how (is|are) .*(doing|going)|status of|is .* (ok|okay|fine|healthy))\b/.test(t)) return 'how';
   if (/\b(today|activity|activities|briefing|dashboard|summary|what happened|overview|command cent(er|re))\b/.test(t)) return 'dash';
-  if (/\b(build|create|design|make)\b.*\b(agent|bot|assistant|copilot|component|workflow|automation)\b|\bnew (agent|component)\b/.test(t)) return 'build';
   if (/\b(open|show|see|go to|back to)\b.*\b(agent|build|studio|graph|design)\b/.test(t)) return 'build-back';
   return null;
 }

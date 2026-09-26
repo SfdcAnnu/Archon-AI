@@ -5,12 +5,14 @@ import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel, type HostedBuild } from '@/components/chat/ChatPanel';
 import { BuildWorkspace } from '@/components/chat/BuildWorkspace';
 import { ArchonOrb, type OrbPhase } from '@/components/archon/ArchonOrb';
-import { ApprovalsSurface, ChartSurface, DashboardSurface, DraftsSurface, FailuresSurface, type SurfaceProps } from '@/components/archon/surfaces';
+import { ApprovalsSurface, ChartSurface, DashboardSurface, DraftsSurface, FailuresSurface, UsageSurface, type SurfaceProps } from '@/components/archon/surfaces';
 import { COPILOT } from '@/lib/copilot';
 import { setVoicePref } from '@/lib/voice';
 import type { ChatActivity, ChatPhase } from '@/lib/chat-activity';
 import { editsCurrentBuild, intentOf } from '@/lib/archon-intent';
 import { loadArchonData, type ArchonData } from '@/lib/archon-data';
+import { loadHomeStats } from '@/lib/home-stats-data';
+import type { ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
 import '@/styles/archon.css';
 
 /**
@@ -18,31 +20,39 @@ import '@/styles/archon.css';
  *
  * One conversation with the built-in agent fills the screen. The screen
  * divides only when an answer needs a surface beside the words — today
- * as a dashboard, a list of failures, drafts or approvals, a chart, or
- * the Architect's build once it starts designing — and closes again when
- * that work is done, so the conversation is always the home position.
+ * as a dashboard, the usage report, a list of failures, drafts or
+ * approvals, a chart, or the Architect's build once it starts designing —
+ * and closes again when that work is done, so the conversation is always
+ * the home position.
+ *
+ * Two things open a surface: the person's own words (a small phrase match
+ * on every send, so the screen answers at once) and the copilot itself,
+ * which calls show_on_screen when asked to show or visualise something
+ * and can send the rows it was given so the screen matches its reply.
  *
  * The conversation itself is the same ChatPanel every other screen uses,
  * in its 'studio' dress: the page draws the header, the greeting and the
  * suggestion chips; the panel keeps the transcript, the composer (the one
  * place to type or talk) and everything a turn can do.
  */
-type Surface = 'build' | 'dash' | 'failures' | 'drafts' | 'approvals' | 'chart';
+type Surface = 'build' | 'dash' | 'usage' | 'failures' | 'drafts' | 'approvals' | 'chart';
 type Message = { text: string; how: 'talk' | 'type' };
 interface NavState { message?: Message | null; how?: 'talk' | 'type'; sessionId?: string | null }
 
 const CHIPS: Record<'idle' | Surface, string[]> = {
-  idle: ['What happened today?', 'Show the failures', 'What is waiting for approval?', 'Cost by agent as a chart'],
-  dash: ['Show the failures', 'Show the approvals', 'Cost by agent as a chart', 'Close'],
+  idle: ['What happened today?', 'Show the failures', 'What is waiting for approval?', 'Show the usage report'],
+  dash: ['Show the failures', 'Show the approvals', 'Show the usage report', 'Close'],
+  usage: ['Cost by agent as a chart', 'What happened today?', 'Close'],
   failures: ['What happened today?', 'Show my drafts', 'Close'],
   drafts: ['What happened today?', 'Show the approvals', 'Close'],
   approvals: ['What happened today?', 'Show the failures', 'Close'],
-  chart: ['What happened today?', 'Show the failures', 'Close'],
+  chart: ['Show the usage report', 'What happened today?', 'Close'],
   build: ['What happened today?', 'Close'],
 };
-const SURFACE_LABEL: Record<Surface, string> = { build: 'Build', dash: 'Dashboard', failures: 'Failures', drafts: 'Drafts', approvals: 'Approvals', chart: 'Chart' };
+const SURFACE_LABEL: Record<Surface, string> = { build: 'Build', dash: 'Dashboard', usage: 'Usage', failures: 'Failures', drafts: 'Drafts', approvals: 'Approvals', chart: 'Chart' };
 const STATUS_COPY: Record<OrbPhase, string> = { ready: 'Ready', listen: 'Listening', think: 'Thinking', speak: 'Speaking', build: 'Building' };
-const isListSurface = (s: string | null): s is 'dash' | 'failures' | 'drafts' | 'approvals' | 'chart' => s === 'dash' || s === 'failures' || s === 'drafts' || s === 'approvals' || s === 'chart';
+const VIEW_TO_SURFACE: Record<ScreenView, Surface> = { dashboard: 'dash', usage: 'usage', failures: 'failures', drafts: 'drafts', approvals: 'approvals', cost: 'chart', build: 'build' };
+const isListSurface = (s: string | null): s is Exclude<Surface, 'build'> => s === 'dash' || s === 'usage' || s === 'failures' || s === 'drafts' || s === 'approvals' || s === 'chart';
 
 export default function ArchonPage() {
   const navigate = useNavigate();
@@ -62,6 +72,7 @@ export default function ArchonPage() {
   const [hosted, setHosted] = useState<HostedBuild | null>(null);
   const [data, setData] = useState<ArchonData | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
+  const [report, setReport] = useState<UsageReport | null>(null);
   const [command, setCommand] = useState<{ text: string; how: 'talk' | 'type'; seq: number } | null>(null);
   const [chips, setChips] = useState<string[]>(CHIPS.idle);
   const [full, setFull] = useState(() => !!document.fullscreenElement);
@@ -78,11 +89,26 @@ export default function ArchonPage() {
     setDataLoading(true);
     loadArchonData().then(d => { setData(d); setDataLoading(false); });
   }, []);
-  const open = useCallback((s: Surface) => {
+  /** The usage report from the org's aggregate — used when the person
+   *  asked in their own words; rows the copilot sent take precedence. */
+  const loadUsage = useCallback((days: number) => {
+    loadHomeStats(days)
+      .then(st => setReport(cur => (cur && cur.source === 'archon' && cur.days === days) ? cur : {
+        days,
+        source: 'org',
+        rows: st.byAgent
+          .map(a => ({ apiName: a.apiName, name: a.name, turns: days === 1 ? a.turnsToday + a.runsToday : null, tokensIn: a.tokensIn, tokensOut: a.tokensOut }))
+          .sort((a, b) => (b.tokensIn + b.tokensOut) - (a.tokensIn + a.tokensOut)),
+      }))
+      .catch(() => { /* the surface says it has nothing */ });
+  }, []);
+  const open = useCallback((s: Surface, opts?: { days?: number | null; usage?: UsageReport }) => {
     setSurface(s);
     setChips(CHIPS[s]);
+    if (opts?.usage) setReport(opts.usage);
+    else if (s === 'usage' || s === 'chart') loadUsage(opts?.days ?? 31);
     if (s !== 'build') refresh();
-  }, [refresh]);
+  }, [refresh, loadUsage]);
   const close = useCallback(() => {
     if (surface === 'build' && hosted) dismissedBuildRef.current = hosted.messageId;
     setSurface(null);
@@ -103,6 +129,14 @@ export default function ArchonPage() {
       dismissedBuildRef.current = null;
     }
   }, [close, open, hosted, surface]);
+
+  /** The copilot asked for a view itself (show_on_screen). Its choice wins
+   *  over the phrase match, and its rows travel with it. */
+  const onShow = useCallback((s: ScreenRequest) => {
+    const target = VIEW_TO_SURFACE[s.view];
+    if (target === 'build') { if (!hosted) return; dismissedBuildRef.current = null; }
+    open(target, { days: s.days, usage: s.usage });
+  }, [open, hosted]);
 
   const onActivity = useCallback((e: ChatActivity) => {
     if (e.kind === 'phase') setPhase(e.phase);
@@ -172,8 +206,10 @@ export default function ArchonPage() {
   const today = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
   const meta = surface === 'build'
     ? hosted?.view ? `$${hosted.view.costUsd.toFixed(2)} of $${hosted.view.maxCostUsd.toFixed(2)} · ${Math.round(hosted.view.elapsedMs / 1000)}s` : ''
-    : data ? `read ${new Date(data.loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
-  const sp: SurfaceProps = { data, loading: dataLoading, now, onGo: href => navigate(href), onAsk: ask, onRefresh: refresh };
+    : surface === 'usage' || surface === 'chart'
+      ? report ? `last ${report.days} day${report.days === 1 ? '' : 's'}${report.source === 'archon' ? ' · as Archon reported it' : ''}` : ''
+      : data ? `read ${new Date(data.loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
+  const sp: SurfaceProps = { data, loading: dataLoading, now, report, onGo: href => navigate(href), onAsk: ask, onRefresh: refresh };
 
   return (
     <AppShell hideRail>
@@ -210,6 +246,7 @@ export default function ArchonPage() {
                 initialSessionId={sessionSeed}
                 command={command}
                 buildHost={setHosted}
+                onShow={onShow}
                 onClose={() => navigate('/home')}
                 onActivity={onActivity}
                 onTransfer={handleTransfer}
@@ -243,6 +280,7 @@ export default function ArchonPage() {
               )}
               {surface === 'build' && !hosted && <div className="ax-empty">No build yet — describe the agent you want and the Architect starts.</div>}
               {surface === 'dash' && <DashboardSurface {...sp} />}
+              {surface === 'usage' && <UsageSurface {...sp} />}
               {surface === 'failures' && <FailuresSurface {...sp} />}
               {surface === 'drafts' && <DraftsSurface {...sp} />}
               {surface === 'approvals' && <ApprovalsSurface {...sp} />}

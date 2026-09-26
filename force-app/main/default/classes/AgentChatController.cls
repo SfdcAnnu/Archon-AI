@@ -60,6 +60,14 @@ public with sharing class AgentChatController {
     }
 
     /**
+     * A conversation that must NOT resume the last one. The Archon screen
+     * opens fresh every time; the earlier conversation stays in Recent.
+     */
+    public static SessionWithMessages startFreshSession(String agentApiName, String recordContextId, String recordContextType) {
+        return openSession(agentApiName, recordContextId, recordContextType, null, null, true);
+    }
+
+    /**
      * Opens (or resumes) a session for a channel that knows who is messaging.
      *
      * A WhatsApp integration knows the sender's number and, usually, the
@@ -71,6 +79,11 @@ public with sharing class AgentChatController {
      */
     @AuraEnabled
     public static SessionWithMessages startChannelSession(String agentApiName, String recordContextId, String recordContextType, String senderPhone, String channel) {
+        return openSession(agentApiName, recordContextId, recordContextType, senderPhone, channel, false);
+    }
+
+    /** The one place a session is found or made; forceNew skips the reuse. */
+    private static SessionWithMessages openSession(String agentApiName, String recordContextId, String recordContextType, String senderPhone, String channel, Boolean forceNew) {
         if (String.isBlank(agentApiName)) {
             throw new ChatException('agentApiName is required.');
         }
@@ -81,7 +94,9 @@ public with sharing class AgentChatController {
         // Try to reuse an existing Active, non-expired session for this user/agent/recordContext.
         // Apex SOQL doesn't allow `:bindVar = null` comparisons, so split into two branches.
         List<ChatSession__c> existing;
-        if (String.isBlank(recordContextId)) {
+        if (forceNew == true) {
+            existing = new List<ChatSession__c>();
+        } else if (String.isBlank(recordContextId)) {
             existing = [
                 SELECT Id FROM ChatSession__c
                 WHERE User__c = :userId

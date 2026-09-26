@@ -74,6 +74,17 @@ private class AgentChatControllerTest {
     }
 
     @IsTest
+    static void startFreshSession_creates_a_second_session_even_when_one_is_active() {
+        AgentChatController.SessionWithMessages a = AgentChatController.startSession('TestChatAgent', null, null);
+        Test.startTest();
+        AgentChatController.SessionWithMessages b = AgentChatController.startFreshSession('TestChatAgent', null, null);
+        Test.stopTest();
+        System.assertNotEquals(a.session.Id, b.session.Id, 'A fresh start must not resume the active session');
+        System.assertEquals('Active', b.session.Status__c, 'The new session is live');
+        System.assertEquals(0, b.messages.size(), 'and empty');
+    }
+
+    @IsTest
     static void findOrCreateAutomatedSession_creates_session_anchored_to_given_user() {
         Id fakeOwnerId = UserInfo.getUserId();
         Test.startTest();

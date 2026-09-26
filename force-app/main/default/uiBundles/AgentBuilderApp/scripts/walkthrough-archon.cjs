@@ -52,6 +52,8 @@ const agents = [
   agent(7, 'Renewal Outreach', 'renewal_outreach', 'Draft', 'Both'),
 ];
 const sessions = [
+  { id: 'sx1', name: 'CS-7', agentName: 'Archon Copilot', agentApiName: 'archon_copilot', title: 'Usage report and the risk scorer', status: 'Ended', lastActivityAt: at(9, 12), expiresAt: null, totalTurns: 6, recordContextId: null, tokensIn: 3000, tokensOut: 900, cachedTokens: 0, latencyMsTotal: 12000 },
+  { id: 'sx2', name: 'CS-6', agentName: 'Archon Copilot', agentApiName: 'archon_copilot', title: 'Build the lead intake agent', status: 'Ended', lastActivityAt: at(18, 40, -1), expiresAt: null, totalTurns: 14, recordContextId: null, tokensIn: 9000, tokensOut: 2100, cachedTokens: 0, latencyMsTotal: 40000 },
   { id: 's1', name: 'CS-1', agentName: 'WhatsApp Lead Intake Qualifier', agentApiName: 'whatsapp_lead_intake_qualifier', title: 'Rohan Mehta · 3BHK enquiry', status: 'Handed off', lastActivityAt: at(9, 15), expiresAt: null, totalTurns: 9, recordContextId: null, tokensIn: 1000, tokensOut: 400, cachedTokens: 0, latencyMsTotal: 20000 },
   { id: 's2', name: 'CS-2', agentName: 'WhatsApp Lead Intake Qualifier', agentApiName: 'whatsapp_lead_intake_qualifier', title: 'Priya Nair · villa plot', status: 'Active', lastActivityAt: at(11, 40), expiresAt: null, totalTurns: 6, recordContextId: null, tokensIn: 800, tokensOut: 300, cachedTokens: 0, latencyMsTotal: 14000 },
 ];
@@ -63,6 +65,7 @@ const session = { session: { Id: 'sess1', Name: 'CS-9', Title__c: null, Status__
 const STEPS = [['understand', 'Understood what you want'], ['survey', 'Looked through your Salesforce org'], ['match', 'Matched what you need to what you have'], ['design', 'Designed the agent'], ['prompts', 'Wrote its instructions'], ['review', 'Checked it against what you asked for'], ['gaps', 'Listed the outstanding setup'], ['compile', 'Saved the agent']];
 const DETAILS = { understand: 'Reading the requirement (gpt-4.1)…', survey: 'Reading your org: 118 objects, 44 tools…', match: 'Matching 15 capabilities against 44 tools…', design: 'Designing the agent — root, specialists, tools (gpt-5.5, deep)…', prompts: 'Writing instructions for 4 nodes…', review: 'Judging the design against your requirement…', gaps: 'Listing what the org still needs…', compile: 'Compiling and saving…' };
 let polls = 0;
+let freshAsked = false;
 const buildStart = { t: 0 };
 function buildView() {
   const n = Math.min(polls, STEPS.length + 1);
@@ -141,7 +144,7 @@ const FAKE_WS = `
     if (url.includes('/connectors')) return json([]);
     if (url.includes('/ws-ticket')) return json({ ticket: 't1', wsUrl: 'ws://localhost:1/chat' });
     if (url.includes('/architect')) { if (url.includes('resource=detail')) return json(buildDetail()); if (!buildStart.t) buildStart.t = Date.now(); polls++; return json(buildView()); }
-    if (url.includes('/chat/')) { if (method === 'GET') return json({ accessMode: 'Org', connected: true, accountEmail: null }); if (body && body.action === 'startSession') return json(session); return json({}); }
+    if (url.includes('/chat/')) { if (method === 'GET') return json({ accessMode: 'Org', connected: true, accountEmail: null }); if (body && body.action === 'startSession') { if (body.forceNew) freshAsked = true; return json(session); } return json({}); }
     return json({});
   });
   const shot = async (name) => { await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('shot', name); };
@@ -166,6 +169,17 @@ const FAKE_WS = `
 
   page.__fail = async () => { await shot('fail'); console.log('--- last logs ---'); for (const l of logs.slice(-40)) console.log(l); };
   console.log('screenshots →', OUT);
+  // 2b · Recent: the copilot's own earlier conversations, and a fresh start
+  await page.click('button:has-text("Recent")');
+  await page.waitForSelector('.ax-recent-item', { timeout: 10000 });
+  await settle(800);
+  await shot('2b-recent');
+  console.log('recent items:', await page.locator('.ax-recent-item').count(), '| fresh session asked:', freshAsked);
+  await page.click('.ax-recent-new');
+  await page.waitForSelector('.ax-composer textarea', { timeout: 20000 });
+  await page.click('button:has-text("Recent")');
+  await settle(600);
+
   // 3 · a question that needs a surface
   await page.fill('.ax-composer textarea', 'What happened today?');
   await page.keyboard.press('Enter');

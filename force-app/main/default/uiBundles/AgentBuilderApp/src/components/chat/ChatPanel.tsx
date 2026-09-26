@@ -216,6 +216,9 @@ export interface ChatPanelProps {
   /** The agent called show_on_screen: the host draws that view beside the
    *  conversation. Fired as the reply that describes it lands. */
   onShow?: (s: ScreenRequest) => void;
+  /** Start a new conversation rather than resuming the person's last
+   *  active one with this agent (ignored when initialSessionId is set). */
+  freshSession?: boolean;
   /** Resume a past conversation instead of starting a new one. */
   initialSessionId?: string | null;
   onClose: () => void;
@@ -269,7 +272,7 @@ const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exe
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel, command, buildHost, onShow,
+  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel, command, buildHost, onShow, freshSession,
 }: ChatPanelProps) {
   const isStudio = variant === 'studio';
   const isFull = variant === 'full' || variant === 'drawer' || isStudio;
@@ -781,7 +784,7 @@ export function ChatPanel({
     setLoadError(null);
 
     console.log('[ChatPanel] calling startChatSession', { agentApiName, initialSessionId });
-    startChatSession(agentApiName, initialSessionId ?? null, null)
+    startChatSession(agentApiName, initialSessionId ?? null, null, !!freshSession && !initialSessionId)
       .then(result => {
         if (cancelled) return;
         console.log('[ChatPanel] startChatSession resolved', {

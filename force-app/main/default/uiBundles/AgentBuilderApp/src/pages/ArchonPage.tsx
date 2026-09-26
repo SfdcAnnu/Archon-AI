@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { ArrowLeft, Maximize2, Minimize2, X } from 'lucide-react';
+import { ArrowLeft, History, Maximize2, Minimize2, Plus, X } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel, type HostedBuild } from '@/components/chat/ChatPanel';
 import { BuildWorkspace } from '@/components/chat/BuildWorkspace';
+import { SessionTranscript } from '@/components/chat/SessionTranscript';
 import { ArchonOrb, type OrbPhase } from '@/components/archon/ArchonOrb';
 import { ApprovalsSurface, ChartSurface, DashboardSurface, DraftsSurface, FailuresSurface, UsageSurface, type SurfaceProps } from '@/components/archon/surfaces';
 import { COPILOT } from '@/lib/copilot';
@@ -13,25 +14,27 @@ import { editsCurrentBuild, intentOf } from '@/lib/archon-intent';
 import { loadArchonData, type ArchonData } from '@/lib/archon-data';
 import { loadHomeStats } from '@/lib/home-stats-data';
 import type { ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
+import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
+import { formatLastTurn, groupSessionsByDay, sessionsForAgent } from '@/lib/chat-list';
 import '@/styles/archon.css';
 
 /**
  * Archon, full screen.
  *
- * One conversation with the built-in agent fills the screen. The screen
- * divides only when an answer needs a surface beside the words — today
- * as a dashboard, the usage report, a list of failures, drafts or
- * approvals, a chart, or the Architect's build once it starts designing —
- * and closes again when that work is done, so the conversation is always
- * the home position.
+ * One conversation with the built-in agent fills the screen, and it is a
+ * NEW conversation every time the screen opens; the earlier ones sit in
+ * the Recent rail, the copilot's own and nobody else's, to read back.
  *
- * Two things open a surface: the person's own words (a small phrase match
- * on every send, so the screen answers at once) and the copilot itself,
- * which calls show_on_screen when asked to show or visualise something
- * and can send the rows it was given so the screen matches its reply.
+ * The screen divides only when an answer needs a surface beside the
+ * words — today as a dashboard, the usage report, a list of failures,
+ * drafts or approvals, a chart, or the Architect's build — and closes
+ * again when that work is done, so the conversation is always the home
+ * position. Two things open a surface: the person's own words (a small
+ * phrase match on every send) and the copilot itself, which calls
+ * show_on_screen when asked to show or visualise something.
  *
- * The conversation itself is the same ChatPanel every other screen uses,
- * in its 'studio' dress: the page draws the header, the greeting and the
+ * The conversation is the same ChatPanel every other screen uses, in its
+ * 'studio' dress: the page draws the header, the greeting and the
  * suggestion chips; the panel keeps the transcript, the composer (the one
  * place to type or talk) and everything a turn can do.
  */
@@ -68,6 +71,7 @@ export default function ArchonPage() {
   const [openSeq, setOpenSeq] = useState(0);
   const [initialMessage, setInitialMessage] = useState<Message | null>(arrival.message);
   const [sessionSeed, setSessionSeed] = useState<string | null>(arrival.sessionId);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(arrival.sessionId);
   const [phase, setPhase] = useState<ChatPhase>('ready');
   const [talking, setTalking] = useState(!!arrival.message || !!arrival.sessionId);
   const [surface, setSurface] = useState<Surface | null>(null);
@@ -78,13 +82,28 @@ export default function ArchonPage() {
   const [command, setCommand] = useState<{ text: string; how: 'talk' | 'type'; seq: number } | null>(null);
   const [chips, setChips] = useState<string[]>(CHIPS.idle);
   const [full, setFull] = useState(() => !!document.fullscreenElement);
+  // Recent: the copilot's own conversations, and the one being read back.
+  const [recentOpen, setRecentOpen] = useState(false);
+  const [recent, setRecent] = useState<SessionSummary[]>([]);
+  const [viewing, setViewing] = useState<SessionSummary | null>(null);
   /** A build the person closed: not reopened by its own progress. */
   const dismissedBuildRef = useRef<string | null>(null);
-  /** The build whose design already opened the surface once. */
+  /** The build whose current moment already opened the surface. */
   const autoOpenedRef = useRef<string | null>(null);
 
   // Arrived by voice: the panel arms the microphone as soon as it is ready.
   useEffect(() => { if (arrival.how === 'talk') setVoicePref(true); }, [arrival.how]);
+
+  // ── recent conversations ─────────────────────────────────────────────
+  const refreshRecent = useCallback(() => {
+    listMySessions(200).then(list => setRecent(sessionsForAgent(list, COPILOT.apiName))).catch(() => { /* the rail stays as it was */ });
+  }, []);
+  useEffect(() => { refreshRecent(); }, [refreshRecent]);
+  const groups = useMemo(() => groupSessionsByDay(recent), [recent]);
+  const onSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => {
+    if (info.sessionId && !info.ended) setLiveSessionId(info.sessionId);
+    refreshRecent();
+  }, [refreshRecent]);
 
   // ── the surface ──────────────────────────────────────────────────────
   const refresh = useCallback(() => {
@@ -111,6 +130,7 @@ export default function ArchonPage() {
     else if (s === 'usage' || s === 'chart') loadUsage(opts?.days ?? 31);
     if (s !== 'build') refresh();
   }, [refresh, loadUsage]);
+  // A data surface re-reads the org every minute while it is open.
   useEffect(() => {
     if (!surface || surface === 'build' || surface === 'usage' || surface === 'chart') return;
     const t = setInterval(refresh, 60_000);
@@ -130,7 +150,7 @@ export default function ArchonPage() {
     if (it === 'build-back') { if (hosted) { dismissedBuildRef.current = null; open('build'); } return; }
     if (it === 'build') {
       // A change to the agent being built keeps the build in view; a new
-      // agent starts as words alone — the graph comes when it is designed.
+      // agent starts as words — its build shows itself the moment it exists.
       if (surface === 'build' && editsCurrentBuild(text)) return;
       if (surface && surface !== 'build') { setSurface(null); setChips(CHIPS.idle); }
       dismissedBuildRef.current = null;
@@ -179,6 +199,27 @@ export default function ArchonPage() {
     setInitialMessage({ text: t.message, how: 'type' });
     setOpenSeq(n => n + 1);
   }, []);
+  /** A new conversation: the panel remounts on a fresh session; the one
+   *  just left stays in Recent. */
+  const newConversation = useCallback(() => {
+    setViewing(null);
+    setAgent(COPILOT);
+    setSessionSeed(null);
+    setLiveSessionId(null);
+    setInitialMessage(null);
+    setTalking(false);
+    setSurface(null);
+    setChips(CHIPS.idle);
+    setHosted(null);
+    setOpenSeq(n => n + 1);
+    refreshRecent();
+  }, [refreshRecent]);
+  /** Read an earlier conversation back. The live one is simply returned to. */
+  const openRecent = useCallback((s: SessionSummary) => {
+    if (s.id === liveSessionId) { setViewing(null); return; }
+    setSurface(null);
+    setViewing(s);
+  }, [liveSessionId]);
 
   // ── full screen and keys ─────────────────────────────────────────────
   useEffect(() => {
@@ -222,47 +263,86 @@ export default function ArchonPage() {
           <div className="ax-title"><ArchonOrb size="sm" phase={orbPhase} />Archon</div>
           <span className="ax-status" data-s={orbPhase} aria-live="polite"><i />{STATUS_COPY[orbPhase]}</span>
           <span className="ax-ctx">{today}</span>
+          <button type="button" className={`ax-btn ghost${recentOpen ? ' on' : ''}`} onClick={() => { setRecentOpen(o => !o); refreshRecent(); }} aria-pressed={recentOpen} title="Earlier conversations with Archon">
+            <History /> Recent{recent.length ? ` · ${recent.length}` : ''}
+          </button>
+          <button type="button" className="ax-btn ghost" onClick={newConversation} title="Start a new conversation"><Plus /> New</button>
           <span className="sp" />
           <button type="button" className="ax-btn ghost" onClick={toggleFull} title={full ? 'Leave full screen' : 'Use the whole screen'}>
             {full ? <Minimize2 /> : <Maximize2 />} {full ? 'Exit full screen' : 'Full screen'}
           </button>
         </header>
 
-        <div className="ax-area" data-layout={surface ? 'split' : 'full'}>
-          <section className={`ax-conv${talking ? ' talking' : ''}`} aria-label="Conversation">
-            <div className="ax-orbhead">
-              <ArchonOrb size="xl" phase={orbPhase} />
-              <div className="ax-greet">
-                <h1>Hello. I'm Archon.</h1>
-                <p>What are we doing today? Ask for anything, or describe an agent to build.</p>
+        <div className="ax-area" data-layout={surface && !viewing ? 'split' : 'full'}>
+          <section className={`ax-conv${talking || viewing ? ' talking' : ''}${recentOpen ? ' with-recent' : ''}`} aria-label="Conversation">
+            {recentOpen && (
+              <aside className="ax-recent" aria-label="Recent conversations with Archon">
+                <div className="ax-recent-hd">Recent <span className="n">Archon only</span></div>
+                <button type="button" className="ax-btn sm ax-recent-new" onClick={newConversation}><Plus /> New conversation</button>
+                <div className="ax-recent-list">
+                  {recent.length === 0 && <div className="ax-empty">No earlier conversations yet.</div>}
+                  {groups.map(g => (
+                    <div key={g.label}>
+                      <div className="ax-recent-group">{g.label}</div>
+                      {g.sessions.map(s => {
+                        const on = viewing ? viewing.id === s.id : s.id === liveSessionId;
+                        return (
+                          <button key={s.id} type="button" className={`ax-recent-item${on ? ' on' : ''}`} onClick={() => openRecent(s)} aria-current={on ? 'true' : undefined}>
+                            <span className="t"><b>{s.title || 'New conversation'}</b><small>{formatLastTurn(s.lastActivityAt)}</small></span>
+                            <span className="s"><i className={s.status === 'Active' ? 'on' : ''} />{s.id === liveSessionId ? 'this conversation' : s.status}{s.totalTurns ? ` · ${s.totalTurns} turn${s.totalTurns === 1 ? '' : 's'}` : ''}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            )}
+            <div className="ax-convmain">
+              <div className="ax-orbhead">
+                <ArchonOrb size="xl" phase={orbPhase} />
+                <div className="ax-greet">
+                  <h1>Hello. I'm Archon.</h1>
+                  <p>What are we doing today? Ask for anything, or describe an agent to build.</p>
+                </div>
+                {working && <span className="ax-working"><i />{working}</span>}
               </div>
-              {working && <span className="ax-working"><i />{working}</span>}
-            </div>
-            <div className="ax-convhd">Conversation <span className={`r${working ? ' live' : ''}`}>{working ? <><i />{working}</> : `you · ${agent.name}`}</span></div>
-            <div className="ax-chat">
-              <ChatPanel
-                key={`${agent.apiName}-${openSeq}`}
-                variant="studio"
-                agentApiName={agent.apiName}
-                agentName={agent.name}
-                initialMessage={initialMessage}
-                initialSessionId={sessionSeed}
-                command={command}
-                buildHost={setHosted}
-                onShow={onShow}
-                onClose={() => navigate('/home')}
-                onActivity={onActivity}
-                onTransfer={handleTransfer}
-                onMove={id => navigate('/new-agent', { state: { sessionId: id } })}
-                moveLabel="Open on the New agent page"
-              />
-            </div>
-            <div className="ax-sugg" aria-label="Suggestions">
-              {chips.map(c => <button key={c} type="button" className="ax-chip" onClick={() => ask(c)}>{c}</button>)}
+              <div className="ax-convhd">Conversation <span className={`r${working ? ' live' : ''}`}>{working ? <><i />{working}</> : `you · ${agent.name}`}</span></div>
+              {viewing ? (
+                <div className="ax-transcript">
+                  <SessionTranscript session={viewing} agentName={COPILOT.name} onNewChat={newConversation} />
+                </div>
+              ) : (
+                <>
+                  <div className="ax-chat">
+                    <ChatPanel
+                      key={`${agent.apiName}-${openSeq}`}
+                      variant="studio"
+                      agentApiName={agent.apiName}
+                      agentName={agent.name}
+                      initialMessage={initialMessage}
+                      initialSessionId={sessionSeed}
+                      freshSession
+                      command={command}
+                      buildHost={setHosted}
+                      onShow={onShow}
+                      onClose={() => navigate('/home')}
+                      onActivity={onActivity}
+                      onSessionChange={onSessionChange}
+                      onTransfer={handleTransfer}
+                      onMove={id => navigate('/new-agent', { state: { sessionId: id } })}
+                      moveLabel="Open on the New agent page"
+                    />
+                  </div>
+                  <div className="ax-sugg" aria-label="Suggestions">
+                    {chips.map(c => <button key={c} type="button" className="ax-chip" onClick={() => ask(c)}>{c}</button>)}
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
-          <section className="ax-surface" data-mode={surface ?? ''} aria-hidden={!surface} aria-label="Answer">
+          <section className="ax-surface" data-mode={surface ?? ''} aria-hidden={!surface || !!viewing} aria-label="Answer">
             <div className="ax-shd">
               <span className="ax-mode">{surface ? SURFACE_LABEL[surface] : ''}</span>
               <span className="meta">{meta}</span>

@@ -266,6 +266,9 @@ export interface HostedBuild {
   isError?: boolean;
   /** Sends words into this conversation on the build's behalf. */
   send: (text: string) => void;
+  /** Writes a report into the transcript — shown, never sent to the
+   *  model. Once per id, so a report is never repeated. */
+  note: (id: string, markdown: string) => void;
 }
 
 /** Platform tools that report an Architect build job in their result — the
@@ -1059,7 +1062,9 @@ export function ChatPanel({
             // the copilot's hand-off needs a synthetic reply here.
             if (!toolBuildsRef.current.jobs.has(jobId)) {
               handleTurnResultRef.current({ status: 'complete', assistantText: describeBuildOutcome(view), toolCalls: [] });
-            } else {
+            } else if (!buildHostRef.current) {
+              // (A host that tells the build stage by stage already ends it
+              // with its own report; this line is for the other screens.)
               // A build the agent started ends between turns, when nobody is
               // speaking: say so in the transcript, once, so its end is not
               // only a card changing colour. Shown only — it is not sent to
@@ -1305,6 +1310,12 @@ export function ChatPanel({
     pendingSendRef.current = command.text;
     setInput(command.text);
   }, [command, wsStatus, session, isCopilot]);
+  const appendNote = useCallback((id: string, markdown: string) => {
+    setMessages(list => (list.some(m => m.id === id) ? list : [...list, {
+      id, role: 'Assistant' as const, content: markdown, toolLabel: null, createdDate: new Date().toISOString(),
+    }]));
+    maybeScrollToBottom();
+  }, [maybeScrollToBottom]);
   // A host that draws builds itself hears about the newest one on every
   // change: a stage finishing, a job id arriving, an error.
   const buildHostRef = useRef(buildHost);
@@ -1313,8 +1324,8 @@ export function ChatPanel({
     const host = buildHostRef.current;
     if (!host) return;
     const b = [...messages].reverse().find(m => m.role === 'Build');
-    host(b ? { messageId: b.id, jobId: b.buildJobId ?? null, requirement: b.content, view: b.build ?? null, interrupted: b.buildInterrupted, isError: b.isError, send: queueSend } : null);
-  }, [messages, queueSend]);
+    host(b ? { messageId: b.id, jobId: b.buildJobId ?? null, requirement: b.content, view: b.build ?? null, interrupted: b.buildInterrupted, isError: b.isError, send: queueSend, note: appendNote } : null);
+  }, [messages, queueSend, appendNote]);
   // The Home page's first message: queue it once the socket is open, then
   // send on the render where the input actually holds it — never on a timer.
   useEffect(() => {

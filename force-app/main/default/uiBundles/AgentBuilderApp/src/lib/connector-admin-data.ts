@@ -41,6 +41,16 @@ export async function deleteCustomMcpServer(recordId: string): Promise<void> {
   });
 }
 
+/** Asks the server for the provider's sign-in page (Google, Microsoft…).
+ *  The browser opens it; the server's callback stores the tokens, and the
+ *  directory shows the connector as Connected once it has. */
+export async function startConnectorOAuth(providerKey: string, displayName: string, returnUrl: string): Promise<{ connectorId: string; authorizeUrl: string }> {
+  return apexFetch<{ connectorId: string; authorizeUrl: string }>(BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'startOAuth', providerKey, displayName, returnUrl }),
+  }, 30000);
+}
+
 export async function disconnectConnector(connectorId: string): Promise<void> {
   await apexFetch<{ success: boolean }>(`${BASE}?connectorId=${encodeURIComponent(connectorId)}`, {
     method: 'DELETE',

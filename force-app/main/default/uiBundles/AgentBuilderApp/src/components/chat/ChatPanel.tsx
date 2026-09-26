@@ -1253,7 +1253,18 @@ export function ChatPanel({
         attachments,
       });
       sendOverSocket(JSON.stringify({ newUserMessage: text, history: historyRef.current.slice(0, -1), attachments, stream: streamingRef.current }))
-        .catch(err => handleTurnResultRef.current({ status: 'error', message: err instanceof Error ? err.message : 'Could not send.' }));
+        .catch(err => {
+          // The message never left the browser: the socket had to be
+          // reopened and the ticket call did not come back (the server
+          // waking up, most often). Take the bubble back, put the words
+          // back in the box, and say so plainly — Send again is the retry.
+          const raw = err instanceof Error ? err.message : 'Could not send.';
+          const waking = /timed out|starting up|waking|50[234]|ECONN|fetch failed|reconnect/i.test(raw);
+          setMessages(list => list.filter(m => !m.isPending));
+          historyRef.current = historyRef.current.slice(0, -1);
+          setInput(text);
+          handleTurnResultRef.current({ status: 'error', message: waking ? 'The Archon server is waking up — your message was not sent. Press Send again in a few seconds.' : raw });
+        });
     }
 
     for (const a of attachedThisTurn) {
@@ -1671,6 +1682,33 @@ export function ChatPanel({
               >
                 {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </button>
+            )}
+            {isStudio && (
+              <>
+                {/* The studio has no panel header, so the two choices that
+                    lived there sit with the composer: read aloud, and live
+                    (streamed) replies. */}
+                <button
+                  type="button"
+                  onClick={() => { const n = nextSoundPref(sound); setSoundPref(n); setSound(n); if (n === 'off') stopSpeaking(); }}
+                  className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted"
+                  title={SOUND_LABEL[sound]}
+                  aria-label={SOUND_LABEL[sound]}
+                >
+                  {sound === 'off' ? <VolumeX className="h-4 w-4" /> : sound === 'always' ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleStreaming}
+                  className={`ax-live${streaming ? ' on' : ''}`}
+                  title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+                  aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+                  aria-pressed={streaming}
+                >
+                  {streaming ? <Zap className="h-3.5 w-3.5" /> : <Gauge className="h-3.5 w-3.5" />}
+                  <span>{streaming ? 'Live' : 'Live off'}</span>
+                </button>
+              </>
             )}
             <textarea
               value={input}

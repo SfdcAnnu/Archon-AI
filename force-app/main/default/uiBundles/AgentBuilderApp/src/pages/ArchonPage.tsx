@@ -337,7 +337,8 @@ export default function ArchonPage() {
                     />
                   </div>
                   <div className="ax-sugg" aria-label="Suggestions">
-                    {chips.map(c => <button key={c} type="button" className="ax-chip" onClick={() => ask(c)}>{c}</button>)}
+                    {/* "Close" is the page's own action, never words sent to the copilot. */}
+              {chips.map(c => <button key={c} type="button" className="ax-chip" onClick={() => (c === 'Close' ? close() : ask(c))}>{c}</button>)}
                   </div>
                 </>
               )}

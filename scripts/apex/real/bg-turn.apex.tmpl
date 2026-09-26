@@ -1,0 +1,16 @@
+// One turn of the intake conversation, with its wall time and phase split. The driver replaces
+// __SESSION__ and __MSG__ and runs one execution per turn (a callout cannot follow DML).
+Long t0 = System.now().getTime();
+AgentChatController.TurnResult r = AgentChatController.sendTurn('__SESSION__', '__MSG__', null);
+Long ms = System.now().getTime() - t0;
+List<String> tools = new List<String>();
+String reply = '';
+String phases = '';
+for (ChatMessage__c m : r.newMessages) {
+    if (m.Role__c == 'Tool' && m.ToolCallsJson__c != null) {
+        try { tools.add(String.valueOf(((Map<String,Object>) JSON.deserializeUntyped(m.ToolCallsJson__c)).get('name'))); } catch (Exception e) { tools.add('?'); }
+    }
+    if (m.Role__c == 'Assistant') { reply = m.Content__c == null ? '' : m.Content__c.left(120); phases = m.PhaseMsJson__c; }
+}
+System.debug('BG_TURN wall=' + ms + ' status=' + r.status + ' tools=[' + String.join(tools, ',') + '] phases=' + phases);
+System.debug('BG_REPLY ' + reply);

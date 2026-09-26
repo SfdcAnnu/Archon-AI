@@ -235,8 +235,6 @@ export default function HomeDashboardPage() {
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   }, [openArchon]);
-  const todayDay = stats?.byDay[stats.byDay.length - 1];
-  const todayBar = todayDay ? { runs: todayDay.runsOk + todayDay.runsFailed + todayDay.runsOther + todayDay.turnsOk + todayDay.turnsFailed, failed: todayDay.runsFailed + todayDay.turnsFailed } : null;
 
   const today = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
   const savedDelta = delta(saved, savedBefore);
@@ -377,9 +375,7 @@ export default function HomeDashboardPage() {
 
           {/* ── the Archon bar: always here, never covering the page ── */}
           <ArchonBar
-            today={todayBar}
             pending={pendingCount}
-            loading={loading && !data}
             wake={wake}
             onTalk={() => openArchon(null, 'talk')}
             onBrief={() => openArchon({ text: 'What happened today?', how: 'type' })}

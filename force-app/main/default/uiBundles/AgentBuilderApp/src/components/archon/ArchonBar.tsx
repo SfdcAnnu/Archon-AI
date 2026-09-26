@@ -1,16 +1,16 @@
-import { Activity, CheckCircle2, Globe, Mic, Play } from 'lucide-react';
+import { Mic, Play } from 'lucide-react';
 import type { WakeWordState } from '@/hooks/useWakeWord';
 
 /**
- * The Archon bar at the foot of Home. Left: the org, today's numbers and
- * the voice-wake switch. Centre: Talk to Archon. Right: today's briefing.
- * Tapping, typing or "Hey Archon" all lead to the same place — the
- * full-screen conversation — so the bar carries no composer of its own.
+ * The Archon bar at the foot of Home. Left: the voice-wake switch. Centre:
+ * Talk to Archon. Right: today's briefing. Tapping, typing or "Hey Archon"
+ * all lead to the same place — the full-screen conversation — so the bar
+ * carries no composer and no numbers of its own; the dashboard above
+ * already shows those.
  */
 export interface ArchonBarProps {
-  today: { runs: number; failed: number } | null;
+  /** Approvals waiting on the person: the bar's edge says so. */
   pending: number;
-  loading: boolean;
   wake: WakeWordState;
   onTalk: () => void;
   onBrief: () => void;
@@ -22,16 +22,13 @@ const Wave = () => (
   </span>
 );
 
-export function ArchonBar({ today, pending, loading, wake, onTalk, onBrief }: ArchonBarProps) {
+export function ArchonBar({ pending, wake, onTalk, onBrief }: ArchonBarProps) {
   const voiceLine = !wake.supported
     ? 'Not in this browser'
     : wake.error ?? (wake.listening ? (wake.heard ? `“${wake.heard}”` : 'Listening') : 'Off');
   return (
     <div className={`ax-bar${wake.listening ? ' voice' : ''}`} data-waiting={pending > 0 ? '1' : '0'} role="region" aria-label="Archon">
       <div className="ax-bar-tiles">
-        <div className="ax-bt"><Globe /><span><small>Org</small><b>Production</b></span></div>
-        <div className="ax-bt"><Activity /><span><small>Today</small><b>{loading || !today ? '…' : `${today.runs} handled · ${today.failed} failed`}</b></span></div>
-        <div className="ax-bt"><CheckCircle2 /><span><small>Waiting on you</small><b>{loading ? '…' : pending ? `${pending} approval${pending === 1 ? '' : 's'}` : 'nothing'}</b></span></div>
         <button
           type="button"
           className={`ax-bt tog${wake.listening ? ' on' : ''}`}

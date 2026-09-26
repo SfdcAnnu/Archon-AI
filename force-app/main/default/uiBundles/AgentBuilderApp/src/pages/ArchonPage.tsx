@@ -13,6 +13,7 @@ import type { ChatActivity, ChatPhase } from '@/lib/chat-activity';
 import { editsCurrentBuild, intentOf } from '@/lib/archon-intent';
 import { loadArchonData, type ArchonData } from '@/lib/archon-data';
 import { loadHomeStats } from '@/lib/home-stats-data';
+import { useBuildReports } from '@/hooks/useBuildReports';
 import type { ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { formatLastTurn, groupSessionsByDay, sessionsForAgent } from '@/lib/chat-list';
@@ -76,6 +77,8 @@ export default function ArchonPage() {
   const [talking, setTalking] = useState(!!arrival.message || !!arrival.sessionId);
   const [surface, setSurface] = useState<Surface | null>(null);
   const [hosted, setHosted] = useState<HostedBuild | null>(null);
+  // The build told in the conversation, stage by stage, as each finishes.
+  useBuildReports(hosted);
   const [data, setData] = useState<ArchonData | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [report, setReport] = useState<UsageReport | null>(null);

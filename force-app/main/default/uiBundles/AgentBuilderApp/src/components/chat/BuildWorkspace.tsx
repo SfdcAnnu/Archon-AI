@@ -5,6 +5,7 @@ import { AlertTriangle, Check, ExternalLink, Loader2, Sparkles } from 'lucide-re
 import { Canvas } from '@/components/agent-builder/Canvas';
 import { getArchitectBuildDetail, ASSIGNEE_LABEL, type BuildDetail, type BuildJobView, type BuildStep } from '@/lib/architect-data';
 import { updateAgentStatus } from '@/lib/agents-data';
+import { reviewFindings } from '@/lib/build-report';
 import type { AgentNode, AgentConnection, NodeConfig } from '@/types/agent';
 import '@/styles/build-workspace.css';
 
@@ -341,8 +342,8 @@ function Review({ d, onSend, running, decided, setDecided, jobId }: { d: BuildDe
   const r = d.review;
   if (!r) return <Head n={6} title="Checked it against what you asked for" pill="pending" />;
   const pass = r.verdict === 'pass';
-  const uncovered = r.uncovered ?? [];
-  const failures = r.failures ?? [];
+  const findings = reviewFindings(r);
+  const uncovered = findings.map(f => f.what);
   const settled = !!decided[-1];
   return (
     <>
@@ -351,8 +352,13 @@ function Review({ d, onSend, running, decided, setDecided, jobId }: { d: BuildDe
         <span className="v">{r.verdict.replace(/_/g, ' ').toUpperCase()}</span>
         <div>
           <p className="bw-p">{pass ? 'Every capability you asked for is covered by the design.' : uncovered.length ? 'Asked for, but nothing in the design covers it:' : 'The reviewer raised concerns:'}{r.repaired ? ' A repair round already ran; this is the re-check.' : ''}</p>
-          {uncovered.length > 0 && <ul className="bw-ul">{uncovered.map((u, i) => <li key={i}>{u}</li>)}</ul>}
-          {failures.length > 0 && <ul className="bw-ul">{failures.slice(0, 6).map((f, i) => <li key={i}>{String(f.message ?? f.issue ?? f.detail ?? JSON.stringify(f)).slice(0, 240)}</li>)}</ul>}
+          {/* One line per requirement, in words: what is missing, then why —
+              never the reviewer's raw JSON. */}
+          {findings.length > 0 && (
+            <ol className="bw-ul">
+              {findings.map((f, i) => <li key={i}><b>{f.what}</b>{f.why && <><br /><span className="bw-why">Why: {f.why}</span></>}</li>)}
+            </ol>
+          )}
         </div>
       </div>
       {!pass && !settled && (

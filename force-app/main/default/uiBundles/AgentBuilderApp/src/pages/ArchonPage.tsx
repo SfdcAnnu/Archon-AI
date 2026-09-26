@@ -52,6 +52,8 @@ const CHIPS: Record<'idle' | Surface, string[]> = {
 const SURFACE_LABEL: Record<Surface, string> = { build: 'Build', dash: 'Dashboard', usage: 'Usage', failures: 'Failures', drafts: 'Drafts', approvals: 'Approvals', chart: 'Chart' };
 const STATUS_COPY: Record<OrbPhase, string> = { ready: 'Ready', listen: 'Listening', think: 'Thinking', speak: 'Speaking', build: 'Building' };
 const VIEW_TO_SURFACE: Record<ScreenView, Surface> = { dashboard: 'dash', usage: 'usage', failures: 'failures', drafts: 'drafts', approvals: 'approvals', cost: 'chart', build: 'build' };
+/** A build's 'moment': which build, and whether it is running, waiting for the person, finished or failed. */
+const buildMoment = (b: HostedBuild): string => `${b.messageId}:${b.view?.status === 'paused' || b.view?.status === 'done' || b.view?.status === 'failed' ? b.view.status : 'live'}`;
 const isListSurface = (s: string | null): s is Exclude<Surface, 'build'> => s === 'dash' || s === 'usage' || s === 'failures' || s === 'drafts' || s === 'approvals' || s === 'chart';
 
 export default function ArchonPage() {
@@ -109,8 +111,13 @@ export default function ArchonPage() {
     else if (s === 'usage' || s === 'chart') loadUsage(opts?.days ?? 31);
     if (s !== 'build') refresh();
   }, [refresh, loadUsage]);
+  useEffect(() => {
+    if (!surface || surface === 'build' || surface === 'usage' || surface === 'chart') return;
+    const t = setInterval(refresh, 60_000);
+    return () => clearInterval(t);
+  }, [surface, refresh]);
   const close = useCallback(() => {
-    if (surface === 'build' && hosted) dismissedBuildRef.current = hosted.messageId;
+    if (surface === 'build' && hosted) dismissedBuildRef.current = buildMoment(hosted);
     setSurface(null);
     setChips(CHIPS.idle);
   }, [surface, hosted]);
@@ -144,26 +151,22 @@ export default function ArchonPage() {
     else if (e.kind === 'reply') setTalking(true);
   }, [route]);
 
-  // The Architect's build opens the surface by itself the moment it starts
-  // designing (or stops for a decision past the first stages) — once per
-  // build, so a person who then looks at something else is not pulled back.
+  // The Architect's build shows itself: the moment it exists (the stage
+  // rail is the only honest progress indicator), and again each time it
+  // stops for the person or finishes. Each such moment opens once, so a
+  // person who closed it and went to look at something else is not
+  // pulled back until the build has something new to say.
   useEffect(() => {
-    const v = hosted?.view;
-    if (!hosted || !v) return;
-    if (dismissedBuildRef.current === hosted.messageId || autoOpenedRef.current === hosted.messageId) return;
-    const design = v.steps.find(s => s.key === 'design');
-    const designStarted = !!design && design.state !== 'pending';
-    const firstOpen = v.steps.findIndex(s => s.state !== 'done' && s.state !== 'warn');
-    const stoppedForDecision = (v.status === 'paused' || v.status === 'failed') && firstOpen >= 2;
-    if (designStarted || stoppedForDecision || v.status === 'done') {
-      autoOpenedRef.current = hosted.messageId;
-      setSurface('build');
-      setChips(CHIPS.build);
-    }
+    if (!hosted?.view) return;
+    const moment = buildMoment(hosted);
+    if (dismissedBuildRef.current === moment || autoOpenedRef.current === moment) return;
+    autoOpenedRef.current = moment;
+    setSurface('build');
+    setChips(CHIPS.build);
   }, [hosted]);
 
   const onActivated = useCallback(() => {
-    if (hosted) dismissedBuildRef.current = hosted.messageId;
+    if (hosted) dismissedBuildRef.current = buildMoment(hosted);
     setSurface(null);
     setChips(['How is it doing?', 'What happened today?', 'Show my drafts']);
   }, [hosted]);
@@ -235,7 +238,7 @@ export default function ArchonPage() {
               </div>
               {working && <span className="ax-working"><i />{working}</span>}
             </div>
-            <div className="ax-convhd">Conversation <span className="r">you · {agent.name}</span></div>
+            <div className="ax-convhd">Conversation <span className={`r${working ? ' live' : ''}`}>{working ? <><i />{working}</> : `you · ${agent.name}`}</span></div>
             <div className="ax-chat">
               <ChatPanel
                 key={`${agent.apiName}-${openSeq}`}

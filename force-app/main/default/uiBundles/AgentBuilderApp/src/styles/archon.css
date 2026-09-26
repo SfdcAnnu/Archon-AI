@@ -79,6 +79,8 @@
 .ax-area[data-layout="split"] .ax-orbhead{display:none}
 .ax-convhd{display:none;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font:600 10.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)} .ax-convhd .r{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--archon-faint);font-weight:400}
 .ax-area[data-layout="split"] .ax-convhd{display:flex}
+.ax-convhd .r{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ax-convhd .r.live{color:var(--primary);display:inline-flex;align-items:center;gap:6px} .ax-convhd .r.live i{width:7px;height:7px;border-radius:50%;background:var(--primary);animation:ax-pulse 1.1s ease-in-out infinite;flex:none}
 .ax-chat{flex:1;min-height:0;display:flex;flex-direction:column}
 .ax-panel{background:transparent}
 /* the transcript: wide and centred alone, a column beside a surface */

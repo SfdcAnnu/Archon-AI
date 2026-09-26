@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { ChevronDown, Layers, Loader2, Mic, Plus, RefreshCw, Send, Zap } from 'lucide-react';
+import { ChevronDown, Layers, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { AppShell, NAV_ICON_BY_HREF } from '@/components/shell/AppShell';
-import { ChatPanel } from '@/components/chat/ChatPanel';
-import { COPILOT } from '@/lib/copilot';
-import { resolveStreaming, setStreamOverride, STREAM_LABEL } from '@/lib/stream-pref';
-import type { VoicePhase } from '@/components/chat/VoiceStrip';
-import type { CorePhase } from '@/components/home/CoreRing';
-import type { ChatActivity } from '@/lib/chat-activity';
-import { setVoicePref } from '@/lib/voice';
+import { ArchonBar } from '@/components/archon/ArchonBar';
+import { getWakePref, useWakeWord } from '@/hooks/useWakeWord';
 import { loadAgents, type AgentSummary } from '@/lib/agents-data';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { loadPendingApprovals, type ApprovalDto } from '@/lib/approvals-data';
@@ -17,13 +12,14 @@ import { loadHomeStats, type HomeStats } from '@/lib/home-stats-data';
 import { loadExecutionLogs, type RawAgentExecution } from '@/lib/executions-data';
 import { loadConnectorDirectory, type DirectoryEntry } from '@/lib/connectors-data';
 import '@/styles/home.css';
+import '@/styles/archon.css';
 
 /**
  * Home — the command center. Four numbers across the top (what the agents
- * saved, handled, how many are live, how often they succeed), Archon's
- * voice agent in the middle with what it did today beside it, and what
- * needs a person on the right. Sending a message fades the dashboard out
- * and the chat in over it; a plain answer fades it back.
+ * saved, handled, how many are live, how often they succeed), the fleet
+ * with what it did today, and what needs a person on the right. Archon
+ * lives in the bar along the bottom: a tap, ⌘J or "Hey Archon" opens the
+ * full-screen conversation, which is where every answer is given.
  *
  * Every number comes from the org: activity runs and chat turns from one
  * aggregate request, approvals, agents, recent runs and sessions, the
@@ -75,8 +71,6 @@ function ago(ms: number): string {
 }
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
-
-const PHASE_COPY: Record<CorePhase, string> = { off: 'Standby', ready: 'Ready · voice on', listen: 'Listening…', think: 'Working on it', speak: 'Answering', build: 'Building the agent' };
 
 const NAV: Array<{ label: string; href: string; key: 'command' | 'chat' | 'fleet' | 'inbox' | 'review' | 'log' }> = [
   { label: 'Command Center', href: '/home', key: 'command' },
@@ -214,55 +208,35 @@ export default function HomeDashboardPage() {
     return items.sort((a, b) => b.at.localeCompare(a.at));
   }, [data]);
 
-  // ── Focus: the chat takes the screen ────────────────────────────────
+  // ── Archon: the bar opens the full-screen conversation ──────────────
   const [stage, setStage] = useState<'dark' | 'live'>('dark');
   useEffect(() => { const t = setTimeout(() => setStage('live'), 80); return () => clearTimeout(t); }, []);
-  const [focus, setFocus] = useState<{ message: { text: string; how: 'talk' | 'type' } | null; sessionId?: string | null } | null>(null);
-  const [copilotAgent, setCopilotAgent] = useState<{ apiName: string; name: string }>(COPILOT);
-  const [events, setEvents] = useState<ChatActivity[]>([]);
-  const [input, setInput] = useState('');
-  const [openSeq, setOpenSeq] = useState(0);
-  /** Streaming, settable BEFORE anything is asked. The drawer reads the
-   *  same per-agent preference when it opens, so choosing here decides how
-   *  the first reply arrives rather than the second. */
-  const [streaming, setStreaming] = useState(() => resolveStreaming(COPILOT.apiName, undefined));
-  const toggleStreaming = () => {
-    setStreaming(prev => {
-      const next = !prev;
-      setStreamOverride(copilotAgent.apiName, next);
-      return next;
-    });
-  };
   const homeRef = useRef<HTMLDivElement>(null);
-  const chatPhase = useMemo<VoicePhase>(() => { let p: VoicePhase = 'ready'; for (const e of events) if (e.kind === 'phase') p = e.phase; return p; }, [events]);
-  const phase: CorePhase = stage !== 'live' ? 'off' : focus ? chatPhase : 'ready';
-  const exitFocus = useCallback(() => { setFocus(null); setCopilotAgent(COPILOT); }, []);
-  // A hand-off changes who the dock is talking to, and streaming is a
-  // per-agent choice: show that agent's, not the one we just left.
-  useEffect(() => { setStreaming(resolveStreaming(copilotAgent.apiName, undefined)); }, [copilotAgent.apiName]);
-  const handleTransfer = useCallback((t: { agentApiName: string; agentName: string; message: string }) => {
-    setCopilotAgent({ apiName: t.agentApiName, name: t.agentName }); setOpenSeq(n => n + 1); setFocus({ message: { text: t.message, how: 'type' } });
-  }, []);
-  /** Open the drawer, optionally with a first message to send. The dashboard
-   *  stays exactly where it is: a drawer is beside the work, not over it. */
-  const openFocus = (message: { text: string; how: 'talk' | 'type' } | null, sessionId?: string | null) => { setOpenSeq(n => n + 1); setFocus({ message, sessionId }); };
-  /** Coming back from the New agent page: reopen the drawer on the same
-   *  conversation, so moving between the two surfaces never costs a turn. */
+  /** Everything leads to the same place: the Archon screen, carrying the
+   *  first message (if any) and how it was given. */
+  const openArchon = useCallback((message: { text: string; how: 'talk' | 'type' } | null, how: 'talk' | 'type' = 'type') => {
+    navigate('/archon', { state: { message, how } });
+  }, [navigate]);
+  // "Hey Archon" — whatever follows the name travels with the person.
+  const wake = useWakeWord(rest => openArchon(rest ? { text: rest, how: 'talk' } : null, 'talk'));
+  const wakeStart = wake.start;
+  const wakeSupported = wake.supported;
+  useEffect(() => { if (wakeSupported && getWakePref()) wakeStart(); }, [wakeSupported, wakeStart]);
+  /** Coming back from the New agent page: the conversation continues on
+   *  the Archon screen, so moving between the two never costs a turn. */
   const returned = (useLocation().state as { sessionId?: string | null } | null)?.sessionId;
-  useEffect(() => { if (returned) { setOpenSeq(n => n + 1); setFocus({ message: null, sessionId: returned }); } }, [returned]);
+  useEffect(() => { if (returned) navigate('/archon', { state: { sessionId: returned }, replace: true }); }, [returned, navigate]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setMoreOpen(false); if (focus) exitFocus(); }
+      if (e.key === 'Escape') setMoreOpen(false);
       // ⌘J / Ctrl+J is the one keystroke that reaches Archon from anywhere on Home.
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') { e.preventDefault(); if (!focus) openFocus(null); document.getElementById('home-ask-input')?.focus(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') { e.preventDefault(); openArchon(null); }
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
-  }, [focus, exitFocus]);
-  const handleActivity = useCallback((e: ChatActivity) => { setEvents(list => (list.length >= 200 ? [...list.slice(-199), e] : [...list, e])); }, []);
-  const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => { if (info.ended) { setEvents([]); exitFocus(); load(); } }, [load, exitFocus]);
-  const submit = () => { const text = input.trim(); if (!text) return; setInput(''); openFocus({ text, how: 'type' }); };
-  const talk = () => { setVoicePref(true); openFocus(null); };
+  }, [openArchon]);
+  const todayDay = stats?.byDay[stats.byDay.length - 1];
+  const todayBar = todayDay ? { runs: todayDay.runsOk + todayDay.runsFailed + todayDay.runsOther + todayDay.turnsOk + todayDay.turnsFailed, failed: todayDay.runsFailed + todayDay.turnsFailed } : null;
 
   const today = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
   const savedDelta = delta(saved, savedBefore);
@@ -401,66 +375,16 @@ export default function HomeDashboardPage() {
             </aside>
           </div>
 
-          {/* ── the dock: Archon is always here, and never covers the page ── */}
-          <div className="dk" data-phase={phase} data-waiting={pendingCount > 0 ? '1' : '0'}>
-            <button type="button" className="dk-core" onClick={() => openFocus(null)} aria-label="Open Archon">
-              <svg viewBox="0 0 60 60" aria-hidden="true"><circle className="tk" cx="30" cy="30" r="26" /><circle className="ar" cx="30" cy="30" r="29" /><circle className="ar b" cx="30" cy="30" r="22" /></svg>
-              <span className="dk-disc"><b>ARCHON</b></span>
-            </button>
-            <div className="dk-who"><b>Archon</b><span><i />{pendingCount > 0 && phase === 'ready' ? `Waiting for your OK · ${pendingCount} task${pendingCount === 1 ? '' : 's'}` : PHASE_COPY[phase]}</span></div>
-            <input
-              id="home-ask-input"
-              className="dk-in"
-              type="text"
-              placeholder="Ask Archon anything — or just start talking"
-              autoComplete="off"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-            />
-            <button
-              type="button"
-              className={`dk-live${streaming ? ' on' : ''}`}
-              onClick={toggleStreaming}
-              aria-pressed={streaming}
-              aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
-              title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
-            >
-              <Zap /> {streaming ? 'Live' : 'Live off'}
-            </button>
-            <button type="button" className="dk-b mic" onClick={talk} aria-label="Talk to Archon" title="Talk"><Mic /></button>
-            <button type="button" className="dk-b" onClick={submit} disabled={!input.trim()} aria-label="Send"><Send /></button>
-            {pendingCount > 0 && (
-              <button type="button" className="dk-wait" onClick={() => navigate('/approvals')}>
-                <span className="n">{pendingCount}</span><span className="t">waiting for your OK</span><span className="go">Review</span>
-              </button>
-            )}
-            <span className="dk-kbd">⌘J</span>
-          </div>
+          {/* ── the Archon bar: always here, never covering the page ── */}
+          <ArchonBar
+            today={todayBar}
+            pending={pendingCount}
+            loading={loading && !data}
+            wake={wake}
+            onTalk={() => openArchon(null, 'talk')}
+            onBrief={() => openArchon({ text: 'What happened today?', how: 'type' })}
+          />
         </div>
-
-        {/* ── the drawer: the same chat, beside the dashboard ─────── */}
-        {focus && (
-          <>
-            <div className="dk-scrim" onClick={exitFocus} />
-            <aside className="dk-drawer" aria-label={`${copilotAgent.name} chat`}>
-              <ChatPanel
-                key={`${copilotAgent.apiName}-${openSeq}`}
-                variant="drawer"
-                agentApiName={copilotAgent.apiName}
-                agentName={copilotAgent.name}
-                initialMessage={focus?.message ?? null}
-                initialSessionId={focus?.sessionId ?? null}
-                onClose={exitFocus}
-                onMove={id => navigate('/new-agent', { state: { sessionId: id } })}
-                moveLabel="Open as page"
-                onSessionChange={handleSessionChange}
-                onActivity={handleActivity}
-                onTransfer={handleTransfer}
-              />
-            </aside>
-          </>
-        )}
       </div>
     </AppShell>
   );

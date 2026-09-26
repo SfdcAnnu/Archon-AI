@@ -199,9 +199,19 @@ export interface ChatPanelProps {
    *  transcript centered in a readable column.
    *  'drawer': fills its container too, but compact — the Home dock's
    *  panel, where width is short and every pixel of height counts.
+   *  'studio': the Archon screen — no header of its own (the page draws
+   *  one), the transcript and composer styled by the page.
    *  Layout only: every variant is the same chat, with the same cards,
    *  approvals, build workspace and voice. */
-  variant?: 'overlay' | 'full' | 'drawer';
+  variant?: 'overlay' | 'full' | 'drawer' | 'studio';
+  /** Words the host wants sent now — a suggestion chip, a surface's
+   *  button. Sent once per `seq`, on the render where the input holds
+   *  them, exactly like the first message. */
+  command?: { text: string; how: 'talk' | 'type'; seq: number } | null;
+  /** The host draws Architect builds itself, beside the conversation. The
+   *  transcript keeps a one-line card per build and this is called with
+   *  the newest build's state every time it changes (null: no build). */
+  buildHost?: (b: HostedBuild | null) => void;
   /** Resume a past conversation instead of starting a new one. */
   initialSessionId?: string | null;
   onClose: () => void;
@@ -236,6 +246,18 @@ export interface ChatPanelProps {
   onTransfer?: (t: { agentApiName: string; agentName: string; message: string }) => void;
 }
 
+/** An Architect build as a host outside the transcript sees it. */
+export interface HostedBuild {
+  messageId: string;
+  jobId: string | null;
+  requirement: string;
+  view: BuildJobView | null;
+  interrupted?: boolean;
+  isError?: boolean;
+  /** Sends words into this conversation on the build's behalf. */
+  send: (text: string) => void;
+}
+
 /** Platform tools that report an Architect build job in their result — the
  *  panel draws the build card and follows the job for each of them. */
 const BUILD_TOOLS = new Set(['build_agent', 'analyze_requirement', 'inspect_org', 'find_gaps', 'design_agent', 'write_instructions', 'review_design', 'save_agent', 'resume_build', 'get_build_status']);
@@ -243,9 +265,10 @@ const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exe
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel,
+  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel, command, buildHost,
 }: ChatPanelProps) {
-  const isFull = variant === 'full' || variant === 'drawer';
+  const isStudio = variant === 'studio';
+  const isFull = variant === 'full' || variant === 'drawer' || isStudio;
   const isDrawer = variant === 'drawer';
   const isCopilot = transport === 'copilot';
   const copilotPlatformRef = useRef(copilotPlatform);
@@ -1217,6 +1240,28 @@ export function ChatPanel({
     pendingSendRef.current = text;
     setInput(text);
   }, []);
+  // The host's words: sent once per seq, and only once the chat can send.
+  // The effect re-runs as the socket opens, so a command issued early
+  // (a chip pressed before the session exists) is not lost.
+  const lastCommandSeqRef = useRef(0);
+  useEffect(() => {
+    if (!command || command.seq === lastCommandSeqRef.current || !command.text.trim()) return;
+    if (wsStatus !== 'open' || (!session && !isCopilot)) return;
+    lastCommandSeqRef.current = command.seq;
+    lastInputVoiceRef.current = command.how === 'talk';
+    pendingSendRef.current = command.text;
+    setInput(command.text);
+  }, [command, wsStatus, session, isCopilot]);
+  // A host that draws builds itself hears about the newest one on every
+  // change: a stage finishing, a job id arriving, an error.
+  const buildHostRef = useRef(buildHost);
+  useEffect(() => { buildHostRef.current = buildHost; }, [buildHost]);
+  useEffect(() => {
+    const host = buildHostRef.current;
+    if (!host) return;
+    const b = [...messages].reverse().find(m => m.role === 'Build');
+    host(b ? { messageId: b.id, jobId: b.buildJobId ?? null, requirement: b.content, view: b.build ?? null, interrupted: b.buildInterrupted, isError: b.isError, send: queueSend } : null);
+  }, [messages, queueSend]);
   // The Home page's first message: queue it once the socket is open, then
   // send on the render where the input actually holds it — never on a timer.
   useEffect(() => {
@@ -1316,11 +1361,14 @@ export function ChatPanel({
   return (
     <div
       className={
-        isFull
+        isStudio
+          ? 'ax-panel flex h-full w-full flex-col'
+          : isFull
           ? 'flex h-full w-full flex-col bg-card'
           : 'absolute inset-y-0 right-0 z-50 flex w-[420px] max-w-[92vw] flex-col border-l border-border bg-card shadow-2xl'
       }
     >
+      {!isStudio && (
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <div className="flex min-w-0 items-center">
           <PhaseRing phase={phase} />
@@ -1372,12 +1420,15 @@ export function ChatPanel({
           </button>
         </div>
       </div>
+      )}
 
       <div
         ref={listRef}
         onScroll={onListScroll}
         className={
-          isFull
+          isStudio
+            ? 'ax-list flex-1 space-y-4 overflow-y-auto px-6 py-5'
+            : isFull
             ? isDrawer ? 'flex-1 space-y-3 overflow-y-auto px-3 py-3' : 'flex-1 space-y-3 overflow-y-auto px-6 py-5'
             : 'flex-1 space-y-3 overflow-y-auto p-4'
         }
@@ -1388,13 +1439,24 @@ export function ChatPanel({
           </div>
         )}
         {loadError && <p className="text-[12.5px] text-destructive">{loadError}</p>}
-        {!loading && !loadError && messages.length === 0 && (
+        {!loading && !loadError && messages.length === 0 && !isStudio && (
           <p className="py-6 text-center text-[12px] text-muted-foreground">
             {isCopilot ? 'Ask what is happening on the platform, what your org can do, or describe an agent to build.' : 'Say hello to get started.'}
           </p>
         )}
         {messages.map(m => {
           if (m.role === 'Build') {
+            if (buildHost) {
+              // The host draws the build beside the conversation; the
+              // transcript keeps its place in the story with one line.
+              const st = m.isError ? 'could not start' : m.buildInterrupted ? 'continues on the New agent page' : m.build?.status === 'done' ? 'saved' : m.build?.status === 'failed' ? 'failed' : m.build?.status === 'paused' ? 'waiting for you' : m.build ? `${m.build.steps.filter(s => s.state === 'done' || s.state === 'warn').length} of ${m.build.steps.length} stages` : 'starting';
+              return (
+                <div key={m.id} className="ax-buildstub" data-status={m.build?.status ?? (m.isError ? 'failed' : 'starting')}>
+                  <span className="k">Architect build · {st}</span>
+                  <span className="r" title={m.content}>{m.content}</span>
+                </div>
+              );
+            }
             return (
               <BuildWorkspace
                 key={m.id}
@@ -1541,7 +1603,7 @@ export function ChatPanel({
           </Button>
         </div>
       ) : (
-        <div className={isFull ? (isDrawer ? 'border-t border-border px-3 py-2.5' : 'border-t border-border px-6 py-3') : 'border-t border-border p-3'}>
+        <div className={isStudio ? 'ax-composer' : isFull ? (isDrawer ? 'border-t border-border px-3 py-2.5' : 'border-t border-border px-6 py-3') : 'border-t border-border p-3'}>
           {pendingAttachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {pendingAttachments.map(a => (
@@ -1592,9 +1654,11 @@ export function ChatPanel({
               <Send className="h-4 w-4" />
             </Button>
           </div>
-          <p className="mt-1.5 text-center text-[9.5px] text-muted-foreground/60">
-            Responses are AI-generated and may be inaccurate.
-          </p>
+          {!isStudio && (
+            <p className="mt-1.5 text-center text-[9.5px] text-muted-foreground/60">
+              Responses are AI-generated and may be inaccurate.
+            </p>
+          )}
         </div>
       )}
     </div>

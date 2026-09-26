@@ -33,11 +33,14 @@ export interface BuildWorkspaceProps {
    *  change of room, not a restart. Omitted where there is nowhere to go. */
   onMove?: () => void;
   moveLabel?: string;
+  /** The agent went live from this card — a host that shows the build
+   *  beside a conversation puts the conversation back in charge. */
+  onActivated?: () => void;
 }
 
 const STAGE_SHORT: Record<string, string> = { understand: 'Understand', survey: 'Survey', match: 'Match', design: 'Design', prompts: 'Instructions', review: 'Review', gaps: 'Setup', compile: 'Save' };
 
-export function BuildWorkspace({ requirement, jobId, view, interrupted, isError, onSend, onMove, moveLabel }: BuildWorkspaceProps) {
+export function BuildWorkspace({ requirement, jobId, view, interrupted, isError, onSend, onMove, moveLabel, onActivated }: BuildWorkspaceProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<BuildDetail | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export function BuildWorkspace({ requirement, jobId, view, interrupted, isError,
   const activate = async () => {
     if (!result) return;
     setActivated('busy'); setActivateError(null);
-    try { await updateAgentStatus(result.agentId, 'Active'); setActivated('yes'); }
+    try { await updateAgentStatus(result.agentId, 'Active'); setActivated('yes'); onActivated?.(); }
     catch (err) { setActivated('failed'); setActivateError(err instanceof Error ? err.message : 'Could not activate.'); }
   };
 

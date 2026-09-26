@@ -14,6 +14,11 @@ describe('intentOf', () => {
     expect(intentOf('what is waiting for approval')).toBe('approvals');
     expect(intentOf('Cost by agent as a chart')).toBe('chart');
   });
+  it('never opens a data view for an agent description', () => {
+    expect(intentOf('Note 10 agent I want to single agent that will show opportunity details their activities and on accounts and on their account activities details')).toBe('build');
+    expect(intentOf('an agent that reports failures to the owner every morning')).toBe('build');
+    expect(intentOf('show me the recent activities on this opportunity')).toBe(null);
+  });
   it('reads a usage or token report', () => {
     expect(intentOf('show me a report of all my agents and how much each has used till now')).toBe('usage');
     expect(intentOf('too many tokens taken by the lead intake qualifier')).toBe('usage');

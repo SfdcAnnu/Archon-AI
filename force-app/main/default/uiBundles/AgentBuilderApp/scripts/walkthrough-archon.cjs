@@ -199,7 +199,7 @@ const FAKE_WS = `
   console.log('tiles:', (await page.locator('.ax-dtiles').innerText()).replace(/\n/g, ' | '));
 
   // 3b · a chip, with a streamed reply: the user bubble must stay above its reply
-  await page.click('.ax-sugg .ax-chip:has-text("Show the failures")');
+  await page.fill('.ax-composer textarea', 'Show the failures'); await page.keyboard.press('Enter');
   await page.waitForSelector('.ax-surface[data-mode="failures"]', { timeout: 20000 });
   await settle(2500);
   const order = await page.evaluate(() => [...document.querySelectorAll('.ax-list > div')].map(d => d.querySelector('.bg-primary') ? 'user' : d.querySelector('.bg-muted') ? 'assistant' : d.className.includes('ax-buildstub') ? 'build' : 'other'));

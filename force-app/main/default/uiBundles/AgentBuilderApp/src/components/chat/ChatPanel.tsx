@@ -139,6 +139,9 @@ function describeBuildOutcome(view: BuildJobView): string {
     ];
     return bits.filter(Boolean).join(' ');
   }
+  if (view.status === 'paused' && /as asked/.test(view.error ?? '')) {
+    return 'The Architect has understood the requirement and is waiting for your answers before it designs anything.';
+  }
   if (view.status === 'paused') {
     return `The build paused at its $${view.maxCostUsd.toFixed(2)} cost ceiling after ${done} of ${view.steps.length} stages — everything finished is saved. Continue it from the New agent page with Resume.`;
   }

@@ -58,11 +58,17 @@ global with sharing class AgentChatRestService {
             }
 
             if (action == 'startSession') {
-                AgentChatController.SessionWithMessages result = AgentChatController.startSession(
-                    (String) body.get('agentApiName'),
-                    (String) body.get('recordContextId'),
-                    (String) body.get('recordContextType')
-                );
+                // forceNew: never resume the last active conversation (the Archon screen).
+                Boolean forceNew = body.get('forceNew') == true;
+                AgentChatController.SessionWithMessages result = forceNew
+                    ? AgentChatController.startFreshSession(
+                        (String) body.get('agentApiName'),
+                        (String) body.get('recordContextId'),
+                        (String) body.get('recordContextType'))
+                    : AgentChatController.startSession(
+                        (String) body.get('agentApiName'),
+                        (String) body.get('recordContextId'),
+                        (String) body.get('recordContextType'));
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(result));
                 return;

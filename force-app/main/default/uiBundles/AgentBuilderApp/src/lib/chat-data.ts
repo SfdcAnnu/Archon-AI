@@ -91,14 +91,17 @@ export async function loadArtifact(id: string): Promise<StoredArtifact> {
   return apexFetch<StoredArtifact>(`${CHAT_BASE}?resource=artifact&id=${encodeURIComponent(id)}`, { method: 'GET' });
 }
 
+/** forceNew: never resume the person's last active conversation with this
+ *  agent — the Archon screen opens fresh every time; Recent keeps the rest. */
 export async function startChatSession(
   agentApiName: string,
   recordContextId?: string | null,
-  recordContextType?: string | null
+  recordContextType?: string | null,
+  forceNew = false
 ): Promise<SessionWithMessages> {
   return apexFetch<SessionWithMessages>(CHAT_BASE, {
     method: 'POST',
-    body: JSON.stringify({ action: 'startSession', agentApiName, recordContextId, recordContextType }),
+    body: JSON.stringify({ action: 'startSession', agentApiName, recordContextId, recordContextType, ...(forceNew ? { forceNew: true } : {}) }),
   });
 }
 

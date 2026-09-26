@@ -60,7 +60,7 @@ const sessions = [
 const approvals = [
   { id: 'apr1', name: 'AP-0001', agentApiName: 'pipeline_manager_assistant', nodeLabel: 'Send renewal proposal', recordId: '001g000000AcmeXX', status: 'Pending', createdDate: at(8, 30), timeoutAt: at(20, 30) },
 ];
-const session = { session: { Id: 'sess1', Name: 'CS-9', Title__c: null, Status__c: 'Active', 'AgentDefinition__r.Name': 'Archon', TokensIn__c: 0, TokensOut__c: 0 }, messages: [], streamReplies: false };
+const session = { session: { Id: 'sess1', Name: 'CS-9', Title__c: null, Status__c: 'Active', 'AgentDefinition__r.Name': 'Archon', TokensIn__c: 0, TokensOut__c: 0 }, messages: [], streamReplies: true };
 
 const STEPS = [['understand', 'Understood what you want'], ['survey', 'Looked through your Salesforce org'], ['match', 'Matched what you need to what you have'], ['design', 'Designed the agent'], ['prompts', 'Wrote its instructions'], ['review', 'Checked it against what you asked for'], ['gaps', 'Listed the outstanding setup'], ['compile', 'Saved the agent']];
 const DETAILS = { understand: 'Reading the requirement (gpt-4.1)…', survey: 'Reading your org: 118 objects, 44 tools…', match: 'Matching 15 capabilities against 44 tools…', design: 'Designing the agent — root, specialists, tools (gpt-5.5, deep)…', prompts: 'Writing instructions for 4 nodes…', review: 'Judging the design against your requirement…', gaps: 'Listing what the org still needs…', compile: 'Compiling and saving…' };
@@ -104,7 +104,16 @@ const FAKE_WS = `
       else if (/usage|report/.test(text)) { reply = 'Here is the usage report for the last 31 days, on the screen beside us. The WhatsApp Lead Intake Qualifier is far ahead: 173 turns and 984,403 input tokens, about $2.90. The Archon Copilot took 58 turns and 203,576 tokens; the Metadata Expert 48 turns and 213,307.'; toolCalls = [{ name: 'show_on_screen', input: { view: 'usage', days: 31 }, output: JSON.stringify({ screen: { view: 'usage', days: 31, agentApiName: null }, usage: { days: 31, turns: 279, tokensIn: 1401286, tokensOut: 96400, byAgent: [{ apiName: 'whatsapp_lead_intake_qualifier', name: 'WhatsApp Lead Intake Qualifier', turns: 173, tokensIn: 984403, tokensOut: 61200 }, { apiName: 'archon_metadata_expert', name: 'Metadata Expert', turns: 48, tokensIn: 213307, tokensOut: 16800 }, { apiName: 'archon_copilot', name: 'Archon Copilot', turns: 58, tokensIn: 203576, tokensOut: 18400 }] } }) + '\\nSHOWN: the usage view is on the screen.' }]; }
       else if (/today|happened/.test(text)) reply = 'Here is today. 40 runs and 79 chat turns, three failed — the two run failures are both the Deal Risk Scorer, the same field error at 10:42 and 10:47. One approval is waiting on you: the renewal proposal to Acme. Spend is about $4.09, most of it the risk scorer.';
       else if (/fail/.test(text)) reply = 'Both failures are the Deal Risk Scorer: Risk_Score__c is not writable by the running user. Grant the field to the Archon Runtime permission set and re-run the two records.';
-      setTimeout(() => { this.onmessage && this.onmessage({ data: JSON.stringify({ status: 'complete', assistantText: reply, toolCalls, tokensIn: 120, tokensOut: 80, modelUsed: 'mock' }) }); }, 700);
+      const fire = (o, ms) => setTimeout(() => { this.onmessage && this.onmessage({ data: JSON.stringify(o) }); }, ms);
+      const result = { status: 'complete', assistantText: reply, toolCalls, tokensIn: 120, tokensOut: 80, modelUsed: 'mock' };
+      if (msg.stream) {
+        // As the server streams: a tool pass (stage frames, then a reset of any text), then the reply in pieces, then the result.
+        let t = 120; let seq = 0;
+        if (toolCalls.length) { fire({ type: 'stage', state: 'start', name: toolCalls[0].name, seq: ++seq }, t); t += 150; fire({ type: 'text.reset', seq: ++seq }, t); t += 80; fire({ type: 'stage', state: 'end', name: toolCalls[0].name, seq: ++seq, ms: 230 }, t); t += 80; }
+        const words = reply.split(' ');
+        for (let i = 0; i < words.length; i += 4) { fire({ type: 'text.delta', delta: words.slice(i, i + 4).join(' ') + ' ', seq: ++seq }, t); t += 35; }
+        fire(result, t + 120);
+      } else fire(result, 700);
     }
     close() { this.readyState = 3; this.onclose && this.onclose({}); }
   }
@@ -189,6 +198,13 @@ const FAKE_WS = `
   await shot('3-archon-dashboard');
   console.log('tiles:', (await page.locator('.ax-dtiles').innerText()).replace(/\n/g, ' | '));
 
+  // 3b · a chip, with a streamed reply: the user bubble must stay above its reply
+  await page.click('.ax-sugg .ax-chip:has-text("Show the failures")');
+  await page.waitForSelector('.ax-surface[data-mode="failures"]', { timeout: 20000 });
+  await settle(2500);
+  const order = await page.evaluate(() => [...document.querySelectorAll('.ax-list > div')].map(d => d.querySelector('.bg-primary') ? 'user' : d.querySelector('.bg-muted') ? 'assistant' : d.className.includes('ax-buildstub') ? 'build' : 'other'));
+  console.log('transcript order after the chip:', order.join(' > '));
+  await shot('3b-chip-order');
   // 4 · close → the conversation fills the screen again
   await page.click('.ax-shd button');
   await page.waitForSelector('.ax-area[data-layout="full"]', { timeout: 10000 });

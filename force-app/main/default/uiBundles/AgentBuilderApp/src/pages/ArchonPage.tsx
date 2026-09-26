@@ -80,7 +80,6 @@ export default function ArchonPage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [report, setReport] = useState<UsageReport | null>(null);
   const [command, setCommand] = useState<{ text: string; how: 'talk' | 'type'; seq: number } | null>(null);
-  const [chips, setChips] = useState<string[]>(CHIPS.idle);
   const [full, setFull] = useState(() => !!document.fullscreenElement);
   // Recent: the copilot's own conversations, and the one being read back.
   const [recentOpen, setRecentOpen] = useState(false);
@@ -125,7 +124,6 @@ export default function ArchonPage() {
   }, []);
   const open = useCallback((s: Surface, opts?: { days?: number | null; usage?: UsageReport }) => {
     setSurface(s);
-    setChips(CHIPS[s]);
     if (opts?.usage) setReport(opts.usage);
     else if (s === 'usage' || s === 'chart') loadUsage(opts?.days ?? 31);
     if (s !== 'build') refresh();
@@ -139,7 +137,6 @@ export default function ArchonPage() {
   const close = useCallback(() => {
     if (surface === 'build' && hosted) dismissedBuildRef.current = buildMoment(hosted);
     setSurface(null);
-    setChips(CHIPS.idle);
   }, [surface, hosted]);
 
   /** What the person just said decides whether the screen divides. */
@@ -152,7 +149,7 @@ export default function ArchonPage() {
       // A change to the agent being built keeps the build in view; a new
       // agent starts as words — its build shows itself the moment it exists.
       if (surface === 'build' && editsCurrentBuild(text)) return;
-      if (surface && surface !== 'build') { setSurface(null); setChips(CHIPS.idle); }
+      if (surface && surface !== 'build') { setSurface(null); }
       dismissedBuildRef.current = null;
     }
   }, [close, open, hosted, surface]);
@@ -182,13 +179,11 @@ export default function ArchonPage() {
     if (dismissedBuildRef.current === moment || autoOpenedRef.current === moment) return;
     autoOpenedRef.current = moment;
     setSurface('build');
-    setChips(CHIPS.build);
   }, [hosted]);
 
   const onActivated = useCallback(() => {
     if (hosted) dismissedBuildRef.current = buildMoment(hosted);
     setSurface(null);
-    setChips(['How is it doing?', 'What happened today?', 'Show my drafts']);
   }, [hosted]);
 
   // ── words the page puts in the person's mouth ────────────────────────
@@ -209,7 +204,6 @@ export default function ArchonPage() {
     setInitialMessage(null);
     setTalking(false);
     setSurface(null);
-    setChips(CHIPS.idle);
     setHosted(null);
     setOpenSeq(n => n + 1);
     refreshRecent();
@@ -336,10 +330,11 @@ export default function ArchonPage() {
                       moveLabel="Open on the New agent page"
                     />
                   </div>
-                  <div className="ax-sugg" aria-label="Suggestions">
-                    {/* "Close" is the page's own action, never words sent to the copilot. */}
-              {chips.map(c => <button key={c} type="button" className="ax-chip" onClick={() => (c === 'Close' ? close() : ask(c))}>{c}</button>)}
-                  </div>
+                  {/* Starting points on an empty screen only; once the
+                      conversation has begun it is the person's, not ours. */}
+                  {!talking && <div className="ax-sugg" aria-label="Suggestions">
+                    {CHIPS.idle.map(c => <button key={c} type="button" className="ax-chip" onClick={() => ask(c)}>{c}</button>)}
+                  </div>}
                 </>
               )}
             </div>

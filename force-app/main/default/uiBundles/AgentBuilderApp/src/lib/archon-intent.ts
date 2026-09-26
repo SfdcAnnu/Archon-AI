@@ -36,13 +36,18 @@ export function intentOf(text: string): ArchonIntent {
   // A request for a new agent first: what it should do may mention
   // failures, reports or approvals without asking to see them.
   if (/\b(build|create|design|make)\b.*\b(agent|bot|assistant|copilot|component|workflow|automation)\b|\bnew (agent|component)\b/.test(t)) return 'build';
+  // Describing an agent is not asking to see data, whatever words the
+  // description uses ("an agent that shows opportunity activities").
+  if (/\bagents?\b/.test(t) && /\b(i want|i need|we need|want (a|an|one|single)|need (a|an|one)|single agent|agents? (that|which|who|to|for)|should|will show|that will)\b/.test(t)) return 'build';
   if (/\b(fail|failed|failure|failures|error|errors|broke|broken|went wrong)\b/.test(t)) return 'failures';
   if (/\bdrafts?\b/.test(t)) return 'drafts';
   if (/\bapprov/.test(t) && !/\b(meeting|event|book|booking)\b/.test(t)) return 'approvals';
   if (/\b(chart|graph of|cost by|compare|breakdown|spend|spending|usage by)\b/.test(t)) return 'chart';
   if (/\b(usage|report|tokens?|token usage|consumption)\b|\bhow much\b.*\b(used|spent|cost|consumed)\b/.test(t)) return 'usage';
   if (/\b(how (is|are) .*(doing|going)|status of|is .* (ok|okay|fine|healthy))\b/.test(t)) return 'how';
-  if (/\b(today|activity|activities|briefing|dashboard|summary|what happened|overview|command cent(er|re))\b/.test(t)) return 'dash';
+  // Today as a dashboard only when that is what is asked for — not every
+  // sentence that says "activity" or "today".
+  if (/\b(what happened|briefing|dashboard|overview|command cent(er|re))\b/.test(t) || /^(what|how)\b.*\btoday\b/.test(t)) return 'dash';
   if (/\b(open|show|see|go to|back to)\b.*\b(agent|build|studio|graph|design)\b/.test(t)) return 'build-back';
   return null;
 }

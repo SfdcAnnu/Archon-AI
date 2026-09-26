@@ -14,6 +14,11 @@ describe('intentOf', () => {
     expect(intentOf('what is waiting for approval')).toBe('approvals');
     expect(intentOf('Cost by agent as a chart')).toBe('chart');
   });
+  it('does not open the approvals list for a yes', () => {
+    expect(intentOf('Approved')).toBe(null);
+    expect(intentOf('yes I approve it')).toBe(null);
+    expect(intentOf('show the approvals')).toBe('approvals');
+  });
   it('never opens a data view for an agent description', () => {
     expect(intentOf('Note 10 agent I want to single agent that will show opportunity details their activities and on accounts and on their account activities details')).toBe('build');
     expect(intentOf('an agent that reports failures to the owner every morning')).toBe('build');

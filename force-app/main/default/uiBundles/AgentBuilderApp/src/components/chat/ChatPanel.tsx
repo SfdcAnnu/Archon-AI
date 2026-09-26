@@ -1056,6 +1056,15 @@ export function ChatPanel({
             // the copilot's hand-off needs a synthetic reply here.
             if (!toolBuildsRef.current.jobs.has(jobId)) {
               handleTurnResultRef.current({ status: 'complete', assistantText: describeBuildOutcome(view), toolCalls: [] });
+            } else {
+              // A build the agent started ends between turns, when nobody is
+              // speaking: say so in the transcript, once, so its end is not
+              // only a card changing colour. Shown only — it is not sent to
+              // the model as something the agent said.
+              const doneId = `build_done_${jobId}`;
+              setMessages(list => (list.some(m => m.id === doneId) ? list : [...list, {
+                id: doneId, role: 'Assistant' as const, content: describeBuildOutcome(view), toolLabel: null, createdDate: new Date().toISOString(),
+              }]));
             }
             return;
           }

@@ -41,7 +41,9 @@ export function intentOf(text: string): ArchonIntent {
   if (/\bagents?\b/.test(t) && /\b(i want|i need|we need|want (a|an|one|single)|need (a|an|one)|single agent|agents? (that|which|who|to|for)|should|will show|that will)\b/.test(t)) return 'build';
   if (/\b(fail|failed|failure|failures|error|errors|broke|broken|went wrong)\b/.test(t)) return 'failures';
   if (/\bdrafts?\b/.test(t)) return 'drafts';
-  if (/\bapprov/.test(t) && !/\b(meeting|event|book|booking)\b/.test(t)) return 'approvals';
+  // Asking to SEE what is waiting — not "approved", "I approve it", or an
+  // agent that should wait for approval.
+  if (/\bapprov/.test(t) && /\b(waiting|pending|queue|show|list|open|any|what|which|how many|need my|needs my)\b/.test(t) && !/\b(meeting|event|book|booking)\b/.test(t)) return 'approvals';
   if (/\b(chart|graph of|cost by|compare|breakdown|spend|spending|usage by)\b/.test(t)) return 'chart';
   if (/\b(usage|report|tokens?|token usage|consumption)\b|\bhow much\b.*\b(used|spent|cost|consumed)\b/.test(t)) return 'usage';
   if (/\b(how (is|are) .*(doing|going)|status of|is .* (ok|okay|fine|healthy))\b/.test(t)) return 'how';

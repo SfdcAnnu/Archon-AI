@@ -28,6 +28,12 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
   const cfg = node.config as CatalogNodeConfig;
   const provider = cfg?.provider ?? '';
   const allowed = useMemo(() => cfg?.allowedTools ?? [], [cfg?.allowedTools]);
+  // Tools the reply does not wait for -- see server lc/background-tools.ts.
+  const background = useMemo(() => cfg?.backgroundTools ?? [], [cfg?.backgroundTools]);
+  const toggleBackground = (name: string) => {
+    const next = background.includes(name) ? background.filter(n => n !== name) : [...background, name];
+    onConfigChange({ backgroundTools: next });
+  };
 
   const [directory, setDirectory] = useState<DirectoryEntry[] | null>(null);
   const [directoryWaking, setDirectoryWaking] = useState(false);
@@ -197,7 +203,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
                       onChange={() => toggleTool(t.name)}
                       className="mt-0.5 h-3.5 w-3.5 shrink-0"
                     />
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block font-mono text-[10.5px] font-semibold text-foreground">{t.name}</span>
                       {t.description && (
                         <span className={cn('mt-0.5 block text-[10px] leading-snug', isWriteTool(t.name) ? 'text-[var(--archon-warning,var(--archon-warning))]' : 'text-muted-foreground')}>
@@ -206,6 +212,16 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
                         </span>
                       )}
                     </span>
+                    {checked && isWriteTool(t.name) && (
+                      <span
+                        className="ml-1 flex shrink-0 items-center gap-1 self-center rounded-full border border-border px-1.5 py-0.5 text-[9.5px] font-semibold text-muted-foreground"
+                        title="Run in the background: the reply does not wait for this write; it runs right after, in order. Not for reads or approval-gated tools."
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); toggleBackground(t.name); }}
+                      >
+                        <input type="checkbox" readOnly checked={background.includes(t.name)} className="h-3 w-3" tabIndex={-1} />
+                        bg
+                      </span>
+                    )}
                   </label>
                 );
               })}

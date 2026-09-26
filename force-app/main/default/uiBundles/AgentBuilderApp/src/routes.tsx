@@ -96,6 +96,13 @@ export const routes: RouteObject[] = [
     handle: { showInNavigation: true, label: 'Chat' },
   },
   {
+    // Archon full screen: the conversation the Home bar opens, which
+    // divides only when an answer needs a surface beside it.
+    path: '/archon',
+    lazy: page(() => import('./pages/ArchonPage')),
+    handle: { showInNavigation: false, label: 'Archon' },
+  },
+  {
     // One conversation, every turn's tool calls and payloads in full —
     // opened in its own tab from the console's activity log.
     path: '/trace/:sessionId',

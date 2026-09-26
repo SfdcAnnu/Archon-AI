@@ -32,8 +32,10 @@ import {
   saveCustomMcpServer,
   deleteCustomMcpServer,
   disconnectConnector,
+  startConnectorOAuth,
   type CustomMcpServer,
 } from '@/lib/connector-admin-data';
+import { loadConnectorDirectory } from '@/lib/connectors-data';
 import {
   loadToolCatalog,
   parseToolArgs,
@@ -201,6 +203,8 @@ export default function ConnectorsAdminPage() {
   const [customServers, setCustomServers] = useState<CustomMcpServer[]>([]);
   const [customLoadState, setCustomLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** The provider whose sign-in window is open, while we wait for it. */
+  const [connecting, setConnecting] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ open: boolean; editing: CustomMcpServer | null }>({ open: false, editing: null });
 
   const [tab, setTab] = useState<TabKey>('dir');
@@ -291,7 +295,45 @@ export default function ConnectorsAdminPage() {
       });
       return;
     }
-    toast.info(`${entry.displayName} isn't wired up yet — coming soon.`);
+    // Connectors with no server behind them yet (no MCP address in the
+    // catalog) have nothing to sign in to.
+    if (!entry.mcpServerUrl) {
+      toast.info(`${entry.displayName} has no server yet`, { description: 'Its MCP server is not deployed, so there is nothing to sign in to. Ask for it to be built and it will appear here.' });
+      return;
+    }
+    // The provider's sign-in opens in its own window; the server's callback
+    // stores the tokens. The page then reads the directory until this
+    // connector says Connected (three minutes at most).
+    const popup = window.open('about:blank', `archon_oauth_${entry.providerKey}`, 'width=620,height=720,scrollbars=yes');
+    setConnecting(entry.providerKey);
+    startConnectorOAuth(entry.providerKey, entry.displayName, window.location.href)
+      .then(({ authorizeUrl }) => {
+        if (popup) popup.location.href = authorizeUrl;
+        else window.open(authorizeUrl, `archon_oauth_${entry.providerKey}`, 'width=620,height=720,scrollbars=yes');
+        toast.info(`Sign in to ${entry.displayName} in the window that opened`, { description: 'This page updates by itself once you have allowed access.' });
+        const until = Date.now() + 180_000;
+        const poll = () => {
+          loadConnectorDirectory()
+            .then(entries => {
+              const now = entries.find(e => e.providerKey === entry.providerKey);
+              if (now && /connected/i.test(now.status) && !/not/i.test(now.status)) {
+                setDirectory(entries);
+                setConnecting(null);
+                toast.success(`${entry.displayName} connected.`);
+                return;
+              }
+              if (Date.now() < until) setTimeout(poll, 3000);
+              else { setConnecting(null); toast.info(`${entry.displayName} is not connected yet`, { description: 'If you finished signing in, press Refresh.' }); }
+            })
+            .catch(() => { if (Date.now() < until) setTimeout(poll, 4000); else setConnecting(null); });
+        };
+        setTimeout(poll, 4000);
+      })
+      .catch(err => {
+        popup?.close();
+        setConnecting(null);
+        toast.error(`Could not start ${entry.displayName} sign-in`, { description: err instanceof Error ? err.message : undefined });
+      });
   }, []);
 
   const handleDisconnect = useCallback(
@@ -526,8 +568,8 @@ export default function ConnectorsAdminPage() {
                               </Button>
                             </>
                           ) : (
-                            <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => handleConnect(entry)}>
-                              Authorise
+                            <Button size="sm" className="h-6 px-2 text-[11px]" disabled={connecting === entry.providerKey} onClick={() => handleConnect(entry)}>
+                              {connecting === entry.providerKey ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Waiting for sign-in…</> : entry.mcpServerUrl ? 'Authorise' : 'Not available yet'}
                             </Button>
                           )}
                         </div>

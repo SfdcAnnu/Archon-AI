@@ -299,14 +299,16 @@ export default function ArchonPage() {
               </aside>
             )}
             <div className="ax-convmain">
-              <div className="ax-orbhead">
+              {/* The orb is the room's light, not a fixture: a faint glow
+                  behind the words that takes no space of its own. */}
+              <div className="ax-orbhead" aria-hidden="true">
                 <ArchonOrb size="xl" phase={orbPhase} />
                 <div className="ax-greet">
                   <h1>Hello. I'm Archon.</h1>
                   <p>What are we doing today? Ask for anything, or describe an agent to build.</p>
                 </div>
-                {working && <span className="ax-working"><i />{working}</span>}
               </div>
+              {working && <div className="ax-workline"><span className="ax-working"><i />{working}</span></div>}
               <div className="ax-convhd">Conversation <span className={`r${working ? ' live' : ''}`}>{working ? <><i />{working}</> : `you · ${agent.name}`}</span></div>
               {viewing ? (
                 <div className="ax-transcript">

@@ -49,14 +49,13 @@
 
     <!-- ── LWC ────────────────────────────────────────────────────── -->
     <types>
-        <members>synapseChatPanel</members>
-        <members>synapseChat</members>
+        <members>archonChat</members>
         <name>LightningComponentBundle</name>
     </types>
 
     <!-- ── Tab ────────────────────────────────────────────────────── -->
     <types>
-        <members>Synapse_Chat</members>
+        <members>Archon_Chat</members>
         <name>CustomTab</name>
     </types>
 

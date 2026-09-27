@@ -17,7 +17,7 @@ import { allServices, wakeUntilSettled, type ServiceState, type WakeOutcome, typ
  *  server and every MCP server up front so an agent run doesn't pay for
  *  them inside its first tool call), the org-level
  *  Archon OAuth connection wizard (every behavior of the old page kept:
- *  full-page redirect flow via ?synapse_setup=1|0, refresh-then-fallback
+ *  full-page redirect flow via ?archon_setup=1|0, refresh-then-fallback
  *  status load, authorize/re-authorize/reset), and People (honest empty
  *  state — no client-side user list exists yet). */
 
@@ -116,7 +116,8 @@ export default function SetupPage() {
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    // The server still redirects with synapse_setup; archon_setup is the new name.
+    // The server redirects with archon_setup; synapse_setup is read too so a
+    // redirect from a server released before the rename still lands.
     const flag = url.searchParams.get('archon_setup') ?? url.searchParams.get('synapse_setup');
     if (flag != null) {
       if (flag === '1') setToast({ kind: 'success', text: 'Salesforce connection authorized.' });

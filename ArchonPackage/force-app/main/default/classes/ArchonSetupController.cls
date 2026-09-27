@@ -10,7 +10,7 @@
  *   3. LWC redirects browser to authorize URL → user logs in / consents →
  *      SF redirects to <server>/api/setup/callback → server completes OAuth
  *      → server promotes the pre-minted sessionKey into an OrgInstall row
- *      → server redirects browser to returnUrl?synapse_setup=1.
+ *      → server redirects browser to returnUrl?archon_setup=1.
  *   4. LWC sees the flag, calls refreshStatus() to enrich the local Custom
  *      Setting with email + configuredAt. No second OAuth callout.
  *   5. From here on, AgentConnectorController.callout() sends
@@ -36,7 +36,7 @@ public with sharing class ArchonSetupController {
 
     /**
      * Hits the server for authoritative status + email. Called by the LWC
-     * after it sees ?synapse_setup=1 to enrich the local Custom Setting
+     * after it sees ?archon_setup=1 to enrich the local Custom Setting
      * with the configured email and confirmed timestamp.
      */
     @AuraEnabled

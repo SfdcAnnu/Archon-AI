@@ -17,8 +17,9 @@ type Cfg = Record<string, unknown>;
 
 const VARIABLES_HINT = (
   <>
-    Refer to earlier steps with <code>{'{!record.Field}'}</code> (the trigger record), <code>{'{!ai.finalText}'}</code> (the AI step’s answer),
-    {' '}<code>{'{!item.Field}'}</code> (inside a loop), or <code>{'{!name.field}'}</code> for a step whose result you named.
+    Use <code>{'{!recordId}'}</code> for the record the run started on, <code>{'{!name.Field}'}</code> for a step whose result you named
+    (add a Get record step to read that record’s fields), <code>{'{!item.Field}'}</code> inside a loop, and <code>{'{!ai.finalText}'}</code> for the AI step’s answer.
+    {' '}<code>{'{!record.x}'}</code> is only what the trigger was sent.
   </>
 );
 
@@ -55,7 +56,7 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
 
       {node.nodeSubType === 'if_else' && (
         <>
-          {text('condition', 'Condition', "{!item.Amount} >= 50000", <>One comparison: <code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code>. Text goes in quotes: <code>{"{!record.Status} == 'New'"}</code>. True follows <b>Yes</b>, false follows <b>No</b>. {VARIABLES_HINT}</>, true)}
+          {text('condition', 'Condition', "{!item.Amount} >= 50000", <>One comparison: <code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code>. Text goes in quotes: <code>{"{!acct.Rating} == 'Hot'"}</code>. True follows <b>Yes</b>, false follows <b>No</b>. {VARIABLES_HINT}</>, true)}
         </>
       )}
 
@@ -104,14 +105,14 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
 
       {node.nodeSubType === 'query_records' && (
         <>
-          {area('soql', 'SOQL query', "SELECT Id, Name, Amount, CloseDate, OwnerId FROM Opportunity WHERE AccountId = '{!record.Id}' AND IsClosed = false", <>The result is <code>records</code> (a list) and <code>count</code>. {VARIABLES_HINT}</>, 5)}
+          {area('soql', 'SOQL query', "SELECT Id, Name, Amount, CloseDate, OwnerId FROM Opportunity WHERE AccountId = '{!recordId}' AND IsClosed = false", <>The result is <code>records</code> (a list) and <code>count</code>. {VARIABLES_HINT}</>, 5)}
           {outputName}
         </>
       )}
 
       {node.nodeSubType === 'get_record' && (
         <>
-          {text('objectType', 'Object', 'Account', 'Reads the trigger record.', true)}
+          {text('objectType', 'Object', 'Account', <>Reads the record the run started on. Name it (for example <code>acct</code>) and later steps use <code>{'{!acct.Name}'}</code>.</>, true)}
           {text('fields', 'Fields', 'Id,Name,OwnerId', 'Comma-separated API names.', true)}
           {outputName}
         </>
@@ -140,7 +141,7 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
 
       {node.nodeSubType === 'post_chatter' && (
         <>
-          {area('message', 'Post', 'Risk review done for {!record.Name}.', <>Posted on the trigger record. {VARIABLES_HINT}</>, 3)}
+          {area('message', 'Post', 'Risk review done for {!acct.Name}.', <>Posted on the trigger record. {VARIABLES_HINT}</>, 3)}
           {outputName}
         </>
       )}

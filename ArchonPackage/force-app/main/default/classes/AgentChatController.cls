@@ -3,11 +3,11 @@
  *
  * Responsibilities:
  *   • Persist ChatSession__c + ChatMessage__c records (server is stateless for chat history)
- *   • Forward turns to the Synapse Node server's /api/chat/turn endpoint
+ *   • Forward turns to the Archon Node server's /api/chat/turn endpoint
  *   • Handle the write-tool approval pause/resume protocol
  *   • Enforce session expiry (24h sliding) + manual End
  *
- * Auth: same Bearer <SynapseInstall__c.SessionKey__c> pattern as other controllers.
+ * Auth: same Bearer <ArchonInstall__c.SessionKey__c> pattern as other controllers.
  */
 @SuppressWarnings('PMD.ApexCRUDViolation')
 public with sharing class AgentChatController {
@@ -1099,13 +1099,13 @@ public with sharing class AgentChatController {
     }
 
     private static HttpResponse callout(String method, String path, String body) {
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
-            throw new ChatException('Synapse is not set up yet. Open Synapse Setup and click Authorize first.');
+            throw new ChatException('Archon is not set up yet. Open Archon Setup and click Authorize first.');
         }
         String base = getServerUrl();
         if (String.isBlank(base)) {
-            throw new ChatException('SynapseConfig.Default.ServerUrl__c is not set.');
+            throw new ChatException('ArchonConfig.Default.ServerUrl__c is not set.');
         }
         HttpRequest req = new HttpRequest();
         req.setEndpoint(base.removeEnd('/') + path);
@@ -1138,8 +1138,8 @@ public with sharing class AgentChatController {
     }
 
     private static String getServerUrl() {
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

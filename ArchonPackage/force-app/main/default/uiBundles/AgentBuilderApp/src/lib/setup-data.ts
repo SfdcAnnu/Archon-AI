@@ -1,7 +1,7 @@
 import { apexFetch } from './apex-client';
 
 /** Talks to AgentSetupRestService.cls, a thin wrapper around
- *  SynapseSetupController — the org-level Archon OAuth connection wizard.
+ *  ArchonSetupController — the org-level Archon OAuth connection wizard.
  *  Still a full-page redirect flow (Salesforce login/consent, then back
  *  to whatever returnUrl this page passes), same as the old LWC. */
 const SETUP_BASE = '/services/apexrest/agent-builder/setup';

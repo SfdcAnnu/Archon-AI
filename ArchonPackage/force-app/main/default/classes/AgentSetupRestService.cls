@@ -1,5 +1,5 @@
 /**
- * Apex REST wrapper around SynapseSetupController for the React Setup
+ * Apex REST wrapper around ArchonSetupController for the React Setup
  * page — the org-level Archon OAuth connection wizard. Thin marshalling
  * only; the actual OAuth authorize/callback flow is unchanged (still a
  * full-page redirect through Salesforce login/consent and back to
@@ -13,7 +13,7 @@ global with sharing class AgentSetupRestService {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
         try {
-            SynapseSetupController.SetupStatus status = SynapseSetupController.getStatus();
+            ArchonSetupController.SetupStatus status = ArchonSetupController.getStatus();
             res.statusCode = 200;
             res.responseBody = Blob.valueOf(JSON.serialize(status));
         } catch (Exception e) {
@@ -35,19 +35,19 @@ global with sharing class AgentSetupRestService {
             }
 
             if (action == 'refresh') {
-                SynapseSetupController.SetupStatus status = SynapseSetupController.refreshStatus();
+                ArchonSetupController.SetupStatus status = ArchonSetupController.refreshStatus();
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(status));
                 return;
             }
             if (action == 'start') {
-                SynapseSetupController.StartResult result = SynapseSetupController.startSetup((String) body.get('returnUrl'));
+                ArchonSetupController.StartResult result = ArchonSetupController.startSetup((String) body.get('returnUrl'));
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(result));
                 return;
             }
             if (action == 'reset') {
-                SynapseSetupController.resetSetup();
+                ArchonSetupController.resetSetup();
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
                 return;

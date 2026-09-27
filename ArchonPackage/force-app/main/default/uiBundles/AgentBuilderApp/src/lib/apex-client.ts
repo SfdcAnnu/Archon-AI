@@ -36,6 +36,55 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): 
   });
 }
 
+/** Namespace of the managed package. Installed from the package, Apex REST
+ *  lives under /services/apexrest/archon/... and serialized records carry
+ *  archon__Field__c keys; deployed as plain source (the dev org) neither
+ *  does. Which one this org is gets learned from the first call. */
+export const PACKAGE_NAMESPACE = 'archon';
+const NS_STORAGE_KEY = 'archon.apexNamespace';
+const APEX_REST = '/services/apexrest/';
+
+let apexNamespace: string | null = readStoredNamespace();
+
+function readStoredNamespace(): string | null {
+  try {
+    return window.sessionStorage.getItem(NS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberNamespace(ns: string) {
+  apexNamespace = ns;
+  try {
+    window.sessionStorage.setItem(NS_STORAGE_KEY, ns);
+  } catch {
+    // Private window or blocked storage — the in-memory value still holds.
+  }
+}
+
+function namespacedPath(path: string, ns: string): string {
+  return ns && path.startsWith(APEX_REST) ? `${APEX_REST}${ns}/${path.slice(APEX_REST.length)}` : path;
+}
+
+/** Salesforce's answer for a URL no @RestResource maps: 404 with NOT_FOUND. */
+function isUnmappedUrl(status: number, body: unknown): boolean {
+  return status === 404 && Array.isArray(body) && body.some(e => (e as { errorCode?: string })?.errorCode === 'NOT_FOUND');
+}
+
+/** archon__Role__c → Role__c, recursively, so the UI reads one shape in
+ *  both kinds of org. */
+export function stripNamespace<T>(value: T, ns: string): T {
+  if (!ns || value == null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(v => stripNamespace(v, ns)) as T;
+  const prefix = `${ns}__`;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k.startsWith(prefix) ? k.slice(prefix.length) : k] = stripNamespace(v, ns);
+  }
+  return out as T;
+}
+
 /** requestTimeoutMs default (15s) fits every existing caller — plain CRUD
  *  round-trips. Callers proxying a slow downstream operation (e.g. the
  *  agent generator's LLM call, given ~60s headroom on the Apex side by
@@ -46,15 +95,31 @@ export async function apexFetch<T>(path: string, init?: RequestInit, requestTime
   if (!sdk.fetch) {
     throw new Error('Platform SDK has no fetch() on this surface — cannot reach Apex REST.');
   }
-  const res = await withTimeout(
-    sdk.fetch(path, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    }),
-    requestTimeoutMs,
-    'Apex REST call'
-  );
-  const body = (await res.json()) as T | { error: string };
+  const sdkFetch = sdk.fetch.bind(sdk);
+  const send = (p: string) =>
+    withTimeout(
+      sdkFetch(p, {
+        ...init,
+        headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+      }),
+      requestTimeoutMs,
+      'Apex REST call'
+    );
+
+  // Unknown org: try the packaged path first, fall back to the plain one.
+  const ns = apexNamespace ?? PACKAGE_NAMESPACE;
+  let res = await send(namespacedPath(path, ns));
+  let body = (await res.json()) as T | { error: string };
+  if (apexNamespace === null && path.startsWith(APEX_REST)) {
+    if (isUnmappedUrl(res.status, body)) {
+      res = await send(path);
+      body = (await res.json()) as T | { error: string };
+      if (!isUnmappedUrl(res.status, body)) rememberNamespace('');
+    } else {
+      rememberNamespace(ns);
+    }
+  }
+  body = stripNamespace(body, apexNamespace ?? '');
   if (!res.ok) {
     const message = (body as { error?: string })?.error ?? `Request failed (${res.status})`;
     // Copy rule: never surface a raw provider/host error body. The Archon

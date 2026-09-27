@@ -20,7 +20,7 @@ private class AgentRunnerTest {
         insert new AgentDefinition__c(
             Name='Runner Agent', ApiName__c='runner_agent', Department__c='Sales', Status__c='Active'
         );
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()

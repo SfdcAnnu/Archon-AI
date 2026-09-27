@@ -11,7 +11,7 @@
     }
   ],
   "name": "ArchonPackage",
-  "namespace": "",
+  "namespace": "archon",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "67.0",
   "packageAliases": {}

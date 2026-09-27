@@ -116,10 +116,12 @@ export default function SetupPage() {
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    const flag = url.searchParams.get('synapse_setup');
+    // The server still redirects with synapse_setup; archon_setup is the new name.
+    const flag = url.searchParams.get('archon_setup') ?? url.searchParams.get('synapse_setup');
     if (flag != null) {
       if (flag === '1') setToast({ kind: 'success', text: 'Salesforce connection authorized.' });
       else setToast({ kind: 'error', text: url.searchParams.get('error') ?? 'Authorization failed.' });
+      url.searchParams.delete('archon_setup');
       url.searchParams.delete('synapse_setup');
       url.searchParams.delete('error');
       window.history.replaceState({}, '', url.toString());

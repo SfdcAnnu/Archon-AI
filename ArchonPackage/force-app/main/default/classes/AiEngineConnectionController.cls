@@ -176,7 +176,7 @@ public with sharing class AiEngineConnectionController {
             FROM AiEngineConnection__c WHERE Id = :recordId WITH USER_MODE LIMIT 1
         ];
 
-        SynapseInstall__c install = getInstall();
+        ArchonInstall__c install = getInstall();
         String base = getServerUrl();
         if (install == null || String.isBlank(install.SessionKey__c) || String.isBlank(base)) {
             throw new AuraHandledException('Archon setup incomplete. Complete Archon Setup before testing.');
@@ -343,7 +343,7 @@ public with sharing class AiEngineConnectionController {
             throw new EngineConnectionException('Pass a saved connection or engineType + apiKey.');
         }
 
-        SynapseInstall__c install = getInstall();
+        ArchonInstall__c install = getInstall();
         String base = getServerUrl();
         if (install == null || String.isBlank(install.SessionKey__c) || String.isBlank(base)) {
             throw new EngineConnectionException('Archon setup incomplete. Complete Archon Setup first.');
@@ -391,15 +391,15 @@ public with sharing class AiEngineConnectionController {
         update rec;
     }
 
-    private static SynapseInstall__c getInstall() {
-        // API name stays SynapseInstall__c until packaging (namespace auto-prefixes).
-        return SynapseInstall__c.getOrgDefaults();
+    private static ArchonInstall__c getInstall() {
+        // API name stays ArchonInstall__c until packaging (namespace auto-prefixes).
+        return ArchonInstall__c.getOrgDefaults();
     }
 
     private static String getServerUrl() {
-        // Backward-compat: SynapseConfig__mdt still the API name until packaging.
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        // Backward-compat: ArchonConfig__mdt still the API name until packaging.
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

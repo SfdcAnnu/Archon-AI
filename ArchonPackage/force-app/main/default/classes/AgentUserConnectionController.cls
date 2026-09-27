@@ -80,7 +80,7 @@ public with sharing class AgentUserConnectionController {
     //    here so chat users don't need access to the admin class) ────────
 
     private static HttpResponse callout(String method, String path, String body) {
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
             throw new AuraHandledException('Archon is not set up yet — ask your admin to run Archon Setup.');
         }
@@ -99,8 +99,8 @@ public with sharing class AgentUserConnectionController {
     }
 
     private static String getServerUrl() {
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

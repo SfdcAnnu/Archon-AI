@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify';
 
 marked.setOptions({ gfm: true, breaks: true });
 
-/** Same allow-list the old synapseChatPanel LWC used for its DOMPurify
+/** Same allow-list the old archonChatPanel LWC used for its DOMPurify
  *  config — kept identical since this is rendering AI-generated content
  *  as HTML, a real XSS surface if the list is loosened. */
 const ALLOWED_TAGS = [

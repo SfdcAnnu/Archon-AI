@@ -3,7 +3,7 @@
     <label>Salesforce MCP</label>
     <protected>false</protected>
     <values><field>DisplayName__c</field><value xsi:type="xsd:string">Salesforce MCP</value></values>
-    <values><field>Description__c</field><value xsi:type="xsd:string">Read and write Salesforce records, run SOQL, execute reports, post Chatter, invoke Apex. Authorized via the Synapse External Client App.</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Read and write Salesforce records, run SOQL, execute reports, post Chatter, invoke Apex. Authorized via the Archon External Client App.</value></values>
     <values><field>Category__c</field><value xsi:type="xsd:string">CRM</value></values>
     <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_salesforce</value></values>
     <values><field>BrandColor__c</field><value xsi:type="xsd:string">#00a1e0</value></values>

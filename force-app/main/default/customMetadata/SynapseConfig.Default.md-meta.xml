@@ -3,6 +3,10 @@
     <label>Default</label>
     <protected>false</protected>
     <values>
+        <field>JwtSecret__c</field>
+        <value xsi:type="xsd:string">b1677e803ad32ef5c9c910ccc3cb0b80f9629f8fd279b5f9453b66d4b7356753</value>
+    </values>
+    <values>
         <field>ServerUrl__c</field>
         <value xsi:type="xsd:string">https://aeventra-ai-agent-server.onrender.com</value>
     </values>

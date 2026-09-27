@@ -15,11 +15,11 @@ private class AgentConnectorControllerTest {
     }
 
     // Every AgentConnectorController.callout() requires a configured
-    // SynapseInstall__c row (Bearer <SessionKey__c> pattern) — without it,
+    // ArchonInstall__c row (Bearer <SessionKey__c> pattern) — without it,
     // the method throws before the HttpCalloutMock is ever reached.
     @TestSetup
     static void seedInstall() {
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()
@@ -62,7 +62,7 @@ private class AgentConnectorControllerTest {
         Test.setMock(HttpCalloutMock.class, new StubMock(200, '{"connectorId":"xyz","authorizeUrl":"https://example.com/auth"}'));
         Test.startTest();
         AgentConnectorController.StartOAuthResult r = AgentConnectorController.startOAuth(
-            'salesforce_mcp', 'My SF', 'https://acme.lightning.force.com/lightning/n/Synapse_AI'
+            'salesforce_mcp', 'My SF', 'https://acme.lightning.force.com/lightning/n/Archon_AI'
         );
         Test.stopTest();
         System.assertEquals('xyz', r.connectorId);

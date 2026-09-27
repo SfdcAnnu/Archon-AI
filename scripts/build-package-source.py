@@ -44,7 +44,7 @@ EXCLUDE = [
     'standardValueSets/',
     'permissionsets/LeadQualificationFields.permissionset-meta.xml',
     # Unused secret; its value must not ship to subscriber orgs
-    'objects/SynapseConfig__mdt/fields/JwtSecret__c.field-meta.xml',
+    'objects/ArchonConfig__mdt/fields/JwtSecret__c.field-meta.xml',
 ]
 
 # Grants in the core permission sets that point at excluded components.
@@ -93,7 +93,7 @@ def main():
             continue
         dst = os.path.join(OUT, 'main', 'default', rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        if rel.startswith('permissionsets/') or rel == 'customMetadata/SynapseConfig.Default.md-meta.xml':
+        if rel.startswith('permissionsets/') or rel == 'customMetadata/ArchonConfig.Default.md-meta.xml':
             with open(src, encoding='utf-8') as fh:
                 text = fh.read()
             text = strip_permset(text) if rel.startswith('permissionsets/') else strip_config_record(text)

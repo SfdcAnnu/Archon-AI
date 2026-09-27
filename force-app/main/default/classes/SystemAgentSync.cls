@@ -16,9 +16,9 @@ public with sharing class SystemAgentSync {
     public static Boolean ensure(String apiName) {
         if (String.isBlank(apiName)) return false;
         try {
-            SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+            ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
             if (install == null || String.isBlank(install.SessionKey__c)) return false;
-            List<SynapseConfig__mdt> cfg = [SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1];
+            List<ArchonConfig__mdt> cfg = [SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1];
             if (cfg.isEmpty() || String.isBlank(cfg[0].ServerUrl__c)) return false;
 
             HttpRequest req = new HttpRequest();

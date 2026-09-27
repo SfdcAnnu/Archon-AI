@@ -1,7 +1,7 @@
 /**
  * Apex REST wrapper around the chat-session-lifecycle surface of
  * AgentChatController, plus AgentChatAttachmentController and
- * AgentUserConnectionController — everything the old synapseChatPanel LWC
+ * AgentUserConnectionController — everything the old archonChatPanel LWC
  * needed for a full production chat experience (attachments, the PerUser
  * connect gate) that the React app's WebSocket test panel never had.
  * Thin marshalling only — zero duplicated logic, same as every other REST

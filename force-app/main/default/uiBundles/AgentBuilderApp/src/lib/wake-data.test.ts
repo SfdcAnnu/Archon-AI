@@ -85,7 +85,7 @@ describe('wakeUntilSettled', () => {
       wakeUntilSettled({
         onUpdate: () => {},
         sleep: noSleep,
-        fetchOnce: () => Promise.reject(new Error('Synapse Config ServerUrl__c is not set.')),
+        fetchOnce: () => Promise.reject(new Error('Archon Config ServerUrl__c is not set.')),
       })
     ).rejects.toThrow(/ServerUrl__c/);
   });

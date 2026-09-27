@@ -2,8 +2,8 @@
 // A no-tool, no-subagent turn measured 9.2s wall clock with only 1.1s of
 // model loop. This splits the remaining 8.1s into the legs we can time
 // from inside Salesforce, without touching the server.
-SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
-String base = SynapseConfig__mdt.getInstance('Default').ServerUrl__c;
+ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
+String base = ArchonConfig__mdt.getInstance('Default').ServerUrl__c;
 System.debug('BASE ' + base);
 
 // Leg 1: Salesforce -> Render network + TLS, no server work.

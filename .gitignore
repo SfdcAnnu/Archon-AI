@@ -84,3 +84,6 @@ force-app.zip
 .tmp-retrieve/
 server-langchain/
 Salesforce Metadata MCP Server/
+
+# Standalone mobile demo app (own git repo)
+Archon Mobile Demo/

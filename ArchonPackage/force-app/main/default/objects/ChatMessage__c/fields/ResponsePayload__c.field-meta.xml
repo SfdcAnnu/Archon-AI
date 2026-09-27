@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ResponsePayload__c</fullName>
+    <label>Response Payload (Debug)</label>
+    <description>Raw JSON response body received from the AI provider for this turn. Only populated when the agent's Debug Mode is on. Truncated if it exceeds field length.</description>
+    <type>LongTextArea</type>
+    <length>131072</length>
+    <visibleLines>10</visibleLines>
+</CustomField>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CachedTokens__c</fullName>
+    <label>Cached Tokens</label>
+    <description>Prompt-cache hits across this turn, already counted inside TokensIn__c. Broken out because providers bill cache reads far cheaper than fresh input, so a turn with a high cached share costs much less than its raw token count suggests.</description>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

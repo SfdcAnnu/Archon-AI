@@ -1,0 +1,548 @@
+/**
+ * AgentBuilderController
+ * - with sharing enforced
+ * - USER_MODE on all SOQL (replaces deprecated WITH_SECURITY_ENFORCED)
+ * - Zero SOQL in loops, bulkified DML
+ * - Callout=true for external server integration
+ */
+@SuppressWarnings('PMD.ApexCRUDViolation')
+public with sharing class AgentBuilderController {
+
+    // GET: All agent definitions for a department
+    @AuraEnabled(cacheable=true)
+    public static List<AgentDefinition__c> getAgentDefinitions(String department) {
+        if (String.isBlank(department)) {
+            return [
+                SELECT Id, Name, ApiName__c, Department__c, Description__c,
+                       Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
+                       IsSystem__c, StreamReplies__c, CreatedDate, LastModifiedDate
+                FROM AgentDefinition__c
+                WITH USER_MODE
+                ORDER BY Department__c, Name ASC
+                LIMIT 200
+            ];
+        }
+        return [
+            SELECT Id, Name, ApiName__c, Department__c, Description__c,
+                   Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
+                   ExecuteType__c, IsSystem__c, StreamReplies__c, CreatedDate, LastModifiedDate
+            FROM AgentDefinition__c
+            WHERE Department__c = :department
+            WITH USER_MODE
+            ORDER BY Name ASC
+            LIMIT 200
+        ];
+    }
+
+    // GET: agents eligible to be named as a "post-turn automation agent" (Trigger or Both),
+    // for the linked-automation-agent picker on a chat-capable agent. Excludes the agent
+    // being edited so it can't point at itself.
+    @AuraEnabled(cacheable=true)
+    public static List<AutomationAgentOption> listAutomationAgents(String excludeAgentId) {
+        // Bind-null comparisons on `!=` aren't reliable in SOQL — branch instead
+        // (new, unsaved agent has no Id yet, so there's nothing to exclude).
+        List<AgentDefinition__c> rows;
+        if (String.isBlank(excludeAgentId)) {
+            rows = [
+                SELECT Id, Name, ApiName__c
+                FROM AgentDefinition__c
+                WHERE ExecuteType__c IN ('Trigger', 'Both')
+                WITH USER_MODE
+                ORDER BY Name ASC
+                LIMIT 200
+            ];
+        } else {
+            Id excludeId = (Id) excludeAgentId;
+            rows = [
+                SELECT Id, Name, ApiName__c
+                FROM AgentDefinition__c
+                WHERE ExecuteType__c IN ('Trigger', 'Both')
+                  AND Id != :excludeId
+                WITH USER_MODE
+                ORDER BY Name ASC
+                LIMIT 200
+            ];
+        }
+        List<AutomationAgentOption> out = new List<AutomationAgentOption>();
+        for (AgentDefinition__c a : rows) {
+            AutomationAgentOption o = new AutomationAgentOption();
+            o.id      = a.Id;
+            o.label   = a.Name;
+            o.apiName = a.ApiName__c;
+            out.add(o);
+        }
+        return out;
+    }
+
+    // GET: Single agent with all nodes — one read for the whole agentEditor
+    // page, mirroring the canvas's existing one-wire pattern. Returns null
+    // wrapper when id is blank — new-agent case.
+    @AuraEnabled(cacheable=true)
+    public static AgentWithNodes getAgentWithNodes(String agentId) {
+        if (String.isBlank(agentId)) return null;
+        List<AgentDefinition__c> agents = [
+            SELECT Id, Name, ApiName__c, Department__c, Description__c,
+                   KnowledgeBase__c, Status__c, Version__c, CanvasJson__c,
+                   ExternalServerUrl__c, TotalExecutions__c, SuccessRate__c, AccessMode__c,
+                   SetupChecklistJson__c, ExecuteType__c, PostTurnAutomationAgent__c, DebugMode__c,
+                   StreamReplies__c,
+                   (SELECT Id, Name, NodeType__c, NodeSubType__c, ConfigJson__c,
+                           PositionX__c, PositionY__c, SortOrder__c,
+                           IsEnabled__c, McpServer__c, McpTool__c,
+                           AiEngineConnection__c
+                    FROM Nodes__r
+                    ORDER BY SortOrder__c ASC)
+            FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) return null;
+        return new AgentWithNodes(agents[0]);
+    }
+
+    // SAVE: Upsert agent + bulk upsert nodes
+    @AuraEnabled
+    public static String saveAgentWithNodes(String agentJson, String nodesJson) {
+        AgentDefinitionInput agentInput = (AgentDefinitionInput)
+            JSON.deserialize(agentJson, AgentDefinitionInput.class);
+        List<AgentNodeInput> nodeInputs = (List<AgentNodeInput>)
+            JSON.deserialize(nodesJson, List<AgentNodeInput>.class);
+
+        Savepoint sp = Database.setSavepoint();
+        try {
+            AgentDefinition__c agentRecord = buildAgentRecord(agentInput);
+            upsert agentRecord ApiName__c;
+
+            String agentRecordId = agentRecord.Id;
+
+            List<AgentNode__c> existingNodes = [
+                SELECT Id FROM AgentNode__c
+                WHERE AgentDefinition__c = :agentRecordId
+                WITH USER_MODE
+            ];
+            if (!existingNodes.isEmpty()) delete existingNodes;
+
+            List<AgentNode__c> newNodes = new List<AgentNode__c>();
+            for (Integer i = 0; i < nodeInputs.size(); i++) {
+                newNodes.add(buildNodeRecord(nodeInputs[i], agentRecordId, i));
+            }
+            if (!newNodes.isEmpty()) insert newNodes;
+
+            return agentRecordId;
+
+        } catch (Exception e) {
+            Database.rollback(sp);
+            throw new AuraHandledException('Save failed: ' + e.getMessage());
+        }
+    }
+
+    // EXECUTE: Callout to Node.js execution engine
+    @AuraEnabled
+    public static ExecutionResult executeAgent(
+        String agentApiName,
+        String recordId,
+        String runMode,
+        String inputPayloadJson
+    ) {
+        List<AgentDefinition__c> agents = [
+            SELECT Id, ApiName__c, ExternalServerUrl__c, Status__c
+            FROM AgentDefinition__c
+            WHERE ApiName__c = :agentApiName
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) throw new AuraHandledException('Agent not found: ' + agentApiName);
+        if (agents[0].Status__c == 'Inactive') throw new AuraHandledException('Agent is Inactive and cannot be run.');
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'agentApiName' => agentApiName,
+            'recordId'     => recordId,
+            'userId'       => UserInfo.getUserId(),
+            'department'   => agents[0].Id,
+            'runMode'      => String.isBlank(runMode) ? 'sync' : runMode,
+            'inputPayload' => String.isNotBlank(inputPayloadJson)
+                                ? JSON.deserializeUntyped(inputPayloadJson)
+                                : new Map<String, Object>(),
+            // This method is only ever called by the builder's Test Runner UI —
+            // real automation (triggers, AgentRunner Flow invocable) posts to the
+            // Node server directly and never sets this, so it still requires Active.
+            'isTestRun' => true
+        };
+
+        // Resolve the running user's AI Engine Connection — same pattern
+        // AgentChatController uses. May be null → Node falls back to .env.
+        List<AgentNode__c> aiNodes = [
+            SELECT Id, NodeSubType__c, AiEngineConnection__c
+            FROM AgentNode__c
+            WHERE AgentDefinition__c = :agents[0].Id AND NodeType__c = 'ai'
+            WITH USER_MODE
+            ORDER BY SortOrder__c ASC
+            LIMIT 1
+        ];
+        if (!aiNodes.isEmpty() && String.isNotBlank(aiNodes[0].NodeSubType__c)) {
+            AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime(
+                aiNodes[0].NodeSubType__c, aiNodes[0].AiEngineConnection__c
+            );
+            if (cred != null) {
+                payload.put('engineOverride', new Map<String, Object>{
+                    'engineType'   => cred.EngineType__c,
+                    'apiKey'       => cred.ApiKey__c,
+                    'endpoint'     => cred.Endpoint__c,
+                    'defaultModel' => cred.DefaultModel__c,
+                    'connectionId' => cred.Id
+                });
+            }
+        }
+
+        HttpResponse res = ArchonServerClient.callout('POST', '/api/agent/execute', JSON.serialize(payload));
+        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+
+        insertExecutionLog(agents[0].Id, agentApiName, recordId, runMode, body);
+
+        return buildExecutionResult(body, res.getStatusCode());
+    }
+
+    // GET: Execution logs (paginated)
+    @AuraEnabled(cacheable=true)
+    public static ExecutionPage getExecutionLogs(
+        String agentId,
+        Integer pageSize,
+        Integer pageOffset,
+        String status
+    ) {
+        Integer pSize   = pageSize   != null ? Math.min(pageSize, 50)   : 20;
+        Integer pOffset = pageOffset != null ? pageOffset                : 0;
+
+        List<String> wheres = new List<String>();
+        if (String.isNotBlank(agentId)) wheres.add('AgentDefinition__c = :agentId');
+        if (String.isNotBlank(status))  wheres.add('Status__c = :status');
+        String whereClause = wheres.isEmpty() ? '' : (' WHERE ' + String.join(wheres, ' AND '));
+
+        List<AgentExecution__c> logs = Database.query(
+            'SELECT Id, Name, AgentDefinition__r.Name, AgentDefinition__r.Department__c, ' +
+            'CorrelationId__c, RecordId__c, Status__c, AgentScore__c, AgentPriority__c, ' +
+            'AgentReason__c, ToolsUsed__c, OutputPayload__c, ExecutionMs__c, Department__c, CreatedDate ' +
+            'FROM AgentExecution__c' + whereClause + ' WITH USER_MODE ' +
+            'ORDER BY CreatedDate DESC LIMIT :pSize OFFSET :pOffset'
+        );
+        Integer total = Database.countQuery(
+            'SELECT COUNT() FROM AgentExecution__c' + whereClause + ' WITH USER_MODE'
+        );
+
+        return new ExecutionPage(logs, total, pSize, pOffset);
+    }
+
+    /**
+     * Per-node trace for one run — Execution Logs' "Node detail" view.
+     * Durable-run steps live in the Node server's Postgres (RunStep), not
+     * Salesforce, so this is a thin callout proxy keyed by CorrelationId__c
+     * (the one identifier both sides share).
+     */
+    @AuraEnabled
+    public static RunStepsResult getRunSteps(String correlationId) {
+        if (String.isBlank(correlationId)) throw new AuraHandledException('correlationId is required.');
+        HttpResponse res = ArchonServerClient.callout(
+            'GET', '/api/agent/runs/by-correlation/' + EncodingUtil.urlEncode(correlationId, 'UTF-8') + '/steps', null
+        );
+        if (res.getStatusCode() == 404) {
+            RunStepsResult empty = new RunStepsResult();
+            empty.status = 'NOT_FOUND';
+            empty.steps = new List<RunStepDto>();
+            return empty;
+        }
+        if (res.getStatusCode() >= 400) {
+            throw new AuraHandledException('Could not load node trace: ' + ArchonServerClient.extractServerError(res));
+        }
+        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        RunStepsResult result = new RunStepsResult();
+        result.status = (String) body.get('status');
+        result.steps = new List<RunStepDto>();
+        for (Object s : (List<Object>) body.get('steps')) {
+            Map<String, Object> sm = (Map<String, Object>) s;
+            RunStepDto dto = new RunStepDto();
+            dto.nodeId      = (String) sm.get('nodeId');
+            dto.nodeLabel   = (String) sm.get('nodeLabel');
+            dto.nodeSubType = (String) sm.get('nodeSubType');
+            dto.inputJson   = sm.get('input')  != null ? JSON.serializePretty(sm.get('input'))  : null;
+            dto.outputJson  = sm.get('output') != null ? JSON.serializePretty(sm.get('output')) : null;
+            dto.success     = (Boolean) sm.get('success');
+            dto.errorMsg    = (String) sm.get('error');
+            dto.startedAt   = (String) sm.get('startedAt');
+            dto.finishedAt  = (String) sm.get('finishedAt');
+            result.steps.add(dto);
+        }
+        return result;
+    }
+
+    public class RunStepsResult {
+        @AuraEnabled public String status;
+        @AuraEnabled public List<RunStepDto> steps;
+    }
+
+    public class RunStepDto {
+        @AuraEnabled public String nodeId;
+        @AuraEnabled public String nodeLabel;
+        @AuraEnabled public String nodeSubType;
+        @AuraEnabled public String inputJson;
+        @AuraEnabled public String outputJson;
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String errorMsg;
+        @AuraEnabled public String startedAt;
+        @AuraEnabled public String finishedAt;
+    }
+
+    // GET: Department summary stats
+    @AuraEnabled(cacheable=true)
+    public static List<DeptStats> getDepartmentStats() {
+        List<AggregateResult> results = [
+            SELECT Department__c dept,
+                   COUNT(Id) agentCount,
+                   SUM(TotalExecutions__c) totalRuns
+            FROM AgentDefinition__c
+            WITH USER_MODE
+            GROUP BY Department__c
+            ORDER BY Department__c
+        ];
+
+        List<DeptStats> stats = new List<DeptStats>();
+        for (AggregateResult ar : results) {
+            stats.add(new DeptStats(ar));
+        }
+        return stats;
+    }
+
+    // DELETE: Agent + all child nodes (cascade via master-detail)
+    @AuraEnabled
+    public static void deleteAgent(String agentId) {
+        List<AgentDefinition__c> toDelete = [
+            SELECT Id, Name, IsSystem__c FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (toDelete.isEmpty()) return;
+        // A built-in agent is part of the product: it can be switched off,
+        // never removed. The platform rewrites it when a new version ships.
+        if (toDelete[0].IsSystem__c == true) {
+            throw new IllegalArgumentException('"' + toDelete[0].Name + '" is a built-in agent — set it to Inactive instead of deleting it.');
+        }
+        delete toDelete;
+    }
+
+    // ACTIVATE / DEACTIVATE
+    @AuraEnabled
+    public static void updateAgentStatus(String agentId, String status) {
+        List<AgentDefinition__c> agents = [
+            SELECT Id, Status__c FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) throw new AuraHandledException('Agent not found');
+        agents[0].Status__c = status;
+        update agents;
+    }
+
+    /** The chat's starting mode for this agent. Written on its own rather
+     *  than through the graph save, because a checkbox should not cost a
+     *  full node delete-and-reinsert. */
+    @AuraEnabled
+    public static void updateStreamReplies(String agentId, Boolean enabled) {
+        List<AgentDefinition__c> agents = [
+            SELECT Id, StreamReplies__c FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) throw new AuraHandledException('Agent not found');
+        agents[0].StreamReplies__c = enabled == true;
+        update agents;
+    }
+
+    @AuraEnabled
+    public static void updateDebugMode(String agentId, Boolean enabled) {
+        List<AgentDefinition__c> agents = [
+            SELECT Id, DebugMode__c FROM AgentDefinition__c
+            WHERE Id = :agentId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (agents.isEmpty()) throw new AuraHandledException('Agent not found');
+        agents[0].DebugMode__c = enabled == true;
+        update agents;
+    }
+
+    // PRIVATE HELPERS
+
+    private static AgentDefinition__c buildAgentRecord(AgentDefinitionInput inp) {
+        return new AgentDefinition__c(
+            Name              = inp.label,
+            ApiName__c        = inp.apiName,
+            Department__c     = inp.department,
+            Description__c    = inp.description,
+            KnowledgeBase__c  = inp.knowledgeBase,
+            Status__c         = inp.status != null ? inp.status : 'Draft',
+            AccessMode__c     = inp.accessMode != null ? inp.accessMode : 'Org',
+            CanvasJson__c     = inp.canvasJson,
+            SetupChecklistJson__c = inp.setupChecklistJson,
+            ExecuteType__c    = inp.executeType != null ? inp.executeType : 'Trigger',
+            PostTurnAutomationAgent__c = inp.postTurnAutomationAgent,
+            StreamReplies__c  = inp.streamReplies == true
+        );
+    }
+
+    private static AgentNode__c buildNodeRecord(AgentNodeInput inp, String agentId, Integer order) {
+        return new AgentNode__c(
+            Name                  = inp.label,
+            AgentDefinition__c    = agentId,
+            NodeType__c           = inp.nodeType,
+            NodeSubType__c        = inp.nodeSubType,
+            ConfigJson__c         = inp.configJson,
+            PositionX__c          = inp.positionX != null ? inp.positionX : 0,
+            PositionY__c          = inp.positionY != null ? inp.positionY : 0,
+            SortOrder__c          = order,
+            IsEnabled__c          = inp.isEnabled != null ? inp.isEnabled : true,
+            McpServer__c          = inp.mcpServer,
+            McpTool__c            = inp.mcpTool,
+            AiEngineConnection__c = inp.aiEngineConnectionId
+        );
+    }
+
+    private static void insertExecutionLog(
+        String agentDefId, String agentApiName, String recordId,
+        String runMode, Map<String, Object> body
+    ) {
+        AgentExecution__c log = new AgentExecution__c(
+            AgentDefinition__c = agentDefId,
+            CorrelationId__c   = (String) body.get('correlationId'),
+            RecordId__c        = recordId,
+            Status__c          = (String) body.get('agentStatus'),
+            RunMode__c         = runMode,
+            AgentReason__c     = (String) body.get('agentReason'),
+            ToolsUsed__c       = (String) body.get('toolsUsed'),
+            OutputPayload__c   = (String) body.get('agentOutputPayload')
+        );
+        if (body.get('agentScore') != null) {
+            log.AgentScore__c = Integer.valueOf(body.get('agentScore'));
+        }
+        if (body.get('agentPriority') != null) {
+            log.AgentPriority__c = (String) body.get('agentPriority');
+        }
+        insert log;
+    }
+
+    private static ExecutionResult buildExecutionResult(
+        Map<String, Object> body, Integer statusCode
+    ) {
+        ExecutionResult result      = new ExecutionResult();
+        result.success              = (Boolean) body.get('success');
+        result.correlationId        = (String)  body.get('correlationId');
+        result.agentStatus          = (String)  body.get('agentStatus');
+        result.agentPriority        = (String)  body.get('agentPriority');
+        result.agentReason          = (String)  body.get('agentReason');
+        result.agentOutputPayload   = (String)  body.get('agentOutputPayload');
+        result.httpStatus           = statusCode;
+        if (body.get('agentScore') != null) {
+            result.agentScore = Integer.valueOf(body.get('agentScore'));
+        }
+        if (result.success != true) {
+            result.errorMessage = (String) body.get('message');
+            if (String.isBlank(result.errorMessage)) {
+                result.errorMessage = (String) body.get('error');
+            }
+            if (String.isBlank(result.errorMessage)) {
+                result.errorMessage = 'Run failed (HTTP ' + statusCode + ') — no further detail returned.';
+            }
+        }
+        return result;
+    }
+
+    // INNER WRAPPER CLASSES
+
+    public class AgentWithNodes {
+        @AuraEnabled public AgentDefinition__c agent;
+        @AuraEnabled public List<AgentNode__c>  nodes;
+        public AgentWithNodes(AgentDefinition__c a) {
+            this.agent   = a;
+            this.nodes   = a.Nodes__r  != null ? a.Nodes__r  : new List<AgentNode__c>();
+        }
+    }
+
+    public class AgentDefinitionInput {
+        @AuraEnabled public String apiName;
+        @AuraEnabled public String label;
+        @AuraEnabled public String department;
+        @AuraEnabled public String description;
+        @AuraEnabled public String knowledgeBase;
+        @AuraEnabled public String status;
+        @AuraEnabled public String accessMode;
+        @AuraEnabled public String canvasJson;
+        @AuraEnabled public String setupChecklistJson;
+        @AuraEnabled public String executeType;
+        @AuraEnabled public String postTurnAutomationAgent;
+        // Null means "leave whatever the record already has" — a caller
+        // that does not know about this flag must never reset it, and the
+        // builder's Save posts the whole agent every time.
+        @AuraEnabled public Boolean streamReplies;
+    }
+
+    public class AutomationAgentOption {
+        @AuraEnabled public String id;
+        @AuraEnabled public String label;
+        @AuraEnabled public String apiName;
+    }
+
+    public class AgentNodeInput {
+        @AuraEnabled public String  label;
+        @AuraEnabled public String  nodeType;
+        @AuraEnabled public String  nodeSubType;
+        @AuraEnabled public String  configJson;
+        @AuraEnabled public Integer positionX;
+        @AuraEnabled public Integer positionY;
+        @AuraEnabled public Boolean isEnabled;
+        @AuraEnabled public String  mcpServer;
+        @AuraEnabled public String  mcpTool;
+        @AuraEnabled public String  aiEngineConnectionId;
+    }
+
+    public class ExecutionResult {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String  correlationId;
+        @AuraEnabled public Integer agentScore;
+        @AuraEnabled public String  agentPriority;
+        @AuraEnabled public String  agentReason;
+        @AuraEnabled public String  agentStatus;
+        @AuraEnabled public String  agentOutputPayload;
+        @AuraEnabled public Integer httpStatus;
+        // Populated whenever success is false — the server's own explanation
+        // (HTTP-layer rejection or a caught exception), independent of
+        // agentReason (which only ever holds the AI's score-tail reasoning).
+        @AuraEnabled public String  errorMessage;
+    }
+
+    public class ExecutionPage {
+        @AuraEnabled public List<AgentExecution__c> records;
+        @AuraEnabled public Integer total;
+        @AuraEnabled public Integer pageSize;
+        @AuraEnabled public Integer pageOffset;
+        public ExecutionPage(List<AgentExecution__c> r, Integer t, Integer s, Integer o) {
+            this.records    = r;
+            this.total      = t;
+            this.pageSize   = s;
+            this.pageOffset = o;
+        }
+    }
+
+    public class DeptStats {
+        @AuraEnabled public String  department;
+        @AuraEnabled public Integer agentCount;
+        @AuraEnabled public Integer totalRuns;
+        public DeptStats(AggregateResult ar) {
+            this.department = (String)  ar.get('dept');
+            this.agentCount = (Integer) ar.get('agentCount');
+            this.totalRuns  = ar.get('totalRuns') != null
+                                ? Integer.valueOf(ar.get('totalRuns')) : 0;
+        }
+    }
+}

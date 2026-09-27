@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>LastActivityAt__c</fullName>
+    <label>Last Activity At</label>
+    <description>Updated on every turn. Drives the sliding 24h expiry.</description>
+    <type>DateTime</type>
+</CustomField>

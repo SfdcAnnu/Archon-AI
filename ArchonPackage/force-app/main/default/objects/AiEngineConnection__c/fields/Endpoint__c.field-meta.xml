@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Endpoint__c</fullName>
+    <label>Endpoint URL</label>
+    <description>Optional. Override the default provider endpoint (e.g., Azure OpenAI, self-hosted proxy). Leave blank to use the provider's standard URL.</description>
+    <required>false</required>
+    <type>Url</type>
+</CustomField>

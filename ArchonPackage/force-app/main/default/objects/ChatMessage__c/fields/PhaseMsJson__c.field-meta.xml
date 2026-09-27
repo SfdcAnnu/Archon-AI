@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>PhaseMsJson__c</fullName>
+    <label>Turn Phases (ms, JSON)</label>
+    <description>Where this turn's server-side time went: {turnMs, setup, resolveServers, loadTools, buildPrompt, modelLoop}. LatencyMs__c is the modelLoop phase only — it starts after setup, MCP tool loading and prompt building have already run, so a turn reporting 888ms had really taken 9.5s and the difference was invisible from either end. turnMs is the whole server-side turn; the caller's wall clock minus turnMs is network and persistence. Only populated on Role = Assistant.</description>
+    <type>LongTextArea</type>
+    <length>4096</length>
+    <visibleLines>3</visibleLines>
+</CustomField>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ApprovalStatus__c</fullName>
+    <label>Approval Status</label>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>NotRequired</fullName><default>true</default></value>
+            <value><fullName>Pending</fullName><default>false</default></value>
+            <value><fullName>Approved</fullName><default>false</default></value>
+            <value><fullName>Declined</fullName><default>false</default></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

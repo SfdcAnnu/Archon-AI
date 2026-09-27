@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>TurnStatus__c</fullName>
+    <label>Turn Status</label>
+    <description>Whether the turn that produced this assistant message completed or failed. Blank on rows written before the field existed — read as Complete. Failed turns are recorded so dashboards can count them; before this, a failed chat turn left no trace in Salesforce at all.</description>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Complete</fullName><default>false</default></value>
+            <value><fullName>Failed</fullName><default>false</default></value>
+        </valueSetDefinition>
+    </valueSet>
+    <required>false</required>
+</CustomField>

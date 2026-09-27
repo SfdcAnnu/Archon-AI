@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SenderPhone__c</fullName>
+    <label>Sender Phone</label>
+    <description>The phone number the customer is messaging from, when the channel knows it (WhatsApp does; the Testing tab does not). Forwarded to the agent as a fact on every turn so it never guesses a number or asks for one it already has. Set by the integration that opens the session.</description>
+    <type>Phone</type>
+    <required>false</required>
+</CustomField>

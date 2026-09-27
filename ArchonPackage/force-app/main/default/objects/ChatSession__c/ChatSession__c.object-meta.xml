@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Chat Session</label>
+    <pluralLabel>Chat Sessions</pluralLabel>
+    <description>One conversation thread between a user and a chat-enabled agent. Sliding 24h expiry from last activity. Manually closeable via End button.</description>
+    <nameField>
+        <label>Session Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>CHAT-{0000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>Private</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableReports>true</enableReports>
+    <enableHistory>false</enableHistory>
+</CustomObject>

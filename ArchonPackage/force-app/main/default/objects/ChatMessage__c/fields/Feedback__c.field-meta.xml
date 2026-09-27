@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Feedback__c</fullName>
+    <label>Feedback</label>
+    <length>8</length>
+    <type>Text</type>
+    <description>End-user reaction to this assistant message: 'up' or 'down' (empty = none). Set from the chat panel's thumbs; reviewable per agent to find replies that need improving.</description>
+</CustomField>

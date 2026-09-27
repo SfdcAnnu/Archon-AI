@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>User__c</fullName>
+    <label>Chatter</label>
+    <description>The user who started this conversation. Immutable — survives OwnerId transfers so reporting stays accurate.</description>
+    <type>Lookup</type>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>Chat Sessions Started</relationshipLabel>
+    <relationshipName>ChatSessionsStarted</relationshipName>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

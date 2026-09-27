@@ -1,7 +1,7 @@
 /**
  * Apex REST wrapper for the React "Salesforce Access" page — a read-only
  * status dashboard combining the org-level Archon connection status
- * (SynapseSetupController.getStatus, same data the Setup wizard shows)
+ * (ArchonSetupController.getStatus, same data the Setup wizard shows)
  * and per-user "Connect my Salesforce" status for PerUser-access-mode
  * agents (AgentConnectorController.listSalesforceUserConnections).
  * Bundled into one GET since the page always needs both together.
@@ -14,7 +14,7 @@ global with sharing class AgentAccessRestService {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
         try {
-            SynapseSetupController.SetupStatus orgStatus = SynapseSetupController.getStatus();
+            ArchonSetupController.SetupStatus orgStatus = ArchonSetupController.getStatus();
             List<AgentConnectorController.UserConnection> userConnections =
                 AgentConnectorController.listSalesforceUserConnections();
             Map<String, Object> payload = new Map<String, Object>{

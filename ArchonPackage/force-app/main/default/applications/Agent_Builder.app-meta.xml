@@ -9,7 +9,7 @@
     <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
     <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
     <isOmniPinnedViewEnabled>false</isOmniPinnedViewEnabled>
-    <label>Agent Builder (React)</label>
+    <label>Archon Agent Builder</label>
     <description>React-native n8n-style graph canvas for building Archon AI agents — subagents, tools, and MCP connectors as drag-and-drop nodes.</description>
     <navType>Standard</navType>
     <uiBundle>c__AgentBuilderApp</uiBundle>

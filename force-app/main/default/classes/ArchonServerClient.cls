@@ -1,8 +1,8 @@
 /**
  * ArchonServerClient — shared callout helper for talking to the Archon
  * Node server, using the SAME auth pattern as chat:
- *   Authorization: Bearer <SynapseInstall__c.SessionKey__c>
- *   endpoint:      SynapseConfig__mdt.Default.ServerUrl__c + path
+ *   Authorization: Bearer <ArchonInstall__c.SessionKey__c>
+ *   endpoint:      ArchonConfig__mdt.Default.ServerUrl__c + path
  *
  * Extracted from AgentChatController so AgentRunner, AgentBuilderController,
  * and any future caller share one implementation instead of copy-pasting it.
@@ -21,13 +21,13 @@ public with sharing class ArchonServerClient {
     }
 
     public static HttpResponse callout(String method, String path, String body, Integer timeoutMs) {
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
             throw new NotConfiguredException('Archon is not set up yet. Open Archon Setup and click Authorize first.');
         }
         String base = getServerUrl();
         if (String.isBlank(base)) {
-            throw new NotConfiguredException('Archon Config ServerUrl__c is not set. Setup → Custom Metadata Types → Synapse Config → Manage Records → Default → edit ServerUrl__c.');
+            throw new NotConfiguredException('Archon Config ServerUrl__c is not set. Setup → Custom Metadata Types → Archon Config → Manage Records → Default → edit ServerUrl__c.');
         }
 
         HttpRequest req = new HttpRequest();
@@ -54,8 +54,8 @@ public with sharing class ArchonServerClient {
     }
 
     private static String getServerUrl() {
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

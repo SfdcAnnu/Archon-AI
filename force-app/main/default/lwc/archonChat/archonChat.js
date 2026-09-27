@@ -4,6 +4,13 @@ import startSession from '@salesforce/apex/AgentChatController.startSession';
 import sendTurn from '@salesforce/apex/AgentChatController.sendTurn';
 import endSession from '@salesforce/apex/AgentChatController.endSession';
 
+/** Installed from the managed package, record fields come back as
+ *  archon__Role__c; deployed as plain source they are Role__c. */
+function field(record, name) {
+  if (!record) return undefined;
+  return record[name] !== undefined ? record[name] : record['archon__' + name];
+}
+
 /**
  * Archon Chat — the embeddable chat widget. Drop it on a record page, an
  * app/home page, the utility bar, or open it as its own tab; it talks to
@@ -119,16 +126,17 @@ export default class ArchonChat extends LightningElement {
           recordContextType: this.objectApiName || null,
         });
         this.sessionId = res.session.Id;
-        if (res.session.AgentDefinition__r && res.session.AgentDefinition__r.Name) {
-          this.agentName = res.session.AgentDefinition__r.Name;
+        const agent = field(res.session, 'AgentDefinition__r');
+        if (agent && agent.Name) {
+          this.agentName = agent.Name;
         }
       }
       const result = await sendTurn({ sessionId: this.sessionId, userText: text, attachments: [] });
       const rows = result && result.newMessages ? result.newMessages : [];
       let gotReply = false;
       rows.forEach(m => {
-        if (m.Role__c === 'Assistant' && m.Content__c) {
-          this.pushMessage('assistant', m.Content__c);
+        if (field(m, 'Role__c') === 'Assistant' && field(m, 'Content__c')) {
+          this.pushMessage('assistant', field(m, 'Content__c'));
           gotReply = true;
         }
       });

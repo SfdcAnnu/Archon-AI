@@ -48,13 +48,13 @@ public with sharing class ArchonWakeService {
         String base = getServerUrl();
         if (String.isBlank(base)) {
             throw new NotConfiguredException(
-                'Synapse Config ServerUrl__c is not set. Setup → Custom Metadata Types → Synapse Config → Manage Records → Default → edit ServerUrl__c.'
+                'Archon Config ServerUrl__c is not set. Setup → Custom Metadata Types → Archon Config → Manage Records → Default → edit ServerUrl__c.'
             );
         }
         base = base.removeEnd('/');
 
         WakeResult out = new WakeResult();
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         out.configured = install != null && String.isNotBlank(install.SessionKey__c);
         out.archon = probeArchon(base);
         out.targets = collectTargets();
@@ -239,8 +239,8 @@ public with sharing class ArchonWakeService {
     }
 
     private static String getServerUrl() {
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

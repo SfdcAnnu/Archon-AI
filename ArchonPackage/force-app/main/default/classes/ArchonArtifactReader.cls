@@ -10,11 +10,11 @@ public with sharing class ArchonArtifactReader {
         if (String.isBlank(artifactId) || !Pattern.matches('^art_[0-9a-f]{10}$', artifactId)) {
             throw new IllegalArgumentException('Invalid artifact id.');
         }
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
             throw new IllegalArgumentException('Archon is not set up yet — ask your admin to run Archon Setup.');
         }
-        List<SynapseConfig__mdt> cfg = [SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1];
+        List<ArchonConfig__mdt> cfg = [SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1];
         if (cfg.isEmpty() || String.isBlank(cfg[0].ServerUrl__c)) {
             throw new IllegalArgumentException('Archon server URL is not configured — ask your admin.');
         }

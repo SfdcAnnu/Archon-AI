@@ -16,7 +16,7 @@ private class AgentChatControllerTest {
 
     @TestSetup
     static void seed() {
-        SynapseInstall__c row = new SynapseInstall__c(
+        ArchonInstall__c row = new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()

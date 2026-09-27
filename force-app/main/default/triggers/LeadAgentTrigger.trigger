@@ -1,5 +1,5 @@
 /**
- * Sample trigger — wires new Leads into the Synapse AI engine.
+ * Sample trigger — wires new Leads into the Archon AI engine.
  * Customers can disable, modify the agent api name, or replicate
  * this pattern for any SObject.
  */

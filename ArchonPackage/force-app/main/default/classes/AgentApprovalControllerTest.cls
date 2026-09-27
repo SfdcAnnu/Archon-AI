@@ -16,7 +16,7 @@ private class AgentApprovalControllerTest {
 
     @TestSetup
     static void seedData() {
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()

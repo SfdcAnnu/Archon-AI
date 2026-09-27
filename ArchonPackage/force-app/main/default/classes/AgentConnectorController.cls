@@ -1,7 +1,7 @@
 /**
  * AgentConnectorController — server-proxy thin layer.
  *
- * Tokens, OAuth client_id/secret, and refresh logic all live on the Synapse
+ * Tokens, OAuth client_id/secret, and refresh logic all live on the Archon
  * Node server now. This class is just a JWT-authenticated callout proxy so
  * the LWC has cacheable Apex methods to wire against.
  *
@@ -417,14 +417,14 @@ public with sharing class AgentConnectorController {
     // ── CALLOUT PLUMBING ──────────────────────────────────────────────
 
     private static HttpResponse callout(String method, String path, String body) {
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
-            throw new AuraHandledException('Synapse is not set up yet. Open Synapse Setup and click Authorize first.');
+            throw new AuraHandledException('Archon is not set up yet. Open Archon Setup and click Authorize first.');
         }
         String base = getServerUrl();
         if (String.isBlank(base)) {
             throw new AuraHandledException(
-                'Synapse Config ServerUrl__c is not set. Setup → Custom Metadata Types → Synapse Config → Manage Records → Default → edit ServerUrl__c.'
+                'Archon Config ServerUrl__c is not set. Setup → Custom Metadata Types → Archon Config → Manage Records → Default → edit ServerUrl__c.'
             );
         }
         HttpRequest req = new HttpRequest();
@@ -438,8 +438,8 @@ public with sharing class AgentConnectorController {
     }
 
     private static String getServerUrl() {
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

@@ -16,7 +16,7 @@ private class ArchonServerClientTest {
 
     @IsTest
     static void callout_throws_when_not_set_up() {
-        // No SynapseInstall__c row inserted.
+        // No ArchonInstall__c row inserted.
         Boolean threw = false;
         try {
             ArchonServerClient.callout('GET', '/health', null);
@@ -29,7 +29,7 @@ private class ArchonServerClientTest {
 
     @IsTest
     static void callout_succeeds_with_install_configured() {
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()

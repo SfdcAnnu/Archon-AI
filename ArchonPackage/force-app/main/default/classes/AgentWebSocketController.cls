@@ -108,13 +108,13 @@ global with sharing class AgentWebSocketController {
     // rather than exposing those as shared utilities, since this is the
     // only other caller today and the helper is ~15 lines.
     private static HttpResponse callout(String method, String path, String body) {
-        SynapseInstall__c install = SynapseInstall__c.getOrgDefaults();
+        ArchonInstall__c install = ArchonInstall__c.getOrgDefaults();
         if (install == null || String.isBlank(install.SessionKey__c)) {
-            throw new AuraHandledException('Synapse is not set up yet. Open Synapse Setup and click Authorize first.');
+            throw new AuraHandledException('Archon is not set up yet. Open Archon Setup and click Authorize first.');
         }
         String base = getServerUrl();
         if (String.isBlank(base)) {
-            throw new AuraHandledException('SynapseConfig.Default.ServerUrl__c is not set.');
+            throw new AuraHandledException('ArchonConfig.Default.ServerUrl__c is not set.');
         }
         HttpRequest httpReq = new HttpRequest();
         httpReq.setEndpoint(base.removeEnd('/') + path);
@@ -127,8 +127,8 @@ global with sharing class AgentWebSocketController {
     }
 
     private static String getServerUrl() {
-        List<SynapseConfig__mdt> rows = [
-            SELECT ServerUrl__c FROM SynapseConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
+        List<ArchonConfig__mdt> rows = [
+            SELECT ServerUrl__c FROM ArchonConfig__mdt WHERE DeveloperName = 'Default' LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0].ServerUrl__c;
     }

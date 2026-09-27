@@ -158,7 +158,7 @@ private class AgentBuilderControllerTest {
     @IsTest
     static void executeAgent_calls_engine_and_returns_result() {
         AgentDefinition__c a = createAgent('exec_agent', 'Active');
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()
@@ -178,7 +178,7 @@ private class AgentBuilderControllerTest {
     @IsTest
     static void executeAgent_allows_draft_agent_as_test_run() {
         AgentDefinition__c a = createAgent('exec_draft_agent', 'Draft');
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()
@@ -196,7 +196,7 @@ private class AgentBuilderControllerTest {
     @IsTest
     static void executeAgent_blocks_inactive_agent() {
         AgentDefinition__c a = createAgent('exec_inactive_agent', 'Inactive');
-        insert new SynapseInstall__c(
+        insert new ArchonInstall__c(
             SetupOwnerId    = UserInfo.getOrganizationId(),
             SessionKey__c   = 'sk-test',
             ConfiguredAt__c = System.now()

@@ -17,6 +17,7 @@ import { useBuildReports } from '@/hooks/useBuildReports';
 import type { ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { formatLastTurn, groupSessionsByDay, sessionsForAgent } from '@/lib/chat-list';
+import { backFromPrefix } from '@/lib/control-messages';
 import '@/styles/archon.css';
 
 /**
@@ -88,6 +89,13 @@ export default function ArchonPage() {
   const [recentOpen, setRecentOpen] = useState(false);
   const [recent, setRecent] = useState<SessionSummary[]>([]);
   const [viewing, setViewing] = useState<SessionSummary | null>(null);
+  // A handover is a round trip: the conversation Archon handed over, and
+  // why, so the person (or the other agent, when its job is done) can come
+  // back to the same conversation and Archon picks the open task up again.
+  const [returnTo, setReturnTo] = useState<{ sessionId: string | null; task: string } | null>(null);
+  const otherReplyRef = useRef<string | null>(null);
+  const agentRef = useRef(agent);
+  useEffect(() => { agentRef.current = agent; }, [agent]);
   /** A build the person closed: not reopened by its own progress. */
   const dismissedBuildRef = useRef<string | null>(null);
   /** The build whose current moment already opened the surface. */
@@ -168,7 +176,10 @@ export default function ArchonPage() {
   const onActivity = useCallback((e: ChatActivity) => {
     if (e.kind === 'phase') setPhase(e.phase);
     else if (e.kind === 'user') { setTalking(true); route(e.text); }
-    else if (e.kind === 'reply') setTalking(true);
+    else if (e.kind === 'reply') {
+      setTalking(true);
+      if (agentRef.current.apiName !== COPILOT.apiName) otherReplyRef.current = e.text ?? null;
+    }
   }, [route]);
 
   // The Architect's build shows itself: the moment it exists (the stage
@@ -192,11 +203,26 @@ export default function ArchonPage() {
   // ── words the page puts in the person's mouth ────────────────────────
   const ask = useCallback((text: string) => setCommand({ text, how: 'type', seq: Date.now() }), []);
   const handleTransfer = useCallback((t: { agentApiName: string; agentName: string; message: string }) => {
+    if (agentRef.current.apiName === COPILOT.apiName) setReturnTo({ sessionId: liveSessionId, task: t.message });
+    otherReplyRef.current = null;
     setAgent({ apiName: t.agentApiName, name: t.agentName });
     setSessionSeed(null);
     setInitialMessage({ text: t.message, how: 'type' });
     setOpenSeq(n => n + 1);
-  }, []);
+  }, [liveSessionId]);
+  /** Back to Archon's own conversation, carrying what the other agent did,
+   *  so Archon carries on with the task it had open before the handover. */
+  const goBack = useCallback((summary?: string) => {
+    const from = agentRef.current.name;
+    const back = returnTo;
+    const did = (summary || otherReplyRef.current || 'They came back before the job was finished.').slice(0, 1500);
+    otherReplyRef.current = null;
+    setReturnTo(null);
+    setAgent(COPILOT);
+    setSessionSeed(back?.sessionId ?? null);
+    setInitialMessage({ text: `${backFromPrefix(from)}${did}`, how: 'type' });
+    setOpenSeq(n => n + 1);
+  }, [returnTo]);
   /** A new conversation: the panel remounts on a fresh session; the one
    *  just left stays in Recent. */
   const newConversation = useCallback(() => {
@@ -313,6 +339,12 @@ export default function ArchonPage() {
                 </div>
               ) : (
                 <>
+                  {agent.apiName !== COPILOT.apiName && (
+                    <div className="ax-handover" role="status">
+                      <span className="who">With <b>{agent.name}</b>{returnTo?.task ? <> · {returnTo.task.length > 90 ? `${returnTo.task.slice(0, 90)}…` : returnTo.task}</> : null}</span>
+                      <button type="button" className="ax-btn ghost sm" onClick={() => goBack()}><ArrowLeft /> Back to Archon</button>
+                    </div>
+                  )}
                   <div className="ax-chat">
                     <ChatPanel
                       key={`${agent.apiName}-${openSeq}`}
@@ -329,6 +361,7 @@ export default function ArchonPage() {
                       onActivity={onActivity}
                       onSessionChange={onSessionChange}
                       onTransfer={handleTransfer}
+                      onReturn={goBack}
                       onMove={id => navigate('/new-agent', { state: { sessionId: id } })}
                       moveLabel="Open on the New agent page"
                     />

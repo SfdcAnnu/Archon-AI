@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Loader2, Plus } from 'lucide-react';
 import { getSessionDetail, type SessionDetail, type SessionSummary } from '@/lib/conversations-data';
 import { formatLastTurn, initials } from '@/lib/chat-list';
+import { controlChip } from '@/lib/control-messages';
+import '@/styles/chat-cards.css';
 
 /**
  * An ended conversation, read back. The live ChatPanel has no read-only
@@ -94,10 +96,16 @@ export function SessionTranscript({ session, agentName, onNewChat }: {
         {rows === null && !error && <div className="cp-muted"><Loader2 className="spin" /> Loading the conversation…</div>}
         {error && <p className="cp-muted">This conversation could not be loaded: {error}</p>}
         {blocks.map(b => b.kind === 'user' ? (
+          controlChip(b.text) ? (
+            <div key={b.key} className={controlChip(b.text)!.kind === 'you' ? 'flex justify-end' : 'flex justify-center'}>
+              <span className={`chat-control ${controlChip(b.text)!.kind}`} title={b.text}><span className="dot" aria-hidden="true" /><span className="txt">{controlChip(b.text)!.label}</span></span>
+            </div>
+          ) : (
           <div key={b.key} className="cp-msg user">
             <div className="txt">{b.text}</div>
             <div className="ts">{b.when}</div>
           </div>
+          )
         ) : (
           <div key={b.key} className="cp-msg agent">
             <div className="cp-avatar" aria-hidden="true">{mark}</div>

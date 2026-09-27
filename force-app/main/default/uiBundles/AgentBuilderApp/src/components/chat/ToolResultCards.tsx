@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
 import type { ChatToolCallSummary } from '@/lib/ws-chat';
 import { loadArtifact } from '@/lib/chat-data';
 import { toolLabel } from '@/lib/tool-label';
@@ -81,6 +82,12 @@ function Card({ kind, title, sub, children, tone }: { kind: string; title: strin
       {children ? <div className="tc-bd">{children}</div> : null}
     </div>
   );
+}
+/** A page the copilot pointed to: one click, and only when the person
+ *  chooses — the conversation is never navigated away from under them. */
+function OpenPage({ path, label }: { path: string; label: string }) {
+  const navigate = useNavigate();
+  return <button type="button" className="tc-open" onClick={() => navigate(path)}>Open {label} <span aria-hidden="true">→</span></button>;
 }
 function KV({ rows }: { rows: Array<[string, ReactNode]> }) {
   const shown = rows.filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== false);
@@ -367,6 +374,24 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
     const extra = name === 'list_approvals' && isObj(data) && Array.isArray(data.runApprovals) ? (data.runApprovals as Json[]) : [];
     return <Card kind="list" title={name.replace(/_/g, ' ')} sub={`${rows.length + extra.length}`}><Table rows={rows.length ? rows : extra} /></Card>;
   }
+  if (name === 'open_page' && isObj(data) && isObj(data.page)) {
+    const pg = data.page as Json;
+    return <Card kind="page" title={str(pg.label)}><OpenPage path={str(pg.path)} label={str(pg.label)} /></Card>;
+  }
+  if (name === 'wake_servers' && isObj(data) && Array.isArray(data.servers)) {
+    const rows = data.servers as Json[];
+    const asleep = rows.filter(r => r.state === 'woke').length;
+    return (
+      <Card kind="wake" title="Servers" sub={asleep ? `${asleep} woke up` : 'all awake'} tone={rows.some(r => r.state === 'no_answer') ? 'warn' : 'ok'}>
+        <KV rows={rows.map(r => [str(r.name), r.state === 'no_answer' ? 'no answer' : r.state === 'woke' ? `woke in ${str(r.seconds)}s` : 'awake'] as [string, ReactNode])} />
+      </Card>
+    );
+  }
+  if (name === 'activate_agent' && isObj(data) && typeof data.status === 'string') {
+    const waiting = data.needsConfirmation === true;
+    return <Card kind="activate" title={str(data.name)} sub={waiting ? 'not activated yet' : str(data.status)} tone={waiting ? 'warn' : 'ok'} />;
+  }
+  if (name === 'return_to_previous_agent') return <Card kind="transfer" title="Handing back to Archon" sub="it picks up where it left off" tone="ok" />;
   if (name === 'transfer_to_agent' && isObj(data) && isObj(data.transfer)) return <Card kind="transfer" title={`Handing over to ${str((data.transfer as Json).agentName)}`} sub="the conversation continues there" tone="ok" />;
   if (BUILD_STAGE.has(name)) return null; // the Architect card draws these
   if (name.startsWith('ask_')) {

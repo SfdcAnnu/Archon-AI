@@ -23,6 +23,7 @@ import { parseScreen, type ScreenRequest } from '@/lib/archon-screen';
 import { resolveStreaming, setStreamOverride, STREAM_LABEL } from '@/lib/stream-pref';
 import { MessageBody } from './MessageBody';
 import { BuildWorkspace } from './BuildWorkspace';
+import { controlChip, UPDATE_PREFIX } from '@/lib/control-messages';
 import {
   startChatSession,
   getConnectionGate,
@@ -254,6 +255,9 @@ export interface ChatPanelProps {
   /** The agent called transfer_to_agent: the host switches the conversation
    *  to that agent, carrying the message. */
   onTransfer?: (t: { agentApiName: string; agentName: string; message: string }) => void;
+  /** This agent handed the conversation back (return_to_previous_agent):
+   *  the host returns to the agent that passed it over, with the summary. */
+  onReturn?: (summary: string) => void;
 }
 
 /** An Architect build as a host outside the transcript sees it. */
@@ -278,7 +282,7 @@ const jobIdIn = (output: string): string | null => /"jobId"\s*:\s*"([^"]+)"/.exe
 
 export function ChatPanel({
   agentApiName, agentName, variant = 'overlay', initialSessionId, onClose, onSessionChange, onActivity, initialMessage,
-  transport = 'session', copilotPlatform, headerNote, onTransfer, onMove, moveLabel, command, buildHost, onShow, freshSession,
+  transport = 'session', copilotPlatform, headerNote, onTransfer, onReturn, onMove, moveLabel, command, buildHost, onShow, freshSession,
 }: ChatPanelProps) {
   const isStudio = variant === 'studio';
   const isFull = variant === 'full' || variant === 'drawer' || isStudio;
@@ -293,6 +297,14 @@ export function ChatPanel({
   const handleTurnResultRef = useRef<(r: ChatTurnResult) => void>(() => {});
   const onTransferRef = useRef(onTransfer);
   useEffect(() => { onTransferRef.current = onTransfer; }, [onTransfer]);
+  const onReturnRef = useRef(onReturn);
+  useEffect(() => { onReturnRef.current = onReturn; }, [onReturn]);
+  const pendingReturnRef = useRef<string | null>(null);
+  // A build the copilot started tells the copilot when it ends, so the
+  // person hears the outcome from it, in its words, without asking. Held
+  // while a reply is still being written, then sent.
+  const sendUpdateRef = useRef<(text: string) => void>(() => {});
+  const heldUpdateRef = useRef<string | null>(null);
   // Builds started by the agent's own tools: one card per build, its job id
   // moving forward as each stage tool resumes the job under a new id.
   const toolBuildsRef = useRef<{ jobs: Set<string>; seen: Record<string, Record<string, string>>; lastMessageId: string | null }>({ jobs: new Set(), seen: {}, lastMessageId: null });
@@ -646,6 +658,10 @@ export function ChatPanel({
             const m = /"agentApiName"\s*:\s*"([^"]+)"[\s\S]*?"agentName"\s*:\s*"([^"]*)"[\s\S]*?"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(output);
             if (m) pendingTransferRef.current = { agentApiName: m[1], agentName: m[2] || m[1], message: JSON.parse(`"${m[3]}"`) };
           }
+          if (tc.name === 'return_to_previous_agent' && !tc.isError) {
+            const m = /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(output);
+            pendingReturnRef.current = m ? JSON.parse(`"${m[1]}"`) : 'The job is done.';
+          }
           if (tc.name === 'show_on_screen' && !tc.isError) {
             const s = parseScreen(output);
             if (s) pendingShowRef.current = s;
@@ -667,6 +683,13 @@ export function ChatPanel({
           pendingTransferRef.current = null;
           emit({ kind: 'sys', text: `Transferring to ${t.agentName}.` });
           setTimeout(() => onTransferRef.current?.(t), 700);
+        }
+        // The agent handed the conversation back: let its reply land, then
+        // the host returns to the agent that passed it over.
+        if (pendingReturnRef.current) {
+          const summary = pendingReturnRef.current;
+          pendingReturnRef.current = null;
+          setTimeout(() => onReturnRef.current?.(summary), 900);
         }
         // The agent put a view on the screen: the host draws it now, as
         // the words that describe it land.
@@ -1062,6 +1085,11 @@ export function ChatPanel({
             // the copilot's hand-off needs a synthetic reply here.
             if (!toolBuildsRef.current.jobs.has(jobId)) {
               handleTurnResultRef.current({ status: 'complete', assistantText: describeBuildOutcome(view), toolCalls: [] });
+            } else if (agentApiName === 'archon_copilot' && !stageStop) {
+              // The copilot started this build: it says how it ended, in
+              // its own words, with the next step — the person does not
+              // have to ask "is it done?". One turn per build end.
+              sendUpdateRef.current(`${UPDATE_PREFIX}${describeBuildOutcome(view)}`);
             } else if (!buildHostRef.current) {
               // (A host that tells the build stage by stage already ends it
               // with its own report; this line is for the other screens.)
@@ -1084,7 +1112,7 @@ export function ChatPanel({
           buildPollRef.current = setTimeout(() => pollBuildRef.current(messageId, jobId, seen), 4000);
         });
     },
-    [emit, maybeScrollToBottom],
+    [emit, maybeScrollToBottom, agentApiName],
   );
   useEffect(() => { pollBuildRef.current = pollBuild; }, [pollBuild]);
 
@@ -1298,6 +1326,17 @@ export function ChatPanel({
     pendingSendRef.current = text;
     setInput(text);
   }, []);
+  useEffect(() => {
+    sendUpdateRef.current = (text: string) => {
+      if (sending || pendingSendRef.current != null) { heldUpdateRef.current = text; return; }
+      queueSend(text);
+    };
+    if (!sending && pendingSendRef.current == null && heldUpdateRef.current) {
+      const t = heldUpdateRef.current;
+      heldUpdateRef.current = null;
+      queueSend(t);
+    }
+  }, [sending, queueSend]);
   // The host's words: sent once per seq, and only once the chat can send.
   // The effect re-runs as the socket opens, so a command issued early
   // (a chip pressed before the session exists) is not lost.
@@ -1561,6 +1600,17 @@ export function ChatPanel({
             );
           }
           const isUser = m.role === 'User';
+          const chip = isUser ? controlChip(m.content) : null;
+          if (chip) {
+            return (
+              <div key={m.id} className={chip.kind === 'you' ? 'flex justify-end' : 'flex justify-center'}>
+                <span className={`chat-control ${chip.kind}`} title={m.content}>
+                  <span className="dot" aria-hidden="true" />
+                  <span className="txt">{chip.label}</span>
+                </span>
+              </div>
+            );
+          }
           const time = m.createdDate
             ? new Date(m.createdDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             : '';

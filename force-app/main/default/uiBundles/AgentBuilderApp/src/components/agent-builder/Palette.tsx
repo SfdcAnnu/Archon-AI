@@ -1,6 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { Bolt, ChevronRight, GitBranch, GripVertical, Plug, ShieldCheck, Sparkles, Square, Wrench, Zap, type LucideIcon } from 'lucide-react';
+import {
+  Bolt, CheckCircle2, ChevronRight, Clock, Database, FilePlus2, FileSearch, GitBranch, GripVertical, ListTodo, Mail, MessageSquareText, PencilLine, Plug, Repeat,
+  ShieldCheck, Sparkles, Square, Variable, Wrench, Zap, type LucideIcon,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -22,6 +25,13 @@ const ICON_BY_TYPE: Record<NodeType, LucideIcon> = {
   end: Square,
   guardrail: ShieldCheck,
   automation: Zap,
+};
+
+/** The automation steps each get their own mark, matching the canvas. */
+const ICON_BY_SUBTYPE: Record<string, LucideIcon> = {
+  if_else: GitBranch, loop: Repeat, wait: Clock, approval: CheckCircle2, set_variable: Variable,
+  query_records: Database, get_record: FileSearch, create_record: FilePlus2, update_record: PencilLine,
+  create_task: ListTodo, post_chatter: MessageSquareText, call_tool: Mail,
 };
 
 /** A palette category header that collapses its items — keeps the default
@@ -149,7 +159,7 @@ export function Palette() {
               }
             >
               {cat.items.map(item => {
-                const Icon = ICON_BY_TYPE[item.nodeType];
+                const Icon = ICON_BY_SUBTYPE[item.nodeSubType] ?? ICON_BY_TYPE[item.nodeType];
                 return (
                   <div
                     key={`${item.nodeType}:${item.nodeSubType}`}

@@ -189,3 +189,10 @@
 @media (max-width:1100px){.ax-area[data-layout="split"]{grid-template-columns:1fr 2fr}.ax-dtiles{grid-template-columns:repeat(2,minmax(0,1fr))}.ax-dgrid{grid-template-columns:1fr}}
 @media (max-width:820px){.ax-area,.ax-area[data-layout="split"]{grid-template-columns:1fr;grid-template-rows:auto auto}.ax-surface{min-height:420px}.ax-greet h1{font-size:24px}.ax-ctx{display:none}}
 @media (prefers-reduced-motion:reduce){.ax *{animation:none !important;transition:none !important}}
+
+/* Handed over to another agent: who the person is with, why, and the way
+   back to Archon's own conversation. */
+.ax-handover{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 16px 0;padding:7px 8px 7px 14px;border:1px solid color-mix(in srgb,var(--primary) 30%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--primary) 6%,var(--card));font-size:12px;color:var(--muted-foreground);position:relative;z-index:1}
+.ax-handover .who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ax-handover .who b{color:var(--foreground);font-weight:600}
+.ax-handover .ax-btn{flex:none}

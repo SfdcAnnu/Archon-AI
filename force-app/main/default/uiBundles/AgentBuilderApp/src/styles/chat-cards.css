@@ -168,3 +168,17 @@
 .chat-audit.no{border-color:color-mix(in srgb,var(--archon-error) 45%,transparent)} .chat-audit.no .mark{background:color-mix(in srgb,var(--archon-error) 18%,transparent);color:var(--archon-error)}
 .chat-audit.warn{border-color:color-mix(in srgb,var(--archon-warning) 55%,transparent)} .chat-audit.warn .mark{background:color-mix(in srgb,var(--archon-warning) 18%,transparent);color:var(--archon-warning)}
 .chat-audit .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .chat-audit .when{font:10.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted-foreground);white-space:nowrap}
+
+/* A page the copilot points to: one click, the person's choice. */
+.tc-open{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid color-mix(in srgb,var(--primary) 40%,var(--border));border-radius:7px;background:color-mix(in srgb,var(--primary) 8%,transparent);color:var(--primary);font:600 11.5px var(--font-sans,inherit);cursor:pointer}
+.tc-open:hover{background:color-mix(in srgb,var(--primary) 14%,transparent)}
+.tc-open:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+
+/* A message the screen sent in the person's name (a build card's button, a
+   build that ended, a return from another agent): a short chip, not a
+   bubble of machine text. The full text is in the title for the curious. */
+.chat-control{display:inline-flex;align-items:center;gap:7px;max-width:85%;padding:4px 10px;border-radius:999px;font:500 11px var(--font-sans,inherit);border:1px solid var(--border);background:var(--secondary);color:var(--muted-foreground)}
+.chat-control.you{align-self:flex-end;border-color:color-mix(in srgb,var(--primary) 35%,var(--border));color:var(--foreground)}
+.chat-control.event{align-self:center}
+.chat-control .dot{width:6px;height:6px;border-radius:50%;background:var(--muted-foreground);flex:none}
+.chat-control.you .dot{background:var(--primary)}

@@ -1,0 +1,17 @@
+// What the Closed Won Handoff agent changed for one test case.
+Id oppId = '006g5000009hmFXAAY';
+Opportunity o = [SELECT Name, StageName, Amount, CloseDate, Type, OwnerId, AccountId, Description FROM Opportunity WHERE Id = :oppId];
+Account a = [SELECT Name, Type, Rating, Description FROM Account WHERE Id = :o.AccountId];
+System.debug('HC opp ' + o.Name + ' | stage=' + o.StageName + ' amount=' + o.Amount + ' close=' + o.CloseDate + ' type=' + o.Type + ' owner=' + o.OwnerId);
+System.debug('HC oppDescription ' + (o.Description == null ? 'null' : o.Description.replace('\n', ' / ')));
+System.debug('HC account type=' + a.Type + ' rating=' + a.Rating + ' desc=' + a.Description);
+for (OpportunityContactRole r : [SELECT Contact.Name, Role, IsPrimary, CreatedDate FROM OpportunityContactRole WHERE OpportunityId = :oppId ORDER BY CreatedDate])
+  System.debug('HC role ' + r.Contact.Name + ' | ' + r.Role + ' | primary=' + r.IsPrimary);
+for (Task t : [SELECT Subject, Priority, Status, ActivityDate, OwnerId, Who.Name, WhatId FROM Task WHERE WhatId = :oppId ORDER BY CreatedDate])
+  System.debug('HC task ' + t.Subject + ' | ' + t.Priority + ' | ' + t.Status + ' | due ' + t.ActivityDate + ' | who=' + t.Who.Name + ' | owner=' + t.OwnerId);
+for (Opportunity r : [SELECT Name, StageName, CloseDate, Amount, Type, OwnerId FROM Opportunity WHERE AccountId = :o.AccountId AND Id != :oppId])
+  System.debug('HC otherOpp ' + r.Name + ' | ' + r.StageName + ' | close ' + r.CloseDate + ' | ' + r.Amount + ' | ' + r.Type + ' | owner=' + r.OwnerId);
+for (FeedItem f : [SELECT Body, Type FROM FeedItem WHERE ParentId = :oppId AND Type = 'TextPost'])
+  System.debug('HC post ' + f.Body);
+for (AgentExecution__c e : [SELECT Status__c, ToolsUsed__c, CreatedDate FROM AgentExecution__c WHERE RecordId__c = :oppId ORDER BY CreatedDate DESC LIMIT 2])
+  System.debug('HC run ' + e.Status__c + ' tools=' + e.ToolsUsed__c);

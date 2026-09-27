@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ExpiresAt__c</fullName>
+    <label>Expires At</label>
+    <description>LastActivityAt + 24h. The ChatSessionExpirer scheduled Apex marks rows past this as Expired.</description>
+    <type>DateTime</type>
+</CustomField>

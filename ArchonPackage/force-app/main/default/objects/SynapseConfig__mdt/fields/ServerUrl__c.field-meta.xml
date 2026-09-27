@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ServerUrl__c</fullName>
+    <label>Server URL</label>
+    <description>Public URL of the Archon Node server. Used by Apex callouts. No trailing slash. Must also have a matching Remote Site Setting.</description>
+    <inlineHelpText>For ngrok dev: https://your-name.ngrok-free.app — no path, no trailing slash.</inlineHelpText>
+    <type>Url</type>
+    <required>false</required>
+</CustomField>

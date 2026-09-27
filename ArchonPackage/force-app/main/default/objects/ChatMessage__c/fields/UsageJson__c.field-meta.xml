@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>UsageJson__c</fullName>
+    <label>Usage by Model (JSON)</label>
+    <description>Per-model token breakdown for this turn: [{model, stages, calls, tokensIn, tokensOut, cacheRead}]. A turn is not one model call — the router, a specialist subagent, and utility passes can each run on a different model. ModelUsed__c names only the model that produced the reply, so it cannot describe a multi-model turn; these entries sum back to TokensIn__c/TokensOut__c. Only populated on Role = Assistant.</description>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>3</visibleLines>
+</CustomField>

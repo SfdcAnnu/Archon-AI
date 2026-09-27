@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>AvailableModelsJson__c</fullName>
+    <label>Available Models (JSON)</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+    <description>JSON array of model ids enabled for this connection (e.g. ["gpt-4o","gpt-4o-mini"]). Empty = provider defaults. Managed from the AI Models page; read by every model picker.</description>
+</CustomField>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SequenceNumber__c</fullName>
+    <label>Sequence Number</label>
+    <description>Monotonic ordering within a session. CreatedDate is only second-precision, so we use this for tie-breaking when multiple messages land in the same second (e.g. user message + assistant message + tool messages from one turn).</description>
+    <type>Number</type>
+    <precision>6</precision>
+    <scale>0</scale>
+    <required>true</required>
+</CustomField>

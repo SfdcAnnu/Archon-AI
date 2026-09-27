@@ -1,0 +1,159 @@
+import { apexFetch } from './apex-client';
+
+/** Talks to AgentEngineConnectionsRestService.cls, a thin wrapper around
+ *  AiEngineConnectionController — used by both the standalone AI
+ *  Connections admin page and the canvas properties-panel credential
+ *  picker for AI/subagent nodes. */
+const ENGINE_CONNECTIONS_BASE = '/services/apexrest/agent-builder/engine-connections/';
+
+export const ENGINE_TYPES = ['claude', 'openai', 'gemini', 'custom'] as const;
+export type EngineType = (typeof ENGINE_TYPES)[number];
+
+export interface ConnectionSummary {
+  id: string;
+  name: string;
+  label: string;
+  userName: string | null;
+  ownershipType: 'Personal' | 'Shared';
+  engineType: string;
+  endpoint: string | null;
+  defaultModel: string | null;
+  isActive: boolean;
+  isPreferred: boolean;
+  isPublicShared: boolean;
+  isMine: boolean;
+  validationStatus: string | null;
+  lastValidatedAt: string | null;
+  /** JSON array of enabled model ids (AvailableModelsJson__c); null = provider defaults. */
+  availableModels?: string | null;
+  lastUsedAt: string | null;
+}
+
+export async function listConnectionsForEngine(engineType: string): Promise<ConnectionSummary[]> {
+  return apexFetch<ConnectionSummary[]>(`${ENGINE_CONNECTIONS_BASE}?engineType=${encodeURIComponent(engineType)}`, {
+    method: 'GET',
+  });
+}
+
+export interface SaveConnectionInput {
+  recordId?: string | null;
+  engineType: string;
+  ownershipType: 'Personal' | 'Shared';
+  label: string;
+  apiKey?: string;
+  endpoint?: string;
+  defaultModel?: string;
+  isActive?: boolean;
+  isPreferred?: boolean;
+  isPublicShared?: boolean;
+  notes?: string;
+}
+
+export async function saveEngineConnection(input: SaveConnectionInput): Promise<string> {
+  const result = await apexFetch<{ id: string }>(ENGINE_CONNECTIONS_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'save', ...input }),
+  });
+  return result.id;
+}
+
+/**
+ * The starting set a provider offers before an admin curates one — what
+ * "enabled" means for a connection whose catalogue was never saved.
+ *
+ * Keep this current. It is not cosmetic: it is the enabled set until
+ * someone presses "Refresh list" and picks, so a model missing from here
+ * gets reported as not-enabled even while an agent is happily running on
+ * it. Use "Refresh list" on the AI Models page for the provider's real
+ * live catalogue — this is only the bootstrap.
+ */
+export const ENGINE_DEFAULT_MODELS: Record<string, string[]> = {
+  claude: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+  openai: ['gpt-5.5', 'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o4-mini'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+  custom: [],
+};
+
+/** Parse a connection's enabled-models JSON; null/invalid → null (defaults). */
+export function parseEnabledModels(conn: ConnectionSummary | null | undefined): string[] | null {
+  if (!conn?.availableModels) return null;
+  try {
+    const parsed = JSON.parse(conn.availableModels) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((m): m is string => typeof m === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * THE definition of "enabled" for one connection: the admin's saved set, or
+ * the provider defaults when they have never curated one.
+ *
+ * Single source of truth on purpose. The AI Models page and the canvas
+ * model pickers both call this, so what the page reports as enabled is
+ * exactly what a builder can choose. They used to disagree — the pickers
+ * fell back to the provider's full live catalogue whenever nothing was
+ * saved, so the page could say "3 models enabled" while the picker offered
+ * every model the provider had ever shipped.
+ */
+export function effectiveEnabledModels(conn: ConnectionSummary): string[] {
+  return parseEnabledModels(conn) ?? ENGINE_DEFAULT_MODELS[conn.engineType] ?? [];
+}
+
+export interface ProviderModel {
+  id: string;
+  /** One-line description for the picker — provider-supplied (Gemini,
+   *  Anthropic) or derived from the id's family (OpenAI). */
+  description: string | null;
+}
+
+/** Live chat models straight from the provider (free management API, no
+ *  token spend). Pass a saved connection's recordId, OR raw engineType +
+ *  apiKey from the add dialog before saving. */
+export async function fetchProviderModels(input: {
+  recordId?: string | null;
+  engineType?: string;
+  apiKey?: string;
+  endpoint?: string | null;
+}): Promise<ProviderModel[]> {
+  const result = await apexFetch<{ models: Array<ProviderModel | string> }>(
+    ENGINE_CONNECTIONS_BASE,
+    { method: 'POST', body: JSON.stringify({ action: 'fetchModels', ...input }) },
+    45000
+  );
+  // Tolerate the pre-descriptions server shape (bare id strings) during
+  // the window where Render is still rolling out the newer build.
+  return (result.models ?? []).map(m => (typeof m === 'string' ? { id: m, description: null } : m));
+}
+
+export async function saveConnectionModels(recordId: string, models: string[] | null): Promise<void> {
+  await apexFetch<{ success: boolean }>(ENGINE_CONNECTIONS_BASE, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'saveModels',
+      recordId,
+      modelsJson: models && models.length > 0 ? JSON.stringify(models) : '',
+    }),
+  });
+}
+
+export async function deleteEngineConnection(recordId: string): Promise<void> {
+  await apexFetch<{ success: boolean }>(ENGINE_CONNECTIONS_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete', recordId }),
+  });
+}
+
+export async function bindEngineConnectionToNode(agentNodeId: string, connectionId: string | null): Promise<void> {
+  await apexFetch<{ success: boolean }>(ENGINE_CONNECTIONS_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'bind', agentNodeId, connectionId }),
+  });
+}
+
+export async function testEngineConnection(recordId: string): Promise<{ success: boolean; message: string }> {
+  return apexFetch<{ success: boolean; message: string }>(ENGINE_CONNECTIONS_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'test', recordId }),
+  });
+}

@@ -1,0 +1,18 @@
+{
+  "packageDirectories": [
+    {
+      "path": "force-app",
+      "default": true,
+      "package": "Archon",
+      "versionName": "Beta 1",
+      "versionNumber": "0.1.0.NEXT",
+      "versionDescription": "Archon AI Agent Builder — first beta for install testing",
+      "definitionFile": "config/project-scratch-def.json"
+    }
+  ],
+  "name": "ArchonPackage",
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "67.0",
+  "packageAliases": {}
+}

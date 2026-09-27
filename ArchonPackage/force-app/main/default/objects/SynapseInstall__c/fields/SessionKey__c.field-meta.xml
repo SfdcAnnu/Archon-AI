@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SessionKey__c</fullName>
+    <label>Session Key</label>
+    <description>Server-issued long-lived Bearer token used by all Apex callouts to the Archon Node server. Minted by /api/setup/pickup.</description>
+    <type>Text</type>
+    <length>120</length>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

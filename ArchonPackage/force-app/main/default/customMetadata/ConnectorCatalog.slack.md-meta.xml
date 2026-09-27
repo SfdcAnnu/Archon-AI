@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>Slack</label>
+    <protected>false</protected>
+    <values><field>DisplayName__c</field><value xsi:type="xsd:string">Slack</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Send messages, create canvases, and fetch Slack data.</value></values>
+    <values><field>Category__c</field><value xsi:type="xsd:string">Channels</value></values>
+    <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_slack</value></values>
+    <values><field>BrandColor__c</field><value xsi:type="xsd:string">#4a154b</value></values>
+    <values><field>AuthType__c</field><value xsi:type="xsd:string">OAuth2</value></values>
+    <values><field>AuthorizeUrl__c</field><value xsi:type="xsd:string">https://slack.com/oauth/v2/authorize</value></values>
+    <values><field>TokenUrl__c</field><value xsi:type="xsd:string">https://slack.com/api/oauth.v2.access</value></values>
+    <values><field>Scopes__c</field><value xsi:type="xsd:string">chat:write channels:read groups:read users:read</value></values>
+    <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">channel_tools</value></values>
+    <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">true</value></values>
+    <values><field>SortOrder__c</field><value xsi:type="xsd:double">70</value></values>
+</CustomMetadata>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>DebugMode__c</fullName>
+    <label>Debug Mode</label>
+    <description>When on, every chat turn stores the complete raw request and response JSON sent to/from the AI provider on the resulting ChatMessage__c, for troubleshooting. Adds extra storage per turn — turn off when done.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

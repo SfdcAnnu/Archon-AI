@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MemoryCoveredCount__c</fullName>
+    <label>Memory Covered Count</label>
+    <precision>9</precision>
+    <scale>0</scale>
+    <type>Number</type>
+    <description>How many leading history messages MemorySummary__c covers. The server sends summary + history[coveredCount..] so summary and raw window always cover the full conversation with no gap.</description>
+</CustomField>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>SharePoint</label>
+    <protected>false</protected>
+    <values><field>DisplayName__c</field><value xsi:type="xsd:string">SharePoint</value></values>
+    <values><field>Description__c</field><value xsi:type="xsd:string">Search and manage files in SharePoint sites.</value></values>
+    <values><field>Category__c</field><value xsi:type="xsd:string">Storage</value></values>
+    <values><field>IconStaticResource__c</field><value xsi:type="xsd:string">connector_sharepoint</value></values>
+    <values><field>BrandColor__c</field><value xsi:type="xsd:string">#038387</value></values>
+    <values><field>AuthType__c</field><value xsi:type="xsd:string">OAuth2</value></values>
+    <values><field>AuthorizeUrl__c</field><value xsi:type="xsd:string">https://login.microsoftonline.com/common/oauth2/v2.0/authorize</value></values>
+    <values><field>TokenUrl__c</field><value xsi:type="xsd:string">https://login.microsoftonline.com/common/oauth2/v2.0/token</value></values>
+    <values><field>Scopes__c</field><value xsi:type="xsd:string">offline_access openid email profile Sites.ReadWrite.All</value></values>
+    <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">storage_tools</value></values>
+    <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">false</value></values>
+    <values><field>SortOrder__c</field><value xsi:type="xsd:double">40</value></values>
+</CustomMetadata>

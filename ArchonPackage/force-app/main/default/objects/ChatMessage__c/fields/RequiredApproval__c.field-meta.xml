@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>RequiredApproval__c</fullName>
+    <label>Required Approval</label>
+    <description>True when this is a Tool-role message that needed user approval before running (e.g. a write tool).</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

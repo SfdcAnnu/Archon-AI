@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>StreamReplies__c</fullName>
+    <label>Stream Replies</label>
+    <description>Whether this agent's chats start with live streaming on: the tools it runs are narrated as they run, and the reply appears as it is written. Off by default. This is the starting point for a conversation, not a lock — anyone chatting can turn streaming on or off from the chat window, and their choice is remembered for that agent in that browser.</description>
+    <inlineHelpText>Start chats with this agent in streaming mode. People can still switch it off during a chat.</inlineHelpText>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

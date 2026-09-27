@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>OwnershipType__c</fullName>
+    <label>Ownership Type</label>
+    <description>Personal = only the owner can use this connection. Shared = admin manages sharing via the standard Sharing button (or the IsPublicShared__c flag for org-wide).</description>
+    <required>true</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Personal</fullName><default>true</default><label>Personal</label></value>
+            <value><fullName>Shared</fullName><default>false</default><label>Shared</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

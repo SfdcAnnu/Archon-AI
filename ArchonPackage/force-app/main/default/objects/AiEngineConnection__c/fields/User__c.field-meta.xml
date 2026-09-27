@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>User__c</fullName>
+    <label>User</label>
+    <description>The user this connection belongs to. Denormalized from OwnerId for reporting and quick queries. For Shared connections, this is the admin who created it. Populated by Apex on insert; SetNull if the referenced User is deleted (Salesforce requires SetNull for User lookups).</description>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>AI Engine Connections</relationshipLabel>
+    <relationshipName>AiEngineConnections</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

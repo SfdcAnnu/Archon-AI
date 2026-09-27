@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>IsPreferred__c</fullName>
+    <label>Preferred</label>
+    <description>When true, this connection is preferred over other connections of the same engine type for the running user. Only one connection per user per engine should be Preferred; the Apex controller enforces this.</description>
+    <defaultValue>false</defaultValue>
+    <type>Checkbox</type>
+</CustomField>

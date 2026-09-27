@@ -175,7 +175,7 @@ export interface AgentNode {
  *  tool attachment — see subagent-router.ts's module doc. Every other port
  *  name is structural flow (automation-mode chaining) and carries no
  *  special meaning here. */
-export type PortName = 'in' | 'out' | 'tool' | 'yes' | 'no' | 'each' | 'done';
+export type PortName = 'in' | 'out' | 'tool' | 'yes' | 'no' | 'each' | 'done' | 'approved' | 'rejected';
 
 export interface AgentConnection {
   id: string;

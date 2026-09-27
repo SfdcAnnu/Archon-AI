@@ -33,6 +33,7 @@ import { CatalogNode } from './nodes/CatalogNode';
 import { SimpleNode } from './nodes/SimpleNode';
 import { GuardrailNode } from './nodes/GuardrailNode';
 import { AutomationNode } from './nodes/AutomationNode';
+import { FlowNode } from './nodes/FlowNode';
 import { CanvasLegend } from './CanvasLegend';
 
 const NODE_TYPES: NodeTypes = {
@@ -43,6 +44,7 @@ const NODE_TYPES: NodeTypes = {
   simple: SimpleNode,
   guardrail: GuardrailNode,
   automation: AutomationNode,
+  flow: FlowNode,
 };
 
 interface DeletableEdgeData extends Record<string, unknown> {
@@ -99,15 +101,16 @@ function flowTypeFor(node: AgentNode): keyof typeof NODE_TYPES {
   if (node.nodeType === 'catalog') return 'catalog';
   if (node.nodeType === 'guardrail') return 'guardrail';
   if (node.nodeType === 'automation') return 'automation';
+  if (node.nodeType === 'logic' || node.nodeType === 'action') return 'flow';
   return 'simple';
 }
 
-function toFlowNodes(agentNodes: AgentNode[], selectedId: string | null): Node[] {
+function toFlowNodes(agentNodes: AgentNode[], selectedId: string | null, connections: AgentConnection[]): Node[] {
   return agentNodes.map(n => ({
     id: n.id,
     type: flowTypeFor(n),
     position: { x: n.positionX, y: n.positionY },
-    data: { agentNode: n },
+    data: { agentNode: n, connections },
     selected: n.id === selectedId,
     draggable: true,
   }));
@@ -242,9 +245,9 @@ export function Canvas({
   );
 
   useEffect(() => {
-    setFlowNodes(toFlowNodes(nodes, selectedNodeId));
+    setFlowNodes(toFlowNodes(nodes, selectedNodeId, connections));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, selectedNodeId]);
+  }, [nodes, selectedNodeId, connections]);
 
   useEffect(() => {
     setFlowEdges(toFlowEdges(connections, nodes, selectedEdgeId, handleDeleteConnection));

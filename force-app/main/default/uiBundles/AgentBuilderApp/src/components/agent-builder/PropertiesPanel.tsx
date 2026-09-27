@@ -17,6 +17,7 @@ import { GuardrailForm } from './properties/GuardrailForm';
 import { AutomationForm } from './properties/AutomationForm';
 import { ReadOnlySummary } from './properties/ReadOnlySummary';
 import { EmptyPanel } from './properties/EmptyPanel';
+import { FlowStepForm } from './properties/FlowStepForm';
 
 /** Per-node-type identity for the panel header — kicker text, icon and the
  *  colored chip, matching the canvas cards' own accent language. */
@@ -29,10 +30,11 @@ const NODE_META: Record<string, { kicker: string; icon: LucideIcon; chipClass: s
   catalog: { kicker: 'Tool Catalog', icon: Plug, chipClass: '', chipStyle: { backgroundColor: 'var(--node-green-tint)', color: 'var(--node-green)' } },
   guardrail: { kicker: 'Guardrails', icon: ShieldCheck, chipClass: '', chipStyle: { backgroundColor: 'var(--node-amber-tint)', color: 'var(--node-amber)' } },
   automation: { kicker: 'Automation', icon: Zap, chipClass: '', chipStyle: { backgroundColor: 'var(--node-green-tint)', color: 'var(--node-green)' } },
-  logic: { kicker: 'Logic', icon: GitBranch, chipClass: 'bg-secondary text-muted-foreground' },
+  logic: { kicker: 'Logic step', icon: GitBranch, chipClass: '', chipStyle: { backgroundColor: 'var(--node-purple-tint)', color: 'var(--node-purple)' } },
+  action: { kicker: 'Action step', icon: Wrench, chipClass: '', chipStyle: { backgroundColor: 'var(--node-amber-tint)', color: 'var(--node-amber)' } },
 };
 
-const RENAMABLE = new Set(['subagent', 'tool', 'guardrail', 'automation']);
+const RENAMABLE = new Set(['subagent', 'tool', 'guardrail', 'automation', 'logic', 'action']);
 
 export interface PropertiesPanelProps {
   graph: AgentGraph;
@@ -213,7 +215,10 @@ export function PropertiesPanel({
                       onConnectionBound={connectionId => onConnectionBound(node.id, connectionId)}
                     />
                   )}
-                  {!['subagent', 'tool', 'ai', 'catalog', 'guardrail', 'automation'].includes(node.nodeType) && (
+                  {(node.nodeType === 'logic' || node.nodeType === 'action') && (
+                    <FlowStepForm node={node} connections={graph.connections} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  )}
+                  {!['subagent', 'tool', 'ai', 'catalog', 'guardrail', 'automation', 'logic', 'action'].includes(node.nodeType) && (
                     <ReadOnlySummary node={node} />
                   )}
                 </>

@@ -22,6 +22,10 @@ const PROVIDER_ICON_CLASS: Record<string, string> = {
   gemini: 'bg-[var(--brand-gemini-tint)] text-[var(--brand-gemini)]',
 };
 
+const LOGIC_ICON = 'bg-[var(--node-purple-tint)] text-[var(--node-purple)]';
+const ACTION_ICON = 'bg-[var(--node-amber-tint)] text-[var(--node-amber)]';
+const CONNECTOR_ICON = 'bg-[var(--node-green-tint)] text-[var(--node-green)]';
+
 /** Mirrors agentCanvas.js's NODE_PALETTE — same categories, same node
  *  types, plus the two new ones (Subagents, Tools) this build adds. */
 export const NODE_PALETTE: PaletteCategory[] = [
@@ -200,6 +204,33 @@ export const NODE_PALETTE: PaletteCategory[] = [
           allowedTools: [],
         },
       },
+    ],
+  },
+  // The automation steps. Every one maps to an executor the automation
+  // runtime registers (server-langchain/src/nodes/logic.ts, action.ts,
+  // call-tool.ts); the exits each has are in lib/flow-nodes.ts.
+  {
+    category: 'Logic',
+    isNew: true,
+    items: [
+      { nodeType: 'logic', nodeSubType: 'if_else', label: 'If / else', sub: 'Branch on a condition — Yes or No', iconClass: LOGIC_ICON, defaultConfig: { condition: '' } },
+      { nodeType: 'logic', nodeSubType: 'loop', label: 'Loop', sub: 'Repeat steps for each item in a list', iconClass: LOGIC_ICON, defaultConfig: { collectionVar: '', iteratorVar: 'item', maxIterations: 25 } },
+      { nodeType: 'logic', nodeSubType: 'wait', label: 'Wait', sub: 'Pause, then continue', iconClass: LOGIC_ICON, defaultConfig: { delayValue: 1, delayUnit: 'hours' } },
+      { nodeType: 'logic', nodeSubType: 'approval', label: 'Approval', sub: 'Submit for approval, continue on the decision', iconClass: LOGIC_ICON, defaultConfig: { processDefinitionId: '', comments: '', timeoutHours: 48 } },
+      { nodeType: 'logic', nodeSubType: 'set_variable', label: 'Set variable', sub: 'Keep a value for later steps', iconClass: LOGIC_ICON, defaultConfig: { variableName: '', template: '' } },
+    ],
+  },
+  {
+    category: 'Actions',
+    isNew: true,
+    items: [
+      { nodeType: 'action', nodeSubType: 'query_records', label: 'Query records', sub: 'Run a SOQL query — a list for a Loop', iconClass: ACTION_ICON, defaultConfig: { soql: '', outputVariable: '' } },
+      { nodeType: 'action', nodeSubType: 'get_record', label: 'Get record', sub: 'Read the trigger record', iconClass: ACTION_ICON, defaultConfig: { objectType: '', fields: 'Id,Name', outputVariable: '' } },
+      { nodeType: 'action', nodeSubType: 'create_record', label: 'Create record', sub: 'Insert a record with the fields you map', iconClass: ACTION_ICON, defaultConfig: { objectType: '', fieldMappings: '{\n  \n}', outputVariable: '' } },
+      { nodeType: 'action', nodeSubType: 'update_record', label: 'Update record', sub: 'Update the trigger record', iconClass: ACTION_ICON, defaultConfig: { objectType: '', fieldMappings: '{\n  \n}', outputVariable: '' } },
+      { nodeType: 'action', nodeSubType: 'create_task', label: 'Create task', sub: 'A Task on the trigger record', iconClass: ACTION_ICON, defaultConfig: { subject: '', priority: 'Normal', dueDate: 'TODAY+1', outputVariable: '' } },
+      { nodeType: 'action', nodeSubType: 'post_chatter', label: 'Post to Chatter', sub: 'A post on the trigger record', iconClass: ACTION_ICON, defaultConfig: { message: '', outputVariable: '' } },
+      { nodeType: 'action', nodeSubType: 'call_tool', label: 'Send email / connector tool', sub: 'Call one tool — Gmail, Outlook, any connector', iconClass: CONNECTOR_ICON, defaultConfig: { provider: '', toolName: '', toolKind: 'standard', paramValues: {}, outputVariable: '' } },
     ],
   },
   // Guardrails/Automations palette entries removed at the user's request

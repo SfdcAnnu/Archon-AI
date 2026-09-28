@@ -152,8 +152,8 @@ export interface BuildDetail {
   design: {
     name: string; department: string; description: string | null;
     trigger: { type: string; channel?: string; sobject?: string } | null;
-    preview: { nodes: Array<{ id: string; name: string; nodeType: 'ai' | 'subagent' | 'tool' | 'catalog'; nodeSubType: string; config: Record<string, unknown>; positionX: number; positionY: number }>; connections: Array<{ id: string; fromNodeId: string; fromPort: 'tool'; toNodeId: string; toPort: 'in' }> };
-    counts: { specialists: number; tools: number; approvals: number };
+    preview: { nodes: Array<{ id: string; name: string; nodeType: 'ai' | 'subagent' | 'tool' | 'catalog' | 'trigger' | 'logic' | 'action'; nodeSubType: string; config: Record<string, unknown>; positionX: number; positionY: number }>; connections: Array<{ id: string; fromNodeId: string; fromPort: 'tool' | 'out' | 'yes' | 'no' | 'each' | 'done' | 'approved' | 'rejected'; toNodeId: string; toPort: 'in' }> };
+    counts: { specialists: number; tools: number; approvals: number; steps?: number };
     instructions: Array<{ id: string; label: string; role: 'agent' | 'subagent'; text: string }>;
     guardrails: string[];
     budgets: { maxSteps: number; maxCostUsd: number; timeoutSeconds: number } | null;

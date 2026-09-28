@@ -19,7 +19,8 @@ const VARIABLES_HINT = (
   <>
     Use <code>{'{!recordId}'}</code> for the record the run started on, <code>{'{!name.Field}'}</code> for a step whose result you named
     (add a Get record step to read that record’s fields), <code>{'{!item.Field}'}</code> inside a loop, and <code>{'{!ai.finalText}'}</code> for the AI step’s answer.
-    {' '}<code>{'{!record.x}'}</code> is only what the trigger was sent.
+    {' '}<code>{'{!record.x}'}</code> is only what the trigger was sent. Functions work too: <code>{'{!TODAY}'}</code>, <code>{'{!DAYS_BETWEEN(deal.CloseDate, TODAY)}'}</code>,
+    {' '}<code>{'{!ADD_BUSINESS_DAYS(TODAY, 3)}'}</code>, <code>{'{!ADD_MONTHS(opp.CloseDate, 12)}'}</code>, <code>{'{!FORMAT_NUMBER(opp.Amount)}'}</code>, <code>{'{!COUNT(list)}'}</code>, <code>{"{!SUM(list, 'Amount')}"}</code>.
   </>
 );
 
@@ -56,7 +57,7 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
 
       {node.nodeSubType === 'if_else' && (
         <>
-          {text('condition', 'Condition', "{!item.Amount} >= 50000", <>One comparison: <code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code>. Text goes in quotes: <code>{"{!acct.Rating} == 'Hot'"}</code>. True follows <b>Yes</b>, false follows <b>No</b>. {VARIABLES_HINT}</>, true)}
+          {text('condition', 'Condition', "{!item.Amount} >= 50000 AND {!item.CloseDate} < {!TODAY}", <>Comparisons joined by <b>AND</b> / <b>OR</b>: <code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code>, <code>contains</code>, <code>is blank</code>, <code>is not blank</code>. Dates compare as dates; text goes in quotes: <code>{"{!acct.Rating} == 'Hot'"}</code>. True follows <b>Yes</b>, false follows <b>No</b>. {VARIABLES_HINT}</>, true)}
         </>
       )}
 
@@ -112,7 +113,8 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
 
       {node.nodeSubType === 'get_record' && (
         <>
-          {text('objectType', 'Object', 'Account', <>Reads the record the run started on. Name it (for example <code>acct</code>) and later steps use <code>{'{!acct.Name}'}</code>.</>, true)}
+          {text('objectType', 'Object', 'Account', <>Name it (for example <code>acct</code>) and later steps use <code>{'{!acct.Name}'}</code>.</>, true)}
+          {text('recordId', 'Record Id (optional)', '{!opp.AccountId}', <>Which record to read. Leave empty for the record the run started on.</>, true)}
           {text('fields', 'Fields', 'Id,Name,OwnerId', 'Comma-separated API names.', true)}
           {outputName}
         </>
@@ -120,7 +122,8 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
 
       {(node.nodeSubType === 'create_record' || node.nodeSubType === 'update_record') && (
         <>
-          {text('objectType', 'Object', node.nodeSubType === 'create_record' ? 'Task' : 'Account', node.nodeSubType === 'update_record' ? 'Updates the trigger record.' : undefined, true)}
+          {text('objectType', 'Object', node.nodeSubType === 'create_record' ? 'Task' : 'Account', undefined, true)}
+          {node.nodeSubType === 'update_record' && text('recordId', 'Record Id (optional)', '{!acct.Id}', <>Which record to update — the loop’s current record, a related Account… Leave empty for the record the run started on.</>, true)}
           {area('fieldMappings', 'Fields to write (JSON)', '{\n  "Subject": "Follow up on {!item.Name}",\n  "WhatId": "{!item.Id}"\n}', <>Field API name to value. {VARIABLES_HINT}</>, 6)}
           {outputName}
         </>

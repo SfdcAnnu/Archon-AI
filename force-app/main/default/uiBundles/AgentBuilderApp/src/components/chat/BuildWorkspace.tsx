@@ -309,6 +309,7 @@ function Design({ d }: { d: BuildDetail }) {
         <Canvas readOnly nodes={nodes} connections={connections} selectedNodeId={null} onSelectNode={noop} onMoveNode={noop} onConnect={noop} onDropNode={noop} onDropConnector={noop} />
       </div>
       <div className="bw-chips">
+        {des.counts.steps ? <span className="bw-chip v">{des.counts.steps} automation step{des.counts.steps === 1 ? '' : 's'}</span> : null}
         <span className="bw-chip v">{des.counts.specialists} specialist{des.counts.specialists === 1 ? '' : 's'}</span>
         <span className="bw-chip">{des.counts.tools} tool{des.counts.tools === 1 ? '' : 's'}</span>
         {des.counts.approvals > 0 && <span className="bw-chip a">{des.counts.approvals} approval gate{des.counts.approvals === 1 ? '' : 's'}</span>}

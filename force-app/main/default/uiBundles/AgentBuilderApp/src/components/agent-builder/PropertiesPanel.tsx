@@ -18,6 +18,7 @@ import { AutomationForm } from './properties/AutomationForm';
 import { ReadOnlySummary } from './properties/ReadOnlySummary';
 import { EmptyPanel } from './properties/EmptyPanel';
 import { FlowStepForm } from './properties/FlowStepForm';
+import { isAiStep } from '@/lib/flow-nodes';
 
 /** Per-node-type identity for the panel header — kicker text, icon and the
  *  colored chip, matching the canvas cards' own accent language. */
@@ -94,7 +95,11 @@ export function PropertiesPanel({
     setExpanded(false);
   };
 
-  const meta = node ? (NODE_META[node.nodeType] ?? { kicker: node.nodeType, icon: Wrench, chipClass: 'bg-secondary text-muted-foreground' }) : null;
+  const meta = node
+    ? (isAiStep(node)
+      ? { kicker: 'AI step', icon: Sparkles, chipClass: 'bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary' }
+      : NODE_META[node.nodeType] ?? { kicker: node.nodeType, icon: Wrench, chipClass: 'bg-secondary text-muted-foreground' })
+    : null;
   const Icon = meta?.icon ?? Wrench;
 
   return (
@@ -165,7 +170,7 @@ export function PropertiesPanel({
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-              {!readOnly && RENAMABLE.has(node.nodeType) && (
+              {!readOnly && (RENAMABLE.has(node.nodeType) || isAiStep(node)) && (
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-bold">Node label</Label>
                   <Input
@@ -207,7 +212,7 @@ export function PropertiesPanel({
                   {node.nodeType === 'automation' && (
                     <AutomationForm node={node} onConfigChange={patch => onConfigChange(node.id, patch)} />
                   )}
-                  {node.nodeType === 'ai' && (
+                  {node.nodeType === 'ai' && !isAiStep(node) && (
                     <AiRootForm
                       node={node}
                       onConfigChange={patch => onConfigChange(node.id, patch)}
@@ -215,8 +220,8 @@ export function PropertiesPanel({
                       onConnectionBound={connectionId => onConnectionBound(node.id, connectionId)}
                     />
                   )}
-                  {(node.nodeType === 'logic' || node.nodeType === 'action') && (
-                    <FlowStepForm node={node} connections={graph.connections} onConfigChange={patch => onConfigChange(node.id, patch)} />
+                  {(node.nodeType === 'logic' || node.nodeType === 'action' || isAiStep(node)) && (
+                    <FlowStepForm node={node} connections={graph.connections} onConfigChange={patch => onConfigChange(node.id, patch)} onProviderChange={subType => onProviderChange(node.id, subType)} />
                   )}
                   {!['subagent', 'tool', 'ai', 'catalog', 'guardrail', 'automation', 'logic', 'action'].includes(node.nodeType) && (
                     <ReadOnlySummary node={node} />

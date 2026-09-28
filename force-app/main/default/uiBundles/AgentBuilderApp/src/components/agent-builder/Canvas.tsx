@@ -95,7 +95,7 @@ function DeletableEdge({
 const EDGE_TYPES: EdgeTypes = { deletable: DeletableEdge };
 
 function flowTypeFor(node: AgentNode): keyof typeof NODE_TYPES {
-  if (node.nodeType === 'ai') return 'aiRoot';
+  if (node.nodeType === 'ai') return (node.config as { step?: unknown }).step === true ? 'flow' : 'aiRoot';
   if (node.nodeType === 'subagent') return 'subagent';
   if (node.nodeType === 'tool') return 'tool';
   if (node.nodeType === 'catalog') return 'catalog';

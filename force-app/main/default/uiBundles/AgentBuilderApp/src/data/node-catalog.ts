@@ -220,6 +220,16 @@ export const NODE_PALETTE: PaletteCategory[] = [
       { nodeType: 'logic', nodeSubType: 'set_variable', label: 'Set variable', sub: 'Keep a value for later steps', iconClass: LOGIC_ICON, defaultConfig: { variableName: '', template: '' } },
     ],
   },
+  // An AI step: its own prompt and NAMED OUTPUTS that later steps and
+  // if/else read ({!judge.mood}) — the LLM-with-output-parser pattern. It
+  // runs on the org's default engine unless a model is chosen.
+  {
+    category: 'AI steps',
+    isNew: true,
+    items: [
+      { nodeType: 'ai', nodeSubType: 'gpt4', label: 'AI step', sub: 'Decide, classify, extract or write — returns named fields', iconClass: PROVIDER_ICON_CLASS.claude, defaultConfig: { step: true, instruction: '', outputs: [], outputVariable: '', model: '' } },
+    ],
+  },
   {
     category: 'Actions',
     isNew: true,

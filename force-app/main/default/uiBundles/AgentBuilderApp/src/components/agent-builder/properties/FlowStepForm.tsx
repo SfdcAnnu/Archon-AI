@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Plus, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentConnection, AgentNode, NodeConfig } from '@/types/agent';
-import { flowNodeProblems } from '@/lib/flow-nodes';
+import { flowNodeProblems, isAiStep, stepOutputs, type StepOutput } from '@/lib/flow-nodes';
 import { loadConnectorDirectory, loadMcpToolsWithRetry, type DirectoryEntry, type RemoteTool } from '@/lib/connectors-data';
 import { FieldLabel, Hint, Segmented } from './controls';
 
@@ -18,13 +18,13 @@ type Cfg = Record<string, unknown>;
 const VARIABLES_HINT = (
   <>
     Use <code>{'{!recordId}'}</code> for the record the run started on, <code>{'{!name.Field}'}</code> for a step whose result you named
-    (add a Get record step to read that record’s fields), <code>{'{!item.Field}'}</code> inside a loop, and <code>{'{!ai.finalText}'}</code> for the AI step’s answer.
+    (add a Get record step to read that record’s fields), <code>{'{!item.Field}'}</code> inside a loop, <code>{'{!judge.mood}'}</code> for an AI step’s named output, and <code>{'{!ai.finalText}'}</code> for the agent’s answer.
     {' '}<code>{'{!record.x}'}</code> is only what the trigger was sent. Functions work too: <code>{'{!TODAY}'}</code>, <code>{'{!DAYS_BETWEEN(deal.CloseDate, TODAY)}'}</code>,
     {' '}<code>{'{!ADD_BUSINESS_DAYS(TODAY, 3)}'}</code>, <code>{'{!ADD_MONTHS(opp.CloseDate, 12)}'}</code>, <code>{'{!FORMAT_NUMBER(opp.Amount)}'}</code>, <code>{'{!COUNT(list)}'}</code>, <code>{"{!SUM(list, 'Amount')}"}</code>.
   </>
 );
 
-export function FlowStepForm({ node, connections, onConfigChange }: { node: AgentNode; connections: AgentConnection[]; onConfigChange: (patch: Partial<NodeConfig>) => void }) {
+export function FlowStepForm({ node, connections, onConfigChange, onProviderChange }: { node: AgentNode; connections: AgentConnection[]; onConfigChange: (patch: Partial<NodeConfig>) => void; onProviderChange?: (subType: string) => void }) {
   const c = node.config as Cfg;
   const str = (k: string) => (typeof c[k] === 'string' ? (c[k] as string) : c[k] == null ? '' : String(c[k]));
   const set = (k: string, v: unknown) => onConfigChange({ [k]: v } as Partial<NodeConfig>);
@@ -53,6 +53,22 @@ export function FlowStepForm({ node, connections, onConfigChange }: { node: Agen
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <div>{problems.map(p => <div key={p}>{p}</div>)}</div>
         </div>
+      )}
+
+      {isAiStep(node) && (
+        <>
+          {area('instruction', 'Prompt', "Deal {!deal.Name}, stage {!deal.StageName}, last activity {!deal.LastActivityDate}.\nDecide how likely it is to close this quarter.", <>What the AI reads and what it decides or writes. Put every value it needs in with <code>{'{!…}'}</code>. {VARIABLES_HINT}</>, 5)}
+          <OutputsEditor outputs={stepOutputs(node)} onChange={outputs => set('outputs', outputs)} />
+          {text('outputVariable', 'Name the result', 'judge', <>Later steps read each output as <code>{`{!${str('outputVariable') || 'judge'}.${stepOutputs(node)[0]?.name ?? 'field'}}`}</code> — branch on it with an If / else.</>, true)}
+          {onProviderChange && (
+            <div>
+              <FieldLabel>Engine</FieldLabel>
+              <Segmented value={(node.nodeSubType || 'gpt4') as 'gpt4' | 'claude' | 'gemini'} onChange={v => onProviderChange(v)}
+                options={[{ value: 'gpt4', label: 'OpenAI' }, { value: 'claude', label: 'Claude' }, { value: 'gemini', label: 'Gemini' }]} />
+              <Hint>Runs on that engine's default model in your org unless the agent sets one.</Hint>
+            </div>
+          )}
+        </>
       )}
 
       {node.nodeSubType === 'if_else' && (
@@ -228,5 +244,43 @@ function ConnectorToolFields({ cfg, set }: { cfg: Cfg; set: (k: string, v: unkno
       ))}
       {tool && <Hint>{VARIABLES_HINT}</Hint>}
     </>
+  );
+}
+
+/** An AI step's named outputs: each a field the AI must return, of a type
+ *  the engine checks. A choice lists its options; later steps branch on it. */
+function OutputsEditor({ outputs, onChange }: { outputs: StepOutput[]; onChange: (o: StepOutput[]) => void }) {
+  const update = (i: number, patch: Partial<StepOutput>) => onChange(outputs.map((o, j) => (j === i ? { ...o, ...patch } : o)));
+  return (
+    <div>
+      <FieldLabel>Outputs</FieldLabel>
+      <div className="space-y-2">
+        {outputs.map((o, i) => (
+          <div key={i} className="rounded-md border border-border p-2">
+            <div className="flex items-center gap-1.5">
+              <Input value={o.name} onChange={e => update(i, { name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') })} placeholder="mood" className="h-7 flex-1 font-mono text-xs" />
+              <select value={o.type} onChange={e => update(i, { type: e.target.value as StepOutput['type'] })} className="h-7 rounded-md border border-input bg-transparent px-1.5 text-xs">
+                <option value="choice">choice</option>
+                <option value="text">text</option>
+                <option value="number">number</option>
+                <option value="boolean">yes / no</option>
+                <option value="date">date</option>
+              </select>
+              <button type="button" onClick={() => onChange(outputs.filter((_, j) => j !== i))} aria-label={`Remove ${o.name || 'output'}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {o.type === 'choice' && (
+              <Input value={(o.options ?? []).join(' | ')} onChange={e => update(i, { options: e.target.value.split('|').map(x => x.trim()).filter(Boolean) })} placeholder="interested | cooling off | blocked" className="mt-1.5 h-7 font-mono text-xs" />
+            )}
+            <Input value={o.description ?? ''} onChange={e => update(i, { description: e.target.value })} placeholder="What it means, e.g. one sentence naming the facts used" className="mt-1.5 h-7 text-xs" />
+          </div>
+        ))}
+        <button type="button" onClick={() => onChange([...outputs, { name: '', type: 'choice', options: [] }])} className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <Plus className="h-3 w-3" /> Add output
+        </button>
+      </div>
+      <Hint>The AI must answer with exactly these fields; the engine checks each one (a choice must be one of its options) and asks once more if it does not fit.</Hint>
+    </div>
   );
 }

@@ -266,7 +266,7 @@ export default function AgentBuilder() {
         const owner =
           selected && (selected.nodeType === 'ai' || selected.nodeType === 'subagent')
             ? selected
-            : g.nodes.find(n => n.nodeType === 'ai');
+            : g.nodes.find(n => n.nodeType === 'ai' && (n.config as { step?: unknown }).step !== true);
         return {
           ...g,
           nodes: [
@@ -318,7 +318,7 @@ export default function AgentBuilder() {
         const source = g.nodes.find(n => n.id === sourceNodeId);
         if (!source) return g;
         const incoming = g.connections.find(c => c.toNodeId === sourceNodeId);
-        const ownerId = incoming?.fromNodeId ?? g.nodes.find(n => n.nodeType === 'ai')?.id;
+        const ownerId = incoming?.fromNodeId ?? g.nodes.find(n => n.nodeType === 'ai' && (n.config as { step?: unknown }).step !== true)?.id;
         const newNodes = picked.map((t, i) => {
           nodeSeq += 1;
           return {

@@ -25,10 +25,28 @@ export function outputPortsFor(nodeSubType: string): FlowPort[] {
   return PORTS[nodeSubType] ?? [{ id: 'out', label: '' }];
 }
 
+/** An AI step in an automation: an AI node with its own prompt and named
+ *  outputs, drawn and edited as a step (not the agent's root). */
+export function isAiStep(node: Pick<AgentNode, 'nodeType' | 'config'>): boolean {
+  return node.nodeType === 'ai' && (node.config as { step?: unknown }).step === true;
+}
+
+export interface StepOutput { name: string; type: 'text' | 'number' | 'boolean' | 'date' | 'choice'; description?: string; options?: string[] }
+
+/** An AI step's declared outputs, as saved. */
+export function stepOutputs(node: Pick<AgentNode, 'config'>): StepOutput[] {
+  const raw = (node.config as { outputs?: unknown }).outputs;
+  return Array.isArray(raw) ? (raw as StepOutput[]).filter(o => o && typeof o.name === 'string') : [];
+}
+
 /** A short line under the node's name: what it is set to do. */
 export function flowNodeSummary(node: AgentNode): string {
   const c = node.config as Record<string, unknown>;
   const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  if (isAiStep(node)) {
+    const outs = stepOutputs(node);
+    return outs.length ? `→ ${s(c.outputVariable) || 'result'} { ${outs.map(o => o.name).join(', ')} }` : 'Write the prompt and its outputs';
+  }
   switch (node.nodeSubType) {
     case 'if_else': return s(c.condition) || 'Set a condition';
     case 'loop': return s(c.collectionVar) ? `Each ${s(c.iteratorVar) || 'item'} in ${s(c.collectionVar)}` : 'Pick the list to go through';
@@ -53,6 +71,13 @@ export function flowNodeProblems(node: AgentNode, connections: AgentConnection[]
   const has = (k: string) => typeof c[k] === 'string' ? (c[k] as string).trim() !== '' : c[k] != null && c[k] !== 0;
   const out: string[] = [];
   const need = (k: string, msg: string) => { if (!has(k)) out.push(msg); };
+  if (isAiStep(node)) {
+    need('instruction', 'No prompt');
+    if (stepOutputs(node).length === 0) out.push('No outputs declared');
+    need('outputVariable', 'Name the result so later steps can read it');
+    for (const o of stepOutputs(node)) if (o.type === 'choice' && (o.options?.length ?? 0) < 2) out.push(`"${o.name}" needs two or more choices`);
+    return out;
+  }
   switch (node.nodeSubType) {
     case 'if_else': need('condition', 'No condition set'); break;
     case 'loop': need('collectionVar', 'No list to go through'); break;

@@ -1,11 +1,11 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
-  AlertTriangle, CheckCircle2, Clock, Database, FilePlus2, FileSearch, GitBranch, ListTodo, Mail, MessageSquareText, PencilLine, Repeat, Variable, Wrench,
+  AlertTriangle, CheckCircle2, Clock, Database, FilePlus2, FileSearch, GitBranch, ListTodo, Mail, MessageSquareText, PencilLine, Repeat, Sparkles, Variable, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AgentConnection, AgentNode } from '@/types/agent';
-import { flowNodeProblems, flowNodeSummary, outputPortsFor } from '@/lib/flow-nodes';
+import { flowNodeProblems, flowNodeSummary, isAiStep, outputPortsFor, stepOutputs } from '@/lib/flow-nodes';
 import { HANDLE_BASE, NODE_CARD_BASE, NODE_ICON_SQUARE, accentStripStyle, accentStyle, selectedRing, type NodeAccent } from './node-styles';
 
 /** One step of an automation: a logic step (branch, loop, wait, approval,
@@ -25,12 +25,14 @@ const META: Record<string, { icon: LucideIcon; accent: NodeAccent; kind: string 
   create_task: { icon: ListTodo, accent: 'amber', kind: 'Create task' },
   post_chatter: { icon: MessageSquareText, accent: 'amber', kind: 'Post to Chatter' },
   call_tool: { icon: Mail, accent: 'green', kind: 'Connector tool' },
+  ai_step: { icon: Sparkles, accent: 'blue', kind: 'AI step' },
 };
 
 export function FlowNode({ data, selected }: NodeProps & { data: { agentNode: AgentNode; connections?: AgentConnection[] } }) {
   const node = data.agentNode;
-  const meta = META[node.nodeSubType] ?? { icon: Wrench, accent: 'gray' as NodeAccent, kind: node.nodeSubType };
-  const ports = outputPortsFor(node.nodeSubType);
+  const aiStep = isAiStep(node);
+  const meta = (aiStep ? META.ai_step : META[node.nodeSubType]) ?? { icon: Wrench, accent: 'gray' as NodeAccent, kind: node.nodeSubType };
+  const ports = outputPortsFor(aiStep ? 'ai_step' : node.nodeSubType);
   const problems = flowNodeProblems(node, data.connections ?? []);
   const multi = ports.length > 1;
   return (
@@ -49,6 +51,13 @@ export function FlowNode({ data, selected }: NodeProps & { data: { agentNode: Ag
         </div>
       </div>
       <div className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground" title={flowNodeSummary(node)}>{flowNodeSummary(node)}</div>
+      {aiStep && stepOutputs(node).length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {stepOutputs(node).slice(0, 6).map(o => (
+            <span key={o.name} className="rounded bg-secondary px-1.5 py-px font-mono text-[9.5px] text-muted-foreground" title={o.type === 'choice' ? (o.options ?? []).join(' | ') : o.type}>{o.name}:{o.type}</span>
+          ))}
+        </div>
+      )}
       {problems.length > 0 && (
         <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[var(--archon-warning)]" title={problems.join(' · ')}>
           <AlertTriangle className="h-3 w-3 shrink-0" /> <span className="truncate">{problems[0]}</span>

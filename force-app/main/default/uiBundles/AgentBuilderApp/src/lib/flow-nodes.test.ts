@@ -36,3 +36,21 @@ describe('flow nodes', () => {
     expect(isFlowPort('tool')).toBe(false);
   });
 });
+
+describe('AI steps', () => {
+  const aiStep = (config: Record<string, unknown>) => ({ ...node('gpt4', config, 'ai'), nodeType: 'ai' as const });
+
+  it('are told apart from the agent root by their step flag', async () => {
+    const { isAiStep } = await import('./flow-nodes');
+    expect(isAiStep(aiStep({ step: true }))).toBe(true);
+    expect(isAiStep(aiStep({ systemPrompt: 'root' }))).toBe(false);
+  });
+
+  it('summarise their outputs and flag what is missing', () => {
+    const ok = aiStep({ step: true, instruction: 'Classify {!c.Subject}', outputVariable: 'triage', outputs: [{ name: 'category', type: 'choice', options: ['billing', 'technical'] }, { name: 'urgent', type: 'boolean' }] });
+    expect(flowNodeSummary(ok)).toBe('→ triage { category, urgent }');
+    expect(flowNodeProblems(ok, [])).toEqual([]);
+    const bad = aiStep({ step: true, instruction: '', outputVariable: '', outputs: [{ name: 'category', type: 'choice', options: ['only'] }] });
+    expect(flowNodeProblems(bad, [])).toEqual(['No prompt', 'Name the result so later steps can read it', '"category" needs two or more choices']);
+  });
+});

@@ -60,7 +60,11 @@ global with sharing class AgentChatRestService {
             if (action == 'startSession') {
                 // forceNew: never resume the last active conversation (the Archon screen).
                 Boolean forceNew = body.get('forceNew') == true;
-                AgentChatController.SessionWithMessages result = forceNew
+                // sessionId: the conversation picked from the list, opened as it is.
+                String pickedId = (String) body.get('sessionId');
+                AgentChatController.SessionWithMessages result = String.isNotBlank(pickedId)
+                    ? AgentChatController.resumeSession((String) body.get('agentApiName'), pickedId)
+                    : forceNew
                     ? AgentChatController.startFreshSession(
                         (String) body.get('agentApiName'),
                         (String) body.get('recordContextId'),

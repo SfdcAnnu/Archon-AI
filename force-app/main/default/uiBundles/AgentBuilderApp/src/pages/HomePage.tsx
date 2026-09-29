@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AGENT_KINDS, executeTypeOfKind, type AgentKindKey } from '@/lib/agent-kind';
 import { AgentKindBadge } from '@/components/AgentKindBadge';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Loader2, Plus, Search, Trash2, Zap } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
@@ -20,61 +20,56 @@ import {
 } from '@/components/ui/dialog';
 import { NoteBar, SpecCard, StatCard, StatusBadge, T, type BadgeTone } from '@/components/spec/blocks';
 import { cn } from '@/lib/utils';
-import { loadAgents, deleteAgent, createAgent, updateAgentStreaming, type AgentSummary } from '@/lib/agents-data';
-import { loadExecutionLogs, type RawAgentExecution } from '@/lib/executions-data';
+import { loadAgents, loadAgentActivity, deleteAgent, createAgent, type AgentActivity, type AgentSummary } from '@/lib/agents-data';
 
 /** Approved spec screen 03 — "Which agents are healthy?" Stat row on top,
  *  then the all-agents table with a success ring, health badge, and a
- *  24-hour activity strip per agent. Numbers derive from the real
- *  execution log where one exists; agents without runs get an honest
- *  grey ring and "No runs yet", never a fabricated percentage. */
+ *  24-hour activity strip per agent. Numbers come from the org's own
+ *  automation runs and chat messages (getAgentActivity); agents without
+ *  runs get an honest grey ring and "No runs yet", never a made-up
+ *  percentage. */
 
 const RING_CIRC = 75.4; // 2π·12 — the spec's 28px ring
-const EXEC_WINDOW = 250; // most-recent logs fetched for health/activity
 
 type HealthTone = Extract<BadgeTone, 'ok' | 'warn' | 'error' | 'muted'>;
 
 interface AgentRunStats {
-  /** 0..1 success rate, or null when the agent has no runs at all. */
+  /** 0..1 success rate, or null when nothing has finished or failed yet. */
   rate: number | null;
-  /** Runs for this agent inside the fetched log window. */
-  logged: number;
+  /** Automation runs plus chat messages, all time. */
+  runs: number;
+  automationRuns: number;
+  chatTurns: number;
+  runs24h: number;
+  failed24h: number;
   /** Twelve 2-hour buckets covering the last 24h, oldest first. */
   buckets: number[];
+  lastActiveAt: string | null;
 }
 
-function deriveRunStats(agents: AgentSummary[], execs: RawAgentExecution[] | null): Map<string, AgentRunStats> {
-  const map = new Map<string, AgentRunStats>();
-  const now = Date.now();
-  const windowStart = now - 24 * 60 * 60 * 1000;
-  const bucketMs = (2 * 60 * 60 * 1000);
+function toRunStats(a: AgentActivity): AgentRunStats {
+  const settled = a.succeeded + a.failed;
+  return {
+    rate: settled > 0 ? a.succeeded / settled : null,
+    runs: a.automationRuns + a.chatTurns,
+    automationRuns: a.automationRuns,
+    chatTurns: a.chatTurns,
+    runs24h: a.buckets.reduce((n, b) => n + b, 0),
+    failed24h: a.failed24h,
+    buckets: a.buckets,
+    lastActiveAt: a.lastActiveAt,
+  };
+}
 
-  for (const a of agents) {
-    const mine = (execs ?? []).filter(e => e['AgentDefinition__r.Name'] === a.name);
-    const buckets = new Array<number>(12).fill(0);
-    let success = 0;
-    let failed = 0;
-    for (const e of mine) {
-      if (e.Status__c === 'SUCCESS') success++;
-      else if (e.Status__c === 'ERROR' || e.Status__c === 'TIMEOUT') failed++;
-      const t = new Date(e.CreatedDate).getTime();
-      if (t >= windowStart) {
-        const idx = Math.min(11, Math.max(0, Math.floor((t - windowStart) / bucketMs)));
-        buckets[idx]++;
-      }
-    }
-
-    let rate: number | null = null;
-    if (success + failed > 0) {
-      rate = success / (success + failed);
-    } else if ((a.totalExecutions ?? 0) > 0 && a.successRate != null) {
-      // Server-tracked lifetime rate — used when the log window has no
-      // terminal runs for this agent. Field is stored as a percentage.
-      rate = a.successRate > 1 ? a.successRate / 100 : a.successRate;
-    }
-    map.set(a.id, { rate, logged: mine.length, buckets });
-  }
-  return map;
+function ago(iso: string | null): string {
+  if (!iso) return 'Never';
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return days < 30 ? `${days} d ago` : new Date(iso).toLocaleDateString();
 }
 
 function healthOf(stats: AgentRunStats | undefined, status: string): { tone: HealthTone; label: string } {
@@ -149,34 +144,13 @@ function statusTone(status: string): BadgeTone {
   return 'muted';
 }
 
-function isToday(iso: string): boolean {
-  const d = new Date(iso);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
-  );
-}
-
 export default function HomePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [agents, setAgents] = useState<AgentSummary[]>([]);
-  /** Where each agent's chats start. Flipped from the list because that is
-   *  where someone comparing their agents actually is. The row updates at
-   *  once and the write follows; a failure puts the row back rather than
-   *  leaving the list claiming something the org does not agree with. */
-  const streamOn = (a: AgentSummary) => a.streamReplies === true;
-  const toggleStreaming = (a: AgentSummary) => {
-    const next = !streamOn(a);
-    setAgents(list => list.map(x => (x.id === a.id ? { ...x, streamReplies: next } : x)));
-    updateAgentStreaming(a.id, next).catch(err => {
-      console.error('Streaming change failed:', err);
-      setAgents(list => list.map(x => (x.id === a.id ? { ...x, streamReplies: !next } : x)));
-    });
-  };
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   // undefined = still loading · null = endpoint failed (page degrades honestly)
-  const [execs, setExecs] = useState<RawAgentExecution[] | null | undefined>(undefined);
+  const [activity, setActivity] = useState<AgentActivity[] | null | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newName, setNewName] = useState('');
@@ -196,11 +170,11 @@ export default function HomePage() {
         console.error('Failed to load agents:', err);
         setLoadState('error');
       });
-    loadExecutionLogs({ pageSize: EXEC_WINDOW })
-      .then(page => setExecs(page.records))
+    loadAgentActivity()
+      .then(setActivity)
       .catch(err => {
-        console.error('Failed to load execution logs (agents page degrades):', err);
-        setExecs(null);
+        console.error('Failed to load agent activity (agents page degrades):', err);
+        setActivity(null);
       });
   }, []);
 
@@ -219,7 +193,10 @@ export default function HomePage() {
     }
   }, [searchParams, setSearchParams]);
 
-  const runStats = useMemo(() => deriveRunStats(agents, execs ?? null), [agents, execs]);
+  const runStats = useMemo(
+    () => new Map((activity ?? []).map(x => [x.agentId, toRunStats(x)] as const)),
+    [activity],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -233,28 +210,26 @@ export default function HomePage() {
   const activeCount = agents.filter(a => a.status === 'Active').length;
   const draftCount = agents.filter(a => a.status === 'Draft').length;
 
-  const todayExecs = (execs ?? []).filter(e => isToday(e.CreatedDate));
-  const failedToday = todayExecs.filter(e => e.Status__c === 'ERROR' || e.Status__c === 'TIMEOUT').length;
-  const totalRunsAllTime = agents.reduce((sum, a) => sum + (a.totalExecutions ?? 0), 0);
+  const all = [...runStats.values()];
+  const runs24h = all.reduce((n, x) => n + x.runs24h, 0);
+  const failed24h = all.reduce((n, x) => n + x.failed24h, 0);
+  const runsAllTime = all.reduce((n, x) => n + x.runs, 0);
 
   const busiest = useMemo(() => {
     if (agents.length === 0) return null;
-    if (execs && execs.length > 0) {
-      const byLogged = [...agents].sort(
-        (a, b) => (runStats.get(b.id)?.logged ?? 0) - (runStats.get(a.id)?.logged ?? 0)
-      )[0];
-      const logged = runStats.get(byLogged.id)?.logged ?? 0;
-      if (logged > 0) return { agent: byLogged, sub: `${logged} of the last ${execs.length} logged runs` };
-    }
-    const byTotal = [...agents].sort((a, b) => (b.totalExecutions ?? 0) - (a.totalExecutions ?? 0))[0];
-    if ((byTotal.totalExecutions ?? 0) > 0) {
-      return { agent: byTotal, sub: `${byTotal.totalExecutions} runs all time` };
-    }
+    const by = (key: 'runs24h' | 'runs') =>
+      [...agents].sort((a, b) => (runStats.get(b.id)?.[key] ?? 0) - (runStats.get(a.id)?.[key] ?? 0))[0];
+    const day = by('runs24h');
+    const dayRuns = runStats.get(day.id)?.runs24h ?? 0;
+    if (dayRuns > 0) return { agent: day, sub: `${dayRuns} runs in the last 24 h` };
+    const ever = by('runs');
+    const everRuns = runStats.get(ever.id)?.runs ?? 0;
+    if (everRuns > 0) return { agent: ever, sub: `${everRuns} runs all time — none in the last 24 h` };
     const byModified = [...agents].sort((a, b) =>
       (b.lastModifiedDate ?? '').localeCompare(a.lastModifiedDate ?? '')
     )[0];
-    return { agent: byModified, sub: 'most recently edited — no runs logged yet' };
-  }, [agents, execs, runStats]);
+    return { agent: byModified, sub: 'most recently edited — no runs yet' };
+  }, [agents, runStats]);
 
   // ── Existing behaviors, unchanged ─────────────────────────────────────
   const handleCreate = useCallback(() => {
@@ -308,26 +283,20 @@ export default function HomePage() {
             value={loadState === 'ready' ? activeCount : '—'}
             sub={loadState === 'ready' ? `${draftCount} in draft` : '…'}
           />
-          {execs !== null ? (
-            <StatCard
-              label="Runs today"
-              value={execs === undefined ? '—' : todayExecs.length.toLocaleString()}
-              sub={
-                execs === undefined
-                  ? '…'
-                  : failedToday > 0
-                    ? `${failedToday} failed`
-                    : 'no failures'
-              }
-              subClass={failedToday > 0 ? 'text-[var(--archon-error)] font-semibold' : undefined}
-            />
-          ) : (
-            <StatCard
-              label="Total runs"
-              value={totalRunsAllTime.toLocaleString()}
-              sub="all time — today's execution log unavailable"
-            />
-          )}
+          <StatCard
+            label="Runs · last 24 h"
+            value={activity === undefined ? '—' : activity === null ? 'n/a' : runs24h.toLocaleString()}
+            sub={
+              activity === undefined
+                ? '…'
+                : activity === null
+                  ? 'activity could not be loaded'
+                  : failed24h > 0
+                    ? `${failed24h} failed · ${runsAllTime.toLocaleString()} all time`
+                    : `no failures · ${runsAllTime.toLocaleString()} all time`
+            }
+            subClass={failed24h > 0 ? 'text-[var(--archon-error)] font-semibold' : undefined}
+          />
           <StatCard
             label="Busiest agent"
             value={busiest ? busiest.agent.name : '—'}
@@ -377,13 +346,12 @@ export default function HomePage() {
               <table className={T.table}>
                 <thead>
                   <tr>
-                    <th className={cn(T.th, 'w-10')} />
                     <th className={T.th}>Agent</th>
                     <th className={T.th}>Type</th>
                     <th className={T.th}>Health</th>
                     <th className={T.th}>Activity 24h</th>
                     <th className={cn(T.th, 'text-right')}>Runs</th>
-                    <th className={T.th}>Streaming</th>
+                    <th className={T.th}>Last active</th>
                     <th className={T.th}>Status</th>
                     <th className={cn(T.th, 'w-10')} />
                   </tr>
@@ -398,9 +366,6 @@ export default function HomePage() {
                         className={cn(T.trClick, 'group')}
                         onClick={() => navigate(`/agent/${a.apiName}`)}
                       >
-                        <td className={T.td}>
-                          <SuccessRing rate={stats?.rate ?? null} tone={health.tone} />
-                        </td>
                         <td className={T.td}>
                           <span className="text-[12.5px] font-semibold text-primary">{a.name}</span>
                           {a.isSystem && (
@@ -417,33 +382,22 @@ export default function HomePage() {
                           <AgentKindBadge executeType={a.executeType} />
                         </td>
                         <td className={T.td}>
-                          <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
+                          <div className="flex items-center gap-2">
+                            <SuccessRing rate={stats?.rate ?? null} tone={health.tone} />
+                            <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
+                          </div>
                         </td>
                         <td className={T.td}>
                           <ActivityBars buckets={stats?.buckets ?? new Array<number>(12).fill(0)} />
                         </td>
-                        <td className={cn(T.td, 'text-right font-mono')}>
-                          {(a.totalExecutions ?? 0).toLocaleString()}
+                        <td
+                          className={cn(T.td, 'text-right font-mono')}
+                          title={stats ? `${stats.automationRuns} automation runs · ${stats.chatTurns} chat messages` : undefined}
+                        >
+                          {(stats?.runs ?? 0).toLocaleString()}
                         </td>
-                        <td className={T.td}>
-                          {/* Where this agent's chats START. Clicking here
-                              must not also open the agent, hence the stop. */}
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); toggleStreaming(a); }}
-                            aria-pressed={streamOn(a)}
-                            title={streamOn(a)
-                              ? 'Chats start with streaming on. Anyone chatting can still switch it off.'
-                              : 'Chats start with streaming off. Anyone chatting can still switch it on.'}
-                            className={cn(
-                              'flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide',
-                              streamOn(a)
-                                ? 'bg-[var(--archon-success-tint)] text-[var(--archon-success)]'
-                                : 'text-[var(--archon-faint)] hover:bg-secondary hover:text-foreground',
-                            )}
-                          >
-                            <Zap className="h-3 w-3" /> {streamOn(a) ? 'On' : 'Off'}
-                          </button>
+                        <td className={cn(T.td, 'whitespace-nowrap text-[11.5px] text-muted-foreground')}>
+                          {ago(stats?.lastActiveAt ?? null)}
                         </td>
                         <td className={T.td}>
                           <StatusBadge tone={statusTone(a.status)}>{a.status}</StatusBadge>
@@ -477,10 +431,10 @@ export default function HomePage() {
               </table>
             </div>
           )}
-          {loadState === 'ready' && execs === null && (
+          {loadState === 'ready' && activity === null && (
             <NoteBar>
-              The execution log couldn't be loaded — rings fall back to each agent's lifetime success
-              rate and the activity strips stay empty.
+              Agent activity couldn't be loaded — health, activity and runs stay empty until the page
+              is refreshed.
             </NoteBar>
           )}
         </SpecCard>

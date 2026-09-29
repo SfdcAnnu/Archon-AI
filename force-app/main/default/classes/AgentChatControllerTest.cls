@@ -74,6 +74,45 @@ private class AgentChatControllerTest {
     }
 
     @IsTest
+    static void resumeSession_opens_the_picked_session_not_the_latest() {
+        AgentChatController.SessionWithMessages older = AgentChatController.startSession('TestChatAgent', null, null);
+        AgentChatController.SessionWithMessages newer = AgentChatController.startFreshSession('TestChatAgent', null, null);
+        Test.startTest();
+        AgentChatController.SessionWithMessages picked = AgentChatController.resumeSession('TestChatAgent', older.session.Id);
+        Test.stopTest();
+        System.assertNotEquals(older.session.Id, newer.session.Id);
+        System.assertEquals(older.session.Id, picked.session.Id, 'the clicked chat opens, not a new one');
+        System.assertNotEquals(null, picked.streamReplies);
+    }
+
+    @IsTest
+    static void resumeSession_falls_back_when_the_session_is_ended() {
+        AgentChatController.SessionWithMessages a = AgentChatController.startSession('TestChatAgent', null, null);
+        AgentChatController.endSession(a.session.Id);
+        AgentChatController.SessionWithMessages r = AgentChatController.resumeSession('TestChatAgent', a.session.Id);
+        System.assertNotEquals(a.session.Id, r.session.Id, 'an ended chat is not reopened for new turns');
+    }
+
+    @IsTest
+    static void agentActivity_counts_chat_messages_as_runs() {
+        AgentChatController.SessionWithMessages s = AgentChatController.startSession('TestChatAgent', null, null);
+        insert new List<ChatMessage__c>{
+            new ChatMessage__c(ChatSession__c = s.session.Id, Role__c = 'User', Content__c = 'hi', SequenceNumber__c = 1),
+            new ChatMessage__c(ChatSession__c = s.session.Id, Role__c = 'Assistant', Content__c = 'hello', SequenceNumber__c = 2, TurnStatus__c = 'Complete')
+        };
+        AgentBuilderController.AgentActivity mine;
+        for (AgentBuilderController.AgentActivity x : AgentBuilderController.getAgentActivity()) {
+            if (x.agentId == s.session.AgentDefinition__c) mine = x;
+        }
+        System.assertEquals(1, mine.chatTurns);
+        System.assertEquals(1, mine.succeeded);
+        Integer inDay = 0;
+        for (Integer b : mine.buckets) inDay += b;
+        System.assertEquals(1, inDay);
+        System.assertNotEquals(null, mine.lastActiveAt);
+    }
+
+    @IsTest
     static void startFreshSession_creates_a_second_session_even_when_one_is_active() {
         AgentChatController.SessionWithMessages a = AgentChatController.startSession('TestChatAgent', null, null);
         Test.startTest();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHref } from 'react-router';
-import { ChevronDown, Loader2, PanelRight, Plus, Search } from 'lucide-react';
+import { ChevronDown, Loader2, PanelLeft, PanelRight, Plus, Search } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ConsoleRail } from '@/components/chat/ConsoleRail';
@@ -57,6 +57,9 @@ export default function ChatPage() {
   const [rail, setRail] = useState<boolean>(() => {
     try { return localStorage.getItem(RAIL_PREF) !== 'off'; } catch { return true; }
   });
+  // The chat list folds away while a chat is open, so the chat has the
+  // page; one button brings it back.
+  const [listOpen, setListOpen] = useState(true);
   const toggleRail = () => setRail(r => { try { localStorage.setItem(RAIL_PREF, r ? 'off' : 'on'); } catch { /* per-viewer nicety */ } return !r; });
 
   const refreshSessions = useCallback(() => {
@@ -109,15 +112,16 @@ export default function ChatPage() {
     try { localStorage.removeItem(AGENT_PREF); } catch { /* fine */ }
   }, []);
   const newChat = useCallback(() => {
-    setEvents([]); setLiveSessionId(null); setActive({ kind: 'live', sessionId: null });
+    setEvents([]); setLiveSessionId(null); setActive({ kind: 'live', sessionId: null }); setListOpen(false);
   }, []);
   const pickSession = useCallback((s: SessionSummary) => {
     setEvents([]);
+    setListOpen(false);
     if (s.status === 'Active') { setLiveSessionId(s.id); setActive({ kind: 'live', sessionId: s.id }); }
     else { setLiveSessionId(null); setActive({ kind: 'ended', session: s }); }
   }, []);
   const handleSessionChange = useCallback((info: { sessionId: string | null; ended: boolean }) => {
-    if (info.ended) { setActive(null); setEvents([]); setLiveSessionId(null); }
+    if (info.ended) { setActive(null); setEvents([]); setLiveSessionId(null); setListOpen(true); }
     else if (info.sessionId) setLiveSessionId(info.sessionId);
     refreshSessions();
   }, [refreshSessions]);
@@ -133,7 +137,7 @@ export default function ChatPage() {
     : null;
 
   return (
-    <AppShell title="Chat" forceCollapsed={!!agent} onRefresh={() => { refreshSessions(); refreshAgents(); }}>
+    <AppShell title="Chat" forceCollapsed onRefresh={() => { refreshSessions(); refreshAgents(); }}>
       <div className="cp">
 
         {/* ── 1 · who do you want to chat with? ─────────────────── */}
@@ -182,7 +186,7 @@ export default function ChatPage() {
 
         {/* ── 2 · an agent chosen: its chats, and the chat ───────── */}
         {agent && (
-          <div className="cp-agent">
+          <div className="cp-agent" data-list={listOpen || !active ? '1' : '0'}>
             <aside className="cp-side" aria-label={`Chats with ${agent.name}`}>
               <div className="cp-side-hd">
                 <div className="cp-avatar" aria-hidden="true">{initials(agent.name)}</div>
@@ -234,6 +238,7 @@ export default function ChatPage() {
               {active?.kind === 'live' && (
                 <div className="cp-focus">
                   <div className="cp-strip">
+                    <button type="button" className={`cp-icon${listOpen ? ' on' : ''}`} onClick={() => setListOpen(o => !o)} aria-label={listOpen ? 'Hide chats' : 'Show chats'} title={listOpen ? 'Hide chats' : 'Show chats'}><PanelLeft /></button>
                     <button type="button" className={`cp-icon${rail ? ' on' : ''}`} onClick={toggleRail} aria-label={rail ? 'Hide console' : 'Show console'} title={rail ? 'Hide console' : 'Show console'}><PanelRight /></button>
                   </div>
                   {rail && <ConsoleRail events={events} agentName={agent.name} traceHref={liveSessionId ? traceHref : null} />}
@@ -252,6 +257,9 @@ export default function ChatPage() {
                 </div>
               )}
 
+              {active?.kind === 'ended' && (
+                <button type="button" className={`cp-icon cp-listbtn${listOpen ? ' on' : ''}`} onClick={() => setListOpen(o => !o)} aria-label={listOpen ? 'Hide chats' : 'Show chats'} title={listOpen ? 'Hide chats' : 'Show chats'}><PanelLeft /></button>
+              )}
               {active?.kind === 'ended' && (
                 <SessionTranscript session={active.session} agentName={agent.name} onNewChat={newChat} />
               )}

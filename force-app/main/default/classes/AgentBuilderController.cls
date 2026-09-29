@@ -15,7 +15,7 @@ public with sharing class AgentBuilderController {
             return [
                 SELECT Id, Name, ApiName__c, Department__c, Description__c,
                        Status__c, Version__c, TotalExecutions__c, SuccessRate__c,
-                       IsSystem__c, StreamReplies__c, CreatedDate, LastModifiedDate
+                       ExecuteType__c, IsSystem__c, StreamReplies__c, CreatedDate, LastModifiedDate
                 FROM AgentDefinition__c
                 WITH USER_MODE
                 ORDER BY Department__c, Name ASC
@@ -32,6 +32,95 @@ public with sharing class AgentBuilderController {
             ORDER BY Name ASC
             LIMIT 200
         ];
+    }
+
+    /**
+     * What each agent has actually done, for the Agents table.
+     *
+     * The table read TotalExecutions__c, which nothing writes, and matched
+     * the last 250 execution rows by agent name — so chat agents never
+     * counted and every column stayed empty. A run here is an automation
+     * run (AgentExecution__c) or a message a person sent in a chat; health
+     * is finished runs and replies against failed ones.
+     */
+    public class AgentActivity {
+        public Id agentId;
+        public Integer automationRuns = 0;
+        public Integer chatTurns = 0;
+        public Integer succeeded = 0;
+        public Integer failed = 0;
+        public Integer failed24h = 0;
+        public List<Integer> buckets = new List<Integer>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        public Datetime lastActiveAt;
+        AgentActivity(Id agentId) { this.agentId = agentId; }
+        void seen(Datetime at) { if (at != null && (lastActiveAt == null || at > lastActiveAt)) lastActiveAt = at; }
+        void inWindow(Datetime at, Datetime windowStart) {
+            if (at == null || at < windowStart) return;
+            Long ms = at.getTime() - windowStart.getTime();
+            buckets[Math.min(11, Integer.valueOf(ms / (2L * 60 * 60 * 1000)))] += 1;
+        }
+    }
+
+    public static List<AgentActivity> getAgentActivity() {
+        Map<Id, AgentActivity> byAgent = new Map<Id, AgentActivity>();
+        for (AgentDefinition__c a : [SELECT Id FROM AgentDefinition__c WITH USER_MODE LIMIT 200]) {
+            byAgent.put(a.Id, new AgentActivity(a.Id));
+        }
+        Datetime windowStart = System.now().addHours(-24);
+
+        for (AggregateResult r : [
+            SELECT AgentDefinition__c agent, Status__c status, COUNT(Id) n, MAX(CreatedDate) lastAt
+            FROM AgentExecution__c WHERE AgentDefinition__c IN :byAgent.keySet()
+            WITH USER_MODE GROUP BY AgentDefinition__c, Status__c
+        ]) {
+            AgentActivity x = byAgent.get((Id) r.get('agent'));
+            Integer n = (Integer) r.get('n');
+            String status = (String) r.get('status');
+            x.automationRuns += n;
+            if (status == 'SUCCESS') x.succeeded += n;
+            else if (status == 'ERROR' || status == 'TIMEOUT') x.failed += n;
+            x.seen((Datetime) r.get('lastAt'));
+        }
+        for (AgentExecution__c e : [
+            SELECT AgentDefinition__c, Status__c, CreatedDate FROM AgentExecution__c
+            WHERE AgentDefinition__c IN :byAgent.keySet() AND CreatedDate >= :windowStart
+            WITH USER_MODE LIMIT 5000
+        ]) {
+            AgentActivity x = byAgent.get(e.AgentDefinition__c);
+            x.inWindow(e.CreatedDate, windowStart);
+            if (e.Status__c == 'ERROR' || e.Status__c == 'TIMEOUT') x.failed24h += 1;
+        }
+
+        // Chats: a person's message is a run; a reply marked Complete or
+        // Failed settles whether it went through.
+        for (AggregateResult r : [
+            SELECT ChatSession__r.AgentDefinition__c agent, Role__c role, TurnStatus__c turn, COUNT(Id) n, MAX(CreatedDate) lastAt
+            FROM ChatMessage__c
+            WHERE ChatSession__r.AgentDefinition__c IN :byAgent.keySet() AND Role__c IN ('User', 'Assistant')
+            WITH USER_MODE GROUP BY ChatSession__r.AgentDefinition__c, Role__c, TurnStatus__c
+        ]) {
+            AgentActivity x = byAgent.get((Id) r.get('agent'));
+            Integer n = (Integer) r.get('n');
+            if ((String) r.get('role') == 'User') {
+                x.chatTurns += n;
+                x.seen((Datetime) r.get('lastAt'));
+            } else if ((String) r.get('turn') == 'Complete') {
+                x.succeeded += n;
+            } else if ((String) r.get('turn') == 'Failed') {
+                x.failed += n;
+            }
+        }
+        for (ChatMessage__c m : [
+            SELECT ChatSession__r.AgentDefinition__c, Role__c, TurnStatus__c, CreatedDate FROM ChatMessage__c
+            WHERE ChatSession__r.AgentDefinition__c IN :byAgent.keySet() AND CreatedDate >= :windowStart
+              AND (Role__c = 'User' OR TurnStatus__c = 'Failed')
+            WITH USER_MODE LIMIT 5000
+        ]) {
+            AgentActivity x = byAgent.get(m.ChatSession__r.AgentDefinition__c);
+            if (m.Role__c == 'User') x.inWindow(m.CreatedDate, windowStart);
+            else x.failed24h += 1;
+        }
+        return byAgent.values();
     }
 
     // GET: agents eligible to be named as a "post-turn automation agent" (Trigger or Both),

@@ -97,11 +97,12 @@ export async function startChatSession(
   agentApiName: string,
   recordContextId?: string | null,
   recordContextType?: string | null,
-  forceNew = false
+  forceNew = false,
+  sessionId?: string | null
 ): Promise<SessionWithMessages> {
   return apexFetch<SessionWithMessages>(CHAT_BASE, {
     method: 'POST',
-    body: JSON.stringify({ action: 'startSession', agentApiName, recordContextId, recordContextType, ...(forceNew ? { forceNew: true } : {}) }),
+    body: JSON.stringify({ action: 'startSession', agentApiName, recordContextId, recordContextType, ...(forceNew ? { forceNew: true } : {}), ...(sessionId ? { sessionId } : {}) }),
   });
 }
 

@@ -185,3 +185,10 @@
 
 /* several components in one change: one card, a rule between them */
 .tc-bundle-item + .tc-bundle-item{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+
+/* an action waiting for the person, pinned above the composer so it is never below the fold */
+.chat-approval-bar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--archon-warning) 55%,transparent);border-radius:8px;background:var(--archon-warning-tint);color:var(--foreground);font-size:11.5px}
+.chat-approval-bar svg{color:var(--archon-warning);flex:none}
+.chat-approval-bar .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-approval-bar .go{flex:none;border:0;border-radius:6px;padding:5px 10px;background:var(--primary);color:var(--primary-foreground);font:600 11px var(--font-sans);cursor:pointer}
+.chat-approval-bar .go:hover{background:var(--primary-hover)}

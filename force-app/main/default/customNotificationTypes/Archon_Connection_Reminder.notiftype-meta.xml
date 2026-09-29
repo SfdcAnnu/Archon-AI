@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomNotificationType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customNotifTypeName>Archon_Connection_Reminder</customNotifTypeName>
+    <description>Asks a person to connect their own account for a connector an Archon agent runs as them.</description>
+    <desktop>true</desktop>
+    <masterLabel>Archon connection reminder</masterLabel>
+    <mobile>true</mobile>
+</CustomNotificationType>

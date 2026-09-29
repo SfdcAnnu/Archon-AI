@@ -102,6 +102,18 @@ export interface CatalogNodeConfig {
   connectorId: string;
   provider?: string;
   allowedTools: string[];
+  /** Whose account this connector runs as. Unset means the org's default
+   *  policy (Settings → Identity & access). Read by the server's identity
+   *  resolver (server-langchain/src/identity/policy.ts). */
+  runAs?: 'user' | 'group' | 'org';
+  /** When the person has no connection: refuse ('none') or use the org's. */
+  fallback?: 'none' | 'org';
+  /** A missing connection blocks the chat until it is connected. */
+  required?: boolean;
+  /** Automations (Flow/Apex runs): act as the record's user, or the org. */
+  automationRunAs?: 'triggeringUser' | 'org' | 'group';
+  /** Only accounts on this email domain may be connected for this node. */
+  allowedDomain?: string;
 }
 
 /** ONE rule inside the agent's single Guardrails node — a line of control

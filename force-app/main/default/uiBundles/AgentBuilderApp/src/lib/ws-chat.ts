@@ -97,6 +97,23 @@ export function continuationText(toolName: string, resultText: string): string {
     'Continue from where you left off. Do not repeat what was already said or done.';
 }
 
+/** Whose account a tool call ran under. */
+export interface RanAs {
+  type: 'user' | 'group' | 'org';
+  subjectKey?: string | null;
+  subjectLabel?: string | null;
+  accountEmail?: string | null;
+  via?: 'connection' | 'jwt' | 'setup' | 'platform' | null;
+}
+
+/** A connector the turn could not use: the person has no identity for it. */
+export interface NeedsConnection {
+  provider: string;
+  reason: 'needs_connection' | 'needs_group_connection' | 'wrong_account' | 'expired';
+  wanted: 'user' | 'group' | 'org';
+  message: string;
+}
+
 export interface ChatToolCallSummary {
   id: string;
   name: string;
@@ -106,6 +123,7 @@ export interface ChatToolCallSummary {
   /** For a call into a specialist (ask_*): the calls the specialist made
    *  in its own turn — the work behind the hand-off. */
   nested?: ChatToolCallSummary[];
+  ranAs?: RanAs | null;
 }
 
 export interface ChatTurnResult {
@@ -118,6 +136,8 @@ export interface ChatTurnResult {
   activeTopicName?: string;
   error?: string;
   message?: string;
+  /** Connectors the turn went without, for want of the person's account. */
+  needsConnection?: NeedsConnection[];
 }
 
 /** Mints a ticket, then opens the WebSocket to Archon-Server using it —

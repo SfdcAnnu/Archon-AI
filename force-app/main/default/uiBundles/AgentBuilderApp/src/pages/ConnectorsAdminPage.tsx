@@ -1,5 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Loader2, Plug, Plus, Server, Trash2 } from 'lucide-react';
+import { Loader2, Plug, Plus, Server, Trash2, Users } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ConnectorDetail, Roster } from '@/components/connectors/ConnectorDetail';
+import { AUTH_STYLES, loadIdentitySummary, type ProviderSummary } from '@/lib/identity-data';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageBody } from '@/components/shell/PageBody';
 import { Button } from '@/components/ui/button';
@@ -50,12 +53,13 @@ import {
  *  catalog is enumerated LIVE per connected connector via tools/list
  *  (tool-catalog.ts), so every count on this page is real or "—". */
 
-type TabKey = 'dir' | 'all' | 'det';
+type TabKey = 'dir' | 'users' | 'all' | 'det';
 type AccessFilter = 'all' | ToolAccess;
 
 function SegTabs({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => void }) {
   const TABS: Array<[TabKey, string]> = [
     ['dir', 'Directory'],
+    ['users', 'Users'],
     ['all', 'All tools'],
     ['det', 'Tool details'],
   ];
@@ -126,6 +130,8 @@ function CustomMcpDialog({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Other');
   const [catalogType, setCatalogType] = useState('custom_mcp_tools');
+  const [authStyle, setAuthStyle] = useState('none');
+  const [principals, setPrincipals] = useState<Set<string>>(new Set(['org']));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -135,13 +141,17 @@ function CustomMcpDialog({
       setDescription(editing?.Description__c ?? '');
       setCategory(editing?.Category__c ?? 'Other');
       setCatalogType(editing?.CatalogType__c ?? 'custom_mcp_tools');
+      setAuthStyle(editing?.AuthStyle__c || 'none');
+      setPrincipals(new Set((editing?.PrincipalTypes__c || 'org').split(',').map(s => s.trim()).filter(Boolean)));
     }
   }, [open, editing]);
+
+  const togglePrincipal = (p: string) => setPrincipals(s => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); if (n.size === 0) n.add('org'); return n; });
 
   const handleSave = () => {
     if (!serverName.trim() || !mcpServerUrl.trim()) return;
     setSaving(true);
-    saveCustomMcpServer({ recordId: editing?.Id ?? null, serverName, mcpServerUrl, description, category, catalogType })
+    saveCustomMcpServer({ recordId: editing?.Id ?? null, serverName, mcpServerUrl, description, category, catalogType, authStyle, principalTypes: ['org', 'group', 'user'].filter(p => principals.has(p)).join(',') })
       .then(() => {
         setSaving(false);
         onSaved();
@@ -183,6 +193,29 @@ function CustomMcpDialog({
               <Input value={catalogType} onChange={e => setCatalogType(e.target.value)} />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label>How Archon authenticates to it</Label>
+            <Select value={authStyle} onValueChange={setAuthStyle}>
+              <SelectTrigger className="h-8 w-full text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {AUTH_STYLES.filter(([k]) => k !== 'provider-token').map(([k, label]) => <SelectItem key={k} value={k}>{label}</SelectItem>)}
+                <SelectItem value="provider-token:salesforce_mcp">The org's Salesforce token, passed through</SelectItem>
+                <SelectItem value="provider-token:gmail">A Google connection's token, passed through</SelectItem>
+                <SelectItem value="provider-token:outlook">A Microsoft connection's token, passed through</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Who may hold a connection to it</Label>
+            <div className="flex gap-4 text-[12px]">
+              {([['org', 'The org'], ['group', 'Groups'], ['user', 'Each person']] as Array<[string, string]>).map(([p, label]) => (
+                <label key={p} className="flex cursor-pointer items-center gap-1.5">
+                  <input type="checkbox" className="h-3.5 w-3.5" checked={principals.has(p)} onChange={() => togglePrincipal(p)} /> {label}
+                </label>
+              ))}
+            </div>
+            <p className="text-[10.5px] text-muted-foreground">Group and per-person connections need a server whose OAuth is discoverable (MCP spec) or a passed-through provider token.</p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
@@ -209,6 +242,12 @@ export default function ConnectorsAdminPage() {
 
   const [tab, setTab] = useState<TabKey>('dir');
   const [dirSearch, setDirSearch] = useState('');
+  /** Who has connected each provider (org / groups / people), for the
+   *  directory's chips. Missing until the server answers; never guessed. */
+  const [summary, setSummary] = useState<Record<string, ProviderSummary>>({});
+  /** A connector opened from the directory: its own page replaces the tabs. */
+  const [detailEntry, setDetailEntry] = useState<DirectoryEntry | null>(null);
+  const [usersProvider, setUsersProvider] = useState<string>('');
   const [toolGroups, setToolGroups] = useState<ConnectorToolGroup[] | null>(null);
   const [catalogState, setCatalogState] = useState<'idle' | 'loading' | 'ready'>('idle');
   const [toolsWaking, setToolsWaking] = useState(false);
@@ -229,6 +268,8 @@ export default function ConnectorsAdminPage() {
         console.error('Failed to load connector directory:', err);
         setDirLoadState('error');
       });
+    // The chips are a nicety: a failure leaves the cards without them.
+    loadIdentitySummary().then(setSummary).catch(() => { /* no chips */ });
   }, []);
 
   const loadCustom = useCallback(() => {
@@ -452,6 +493,21 @@ export default function ConnectorsAdminPage() {
     [accessFilter]
   );
 
+  if (detailEntry) {
+    return (
+      <AppShell title="Connectors" onRefresh={refreshAll}>
+        <PageBody width="standard">
+          <ConnectorDetail
+            entry={detailEntry}
+            onBack={() => setDetailEntry(null)}
+            onChanged={refreshAll}
+            onViewTools={() => { setConnectorFilter(detailEntry.providerKey); setAccessFilter('all'); setTab('all'); setDetailEntry(null); }}
+          />
+        </PageBody>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell title="Connectors" onRefresh={refreshAll}>
       <PageBody width="standard">
@@ -514,6 +570,10 @@ export default function ConnectorsAdminPage() {
                   {filteredDirectory.map(entry => {
                     const toolCount = toolCountByKey.get(entry.providerKey);
                     const connected = entry.status === 'Connected';
+                    const who = summary[entry.providerKey];
+                    // Someone holds a connection even when the org does not:
+                    // a group's, or people's own.
+                    const anyone = connected || !!who?.org || (who?.groups ?? 0) > 0 || (who?.users.connected ?? 0) > 0;
                     return (
                       <div
                         key={entry.providerKey}
@@ -523,19 +583,29 @@ export default function ConnectorsAdminPage() {
                           <Plug className="h-4 w-4" />
                         </IconSquare>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[12.5px] font-bold text-foreground">{entry.displayName}</div>
+                          <button type="button" onClick={() => setDetailEntry(entry)} className="block max-w-full truncate text-left text-[12.5px] font-bold text-foreground hover:text-primary hover:underline" title="Open this connector">
+                            {entry.displayName}
+                          </button>
                           <div className="mb-1.5 mt-0.5 truncate text-[10.5px] text-[var(--archon-faint)]">
                             {entry.description ?? entry.category ?? 'MCP connector'}
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             {connected ? (
-                              <StatusBadge tone="ok">Connected</StatusBadge>
+                              <StatusBadge tone="ok">Org connected</StatusBadge>
                             ) : entry.status === 'Error' ? (
                               <StatusBadge tone="error">
                                 <span title={entry.lastErrorMessage ?? undefined}>Error</span>
                               </StatusBadge>
+                            ) : anyone ? (
+                              <StatusBadge tone="muted">No org connection</StatusBadge>
                             ) : (
                               <StatusBadge tone="muted">Not connected</StatusBadge>
+                            )}
+                            {who && who.groups > 0 && <StatusBadge tone="blue">{who.groups} group{who.groups === 1 ? '' : 's'}</StatusBadge>}
+                            {who && who.users.total > 0 && (
+                              <StatusBadge tone={who.users.expired ? 'warn' : 'muted'}>
+                                <Users className="h-2.5 w-2.5" /> {who.users.connected} of {who.users.total}{who.users.expired ? ` · ${who.users.expired} expired` : ''}
+                              </StatusBadge>
                             )}
                             {connected && toolCount != null && (
                               <span className="font-mono text-[10px] text-[var(--archon-faint)]">{toolCount} tools</span>
@@ -545,17 +615,8 @@ export default function ConnectorsAdminPage() {
                         <div className="flex shrink-0 flex-col gap-1.5">
                           {connected ? (
                             <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-6 px-2 text-[11px]"
-                                onClick={() => {
-                                  setConnectorFilter(entry.providerKey);
-                                  setAccessFilter('all');
-                                  setTab('all');
-                                }}
-                              >
-                                View tools
+                              <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDetailEntry(entry)}>
+                                Manage
                               </Button>
                               <Button
                                 variant="outline"
@@ -568,9 +629,16 @@ export default function ConnectorsAdminPage() {
                               </Button>
                             </>
                           ) : (
-                            <Button size="sm" className="h-6 px-2 text-[11px]" disabled={connecting === entry.providerKey} onClick={() => handleConnect(entry)}>
-                              {connecting === entry.providerKey ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Waiting for sign-in…</> : entry.mcpServerUrl ? 'Authorise' : 'Not available yet'}
-                            </Button>
+                            <>
+                              <Button size="sm" className="h-6 px-2 text-[11px]" disabled={connecting === entry.providerKey} onClick={() => handleConnect(entry)}>
+                                {connecting === entry.providerKey ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Waiting for sign-in…</> : entry.mcpServerUrl ? 'Authorise' : 'Not available yet'}
+                              </Button>
+                              {(anyone || entry.mcpServerUrl) && (
+                                <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDetailEntry(entry)}>
+                                  Manage
+                                </Button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -648,6 +716,37 @@ export default function ConnectorsAdminPage() {
                 the server each time — nothing is cached in Salesforce.
               </NoteBar>
             </SpecCard>
+          </>
+        )}
+
+        {/* ════════ USERS — who has connected their own account ════════ */}
+        {tab === 'users' && (
+          <>
+            {dirLoadState !== 'ready' ? (
+              <div className="flex items-center gap-2 py-6 text-[12.5px] text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {dirWaking ? 'The server is waking up…' : 'Loading…'}
+              </div>
+            ) : (
+              <>
+                <div className="mb-3.5 flex items-center gap-3">
+                  <span className="text-[12px] text-muted-foreground">Connector</span>
+                  <Select value={usersProvider || directory[0]?.providerKey || ''} onValueChange={setUsersProvider}>
+                    <SelectTrigger className="h-8 w-[260px] text-xs"><SelectValue placeholder="Pick a connector" /></SelectTrigger>
+                    <SelectContent>
+                      {directory.map(d => {
+                        const who = summary[d.providerKey];
+                        return <SelectItem key={d.providerKey} value={d.providerKey}>{d.displayName}{who?.users.total ? ` — ${who.users.connected} of ${who.users.total} connected` : ''}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(usersProvider || directory[0]?.providerKey) ? (
+                  <Roster key={usersProvider || directory[0].providerKey} providerKey={usersProvider || directory[0].providerKey} />
+                ) : (
+                  <EmptyPanel>No connectors in the directory yet.</EmptyPanel>
+                )}
+              </>
+            )}
           </>
         )}
 

@@ -813,7 +813,8 @@ export function ChatPanel({
     setLoadError(null);
 
     console.log('[ChatPanel] calling startChatSession', { agentApiName, initialSessionId });
-    startChatSession(agentApiName, initialSessionId ?? null, null, !!freshSession && !initialSessionId)
+    // The picked conversation goes as sessionId; it is not a record context.
+    startChatSession(agentApiName, null, null, !!freshSession && !initialSessionId, initialSessionId ?? null)
       .then(result => {
         if (cancelled) return;
         console.log('[ChatPanel] startChatSession resolved', {

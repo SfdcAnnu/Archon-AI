@@ -60,6 +60,33 @@ public with sharing class AgentChatController {
     }
 
     /**
+     * Opens the conversation the person picked from the list.
+     *
+     * The chat screen used to send the picked session's Id as the record
+     * context, so the lookup matched nothing and a new, empty chat opened
+     * instead of the one clicked. When the picked session is the running
+     * user's own, still Active and with this agent, it is returned with its
+     * messages; anything else falls back to the usual resume-or-create.
+     */
+    public static SessionWithMessages resumeSession(String agentApiName, String sessionId) {
+        if (String.isNotBlank(sessionId) && String.isNotBlank(agentApiName)) {
+            List<ChatSession__c> rows = [
+                SELECT Id FROM ChatSession__c
+                WHERE Id = :sessionId AND User__c = :UserInfo.getUserId()
+                  AND AgentDefinition__r.ApiName__c = :agentApiName
+                  AND Status__c = 'Active'
+                WITH USER_MODE LIMIT 1
+            ];
+            if (!rows.isEmpty()) {
+                SessionWithMessages r = getSession(rows[0].Id);
+                r.streamReplies = loadAgent(agentApiName).StreamReplies__c == true;
+                return r;
+            }
+        }
+        return startSession(agentApiName, null, null);
+    }
+
+    /**
      * A conversation that must NOT resume the last one. The Archon screen
      * opens fresh every time; the earlier conversation stays in Recent.
      */

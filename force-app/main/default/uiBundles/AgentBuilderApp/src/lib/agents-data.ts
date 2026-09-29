@@ -68,6 +68,24 @@ export async function loadAgents(): Promise<AgentSummary[]> {
   return raw.map(fromRaw);
 }
 
+/** What an agent has done — automation runs plus messages people sent it
+ *  in chat — from AgentBuilderController.getAgentActivity. */
+export interface AgentActivity {
+  agentId: string;
+  automationRuns: number;
+  chatTurns: number;
+  succeeded: number;
+  failed: number;
+  failed24h: number;
+  /** Twelve 2-hour buckets covering the last 24h, oldest first. */
+  buckets: number[];
+  lastActiveAt: string | null;
+}
+
+export async function loadAgentActivity(): Promise<AgentActivity[]> {
+  return apexFetch<AgentActivity[]>(`${AGENTS_BASE}?activity=1`, { method: 'GET' });
+}
+
 export async function deleteAgent(agentId: string): Promise<void> {
   await apexFetch<{ success: boolean }>(`${AGENTS_BASE}?agentId=${encodeURIComponent(agentId)}`, {
     method: 'DELETE',

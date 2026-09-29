@@ -19,6 +19,12 @@ global with sharing class AgentListRestService {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
         try {
+            // ?activity=1 — what each agent has done (runs, health, last 24h).
+            if (req.params.get('activity') == '1') {
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(AgentBuilderController.getAgentActivity()));
+                return;
+            }
             String department = req.params.get('department');
             List<AgentDefinition__c> agents = AgentBuilderController.getAgentDefinitions(department);
             res.statusCode = 200;

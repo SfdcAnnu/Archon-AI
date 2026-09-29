@@ -32,6 +32,7 @@ import {
   endChatSession,
   discardChatSessionIfEmpty,
   sendMessageFeedback,
+  isApprovalOutcomeRow,
   type RawChatMessage,
   type RawChatSession,
   type ConnectionGate,
@@ -828,8 +829,12 @@ export function ChatPanel({
         setStreaming(resolveStreaming(agentApiName, result.streamReplies));
         const display = foldToolRows(result.messages.map(toDisplay).filter((m): m is DisplayMessage => m != null), result.messages);
         setMessages(display);
+        // System rows are screen chrome, except the one that says what a
+        // person decided about an action parked for approval and how it
+        // went — the runtime reads that one, so the agent does not run the
+        // action again.
         historyRef.current = result.messages
-          .filter(m => m.Role__c !== 'System')
+          .filter(m => m.Role__c !== 'System' || isApprovalOutcomeRow(m))
           .map(m => ({ role: m.Role__c.toLowerCase() as ChatHistoryEntry['role'], content: m.Content__c ?? '' }));
         setApprovals([]);
         refreshApprovals(result.session.Id);

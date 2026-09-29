@@ -334,13 +334,22 @@ function ToolCard({ call, all }: { call: ChatToolCallSummary; all: ChatToolCallS
     );
   }
   if (name === 'serialize') {
-    const env = (isObj(call.input.ir) ? call.input.ir : call.input) as Envelope;
+    // One envelope, or a list that became one change: one card, every component in it.
+    const raw = call.input.ir;
+    const envs = (Array.isArray(raw) ? raw : [isObj(raw) ? raw : call.input]) as Envelope[];
     const out = isObj(data) ? data : {};
     const preview = all.find(c => c.name === 'layout_to_preview_json' && !c.isError);
     const previewData = preview ? parseOutput(preview.output) : null;
+    const titleOf = (env: Envelope) => `${env.operation === 'modify' ? 'Change' : 'New'} ${TYPE_LABEL[env.type ?? ''] ?? env.type ?? 'component'}`;
+    const many = envs.length > 1;
     return (
-      <Card kind="change" title={`${env.operation === 'modify' ? 'Change' : 'New'} ${TYPE_LABEL[env.type ?? ''] ?? env.type ?? 'component'}`} sub={out.changeId ? `change ${str(out.changeId, 20)}` : undefined}>
-        <EnvelopeView env={env} preview={isObj(previewData) ? previewData : null} />
+      <Card kind="change" title={many ? `${envs.length} components in one change` : titleOf(envs[0])} sub={out.changeId ? `change ${str(out.changeId, 20)}` : undefined}>
+        {envs.map((env, i) => (
+          <div key={i} className={many ? 'tc-bundle-item' : undefined}>
+            {many && <div className="tc-label">{titleOf(env)}{env.apiName ? ` · ${env.object ? `${env.object}.` : ''}${env.apiName}` : ''}</div>}
+            <EnvelopeView env={env} preview={env.type === 'Layout' && isObj(previewData) ? previewData : null} />
+          </div>
+        ))}
         {typeof out.diff === 'string' && out.diff.trim() ? <Diff text={out.diff} /> : Array.isArray(out.files) && (out.files as Json[]).length > 0 ? <pre className="tc-code">{str((out.files as Json[])[0].preview, 3000)}</pre> : null}
       </Card>
     );

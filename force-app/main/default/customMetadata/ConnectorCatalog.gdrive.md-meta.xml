@@ -10,7 +10,8 @@
     <values><field>AuthType__c</field><value xsi:type="xsd:string">OAuth2</value></values>
     <values><field>AuthorizeUrl__c</field><value xsi:type="xsd:string">https://accounts.google.com/o/oauth2/v2/auth</value></values>
     <values><field>TokenUrl__c</field><value xsi:type="xsd:string">https://oauth2.googleapis.com/token</value></values>
-    <values><field>Scopes__c</field><value xsi:type="xsd:string">https://www.googleapis.com/auth/drive.file openid email profile</value></values>
+    <values><field>Scopes__c</field><value xsi:type="xsd:string">https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file openid email profile</value></values>
+    <values><field>McpServerUrl__c</field><value xsi:type="xsd:string">https://drivemcp.googleapis.com/mcp/v1</value></values>
     <values><field>MapsToCatalogType__c</field><value xsi:type="xsd:string">storage_tools</value></values>
     <values><field>IsPopular__c</field><value xsi:type="xsd:boolean">true</value></values>
     <values><field>SortOrder__c</field><value xsi:type="xsd:double">20</value></values>

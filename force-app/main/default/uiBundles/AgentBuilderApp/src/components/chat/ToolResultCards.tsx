@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import type { ChatToolCallSummary } from '@/lib/ws-chat';
+import type { ChatToolCallSummary, RanAs } from '@/lib/ws-chat';
 import { loadArtifact } from '@/lib/chat-data';
+import { ranAsLabel } from '@/lib/identity-data';
 import { toolLabel } from '@/lib/tool-label';
 import { GenericBody, describeShape } from './GenericResultCard';
 import '@/styles/chat-cards.css';
@@ -75,10 +76,20 @@ function useFullOutput(call: ChatToolCallSummary): { data: unknown; loading: boo
 }
 
 // ── primitives ────────────────────────────────────────────────────────
+/** Whose account the call being drawn ran under — set per call by
+ *  ToolResultCards so every card kind shows it without each branch
+ *  threading it through. */
+const RanAsCtx = createContext<RanAs | null>(null);
+
 function Card({ kind, title, sub, children, tone }: { kind: string; title: string; sub?: ReactNode; children?: ReactNode; tone?: 'ok' | 'warn' | 'err' }) {
+  const ranAs = useContext(RanAsCtx);
   return (
     <div className={`tc-card tc-${kind}${tone ? ' tc-tone-' + tone : ''}`}>
-      <div className="tc-hd"><span className="tc-title">{title}</span>{sub ? <span className="tc-sub">{sub}</span> : null}</div>
+      <div className="tc-hd">
+        <span className="tc-title">{title}</span>
+        {ranAs ? <span className={`tc-ranas tc-ranas-${ranAs.type}`} title={`Ran ${ranAsLabel(ranAs)}`}>{ranAsLabel(ranAs)}</span> : null}
+        {sub ? <span className="tc-sub">{sub}</span> : null}
+      </div>
       {children ? <div className="tc-bd">{children}</div> : null}
     </div>
   );
@@ -489,7 +500,11 @@ export function ToolResultCards({ calls }: { calls: ChatToolCallSummary[] | unde
       {open && groups.map((g, gi) => (
         <div key={gi} className={g.owner ? 'tc-group' : undefined}>
           {g.owner && <div className="tc-group-hd">{toolLabel(g.owner.name)} · what it did</div>}
-          {g.calls.map((c, i) => <ToolCard key={c.id || `${gi}-${i}`} call={c} all={g.calls} />)}
+          {g.calls.map((c, i) => (
+            <RanAsCtx.Provider key={c.id || `${gi}-${i}`} value={c.ranAs ?? null}>
+              <ToolCard call={c} all={g.calls} />
+            </RanAsCtx.Provider>
+          ))}
         </div>
       ))}
     </div>

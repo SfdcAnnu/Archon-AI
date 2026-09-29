@@ -14,6 +14,11 @@ export interface CustomMcpServer {
   Category__c: string | null;
   CatalogType__c: string | null;
   IsActive__c: boolean;
+  /** none | api-key | mcp-oauth | provider-token:<provider>. Absent from
+   *  an org whose fields predate identity. */
+  AuthStyle__c?: string | null;
+  /** "org,group,user" — who may hold a connection to this server. */
+  PrincipalTypes__c?: string | null;
 }
 
 export async function loadCustomMcpServers(): Promise<CustomMcpServer[]> {
@@ -27,6 +32,8 @@ export async function saveCustomMcpServer(input: {
   description?: string;
   category: string;
   catalogType: string;
+  authStyle?: string | null;
+  principalTypes?: string | null;
 }): Promise<string> {
   const result = await apexFetch<{ id: string }>(BASE, {
     method: 'POST',

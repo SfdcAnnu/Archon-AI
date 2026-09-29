@@ -152,6 +152,22 @@
         <apexClass>AgentGuardrailsController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>AgentIdentityController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentIdentityRestService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>ConnectionReminderService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>ConnectionReminderQueueable</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 
     <objectPermissions>
         <allowCreate>true</allowCreate>
@@ -372,6 +388,8 @@
     <fieldPermissions><field>AgentNode__c.AiEngineConnection__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>CustomMcpServer__c.Description__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>CustomMcpServer__c.IsActive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>CustomMcpServer__c.AuthStyle__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>CustomMcpServer__c.PrincipalTypes__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
 
     <!-- Required fields (ApiName__c, Department__c on AgentDefinition__c; NodeType__c on AgentNode__c; -->
     <!-- master-detail AgentDefinition__c on AgentNode__c) cannot have explicit fieldPermissions — -->

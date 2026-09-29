@@ -40,6 +40,26 @@ public with sharing class AgentChatController {
             ORDER BY Name ASC
             LIMIT 200
         ];
+        // Which connectors each agent runs as the person (their own or their
+        // group's account) — shown on the picker card before they open it.
+        Map<Id, List<String>> needsByAgent = new Map<Id, List<String>>();
+        Map<Id, Boolean> runsAsUserByAgent = new Map<Id, Boolean>();
+        for (AgentNode__c n : [
+            SELECT AgentDefinition__c, ConfigJson__c FROM AgentNode__c
+            WHERE AgentDefinition__c IN :rows AND NodeType__c = 'catalog' AND IsEnabled__c = true
+            WITH USER_MODE
+        ]) {
+            if (String.isBlank(n.ConfigJson__c)) continue;
+            try {
+                Map<String, Object> cfg = (Map<String, Object>) JSON.deserializeUntyped(n.ConfigJson__c);
+                String runAs = (String) cfg.get('runAs');
+                String provider = (String) cfg.get('provider');
+                if (String.isBlank(provider) || (runAs != 'user' && runAs != 'group')) continue;
+                if (!needsByAgent.containsKey(n.AgentDefinition__c)) needsByAgent.put(n.AgentDefinition__c, new List<String>());
+                needsByAgent.get(n.AgentDefinition__c).add(provider);
+                if (runAs == 'user') runsAsUserByAgent.put(n.AgentDefinition__c, true);
+            } catch (Exception e) { /* an unreadable node says nothing */ }
+        }
         List<AgentSummary> out = new List<AgentSummary>();
         for (AgentDefinition__c a : rows) {
             AgentSummary s = new AgentSummary();
@@ -47,6 +67,8 @@ public with sharing class AgentChatController {
             s.name        = a.Name;
             s.department  = a.Department__c;
             s.description = a.Description__c;
+            s.needs       = needsByAgent.containsKey(a.Id) ? needsByAgent.get(a.Id) : new List<String>();
+            s.runsAsUser  = runsAsUserByAgent.containsKey(a.Id);
             out.add(s);
         }
         return out;
@@ -682,10 +704,24 @@ public with sharing class AgentChatController {
                 'allowedTools' => allowedTools,
                 'connectorId'  => (String) cfg.get('connectorId'),
                 'accessMode'   => provider == 'salesforce_mcp' ? accessMode : null,
-                'customTools'  => customTools
+                'customTools'  => customTools,
+                // Whose account this connector runs as (runAs, fallback,
+                // required, automationRunAs, allowedDomain) — the node's
+                // identity policy, read by the server's identity resolver.
+                'identity'     => identityOf(cfg)
             });
         }
         return out;
+    }
+
+    /** The identity keys a connector node carries, or null when it carries none. */
+    public static Map<String, Object> identityOf(Map<String, Object> cfg) {
+        Map<String, Object> identity = new Map<String, Object>();
+        for (String k : new List<String>{ 'runAs', 'fallback', 'automationRunAs', 'allowedDomain' }) {
+            if (cfg.get(k) instanceof String && String.isNotBlank((String) cfg.get(k))) identity.put(k, cfg.get(k));
+        }
+        if (cfg.get('required') instanceof Boolean) identity.put('required', cfg.get('required'));
+        return identity.isEmpty() ? null : identity;
     }
 
     /** Find the AI orchestrator node for an agent (there is exactly one per agent). */
@@ -1178,6 +1214,9 @@ public with sharing class AgentChatController {
         @AuraEnabled public String name;
         @AuraEnabled public String department;
         @AuraEnabled public String description;
+        /** Connectors this agent runs as the person or their group. */
+        @AuraEnabled public List<String> needs;
+        @AuraEnabled public Boolean runsAsUser;
     }
 
     public class SessionSummary {

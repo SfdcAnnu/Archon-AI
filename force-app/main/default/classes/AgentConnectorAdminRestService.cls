@@ -41,7 +41,9 @@ global with sharing class AgentConnectorAdminRestService {
                     (String) body.get('mcpServerUrl'),
                     (String) body.get('description'),
                     (String) body.get('category'),
-                    (String) body.get('catalogType')
+                    (String) body.get('catalogType'),
+                    (String) body.get('authStyle'),
+                    (String) body.get('principalTypes')
                 );
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, String>{ 'id' => newId }));

@@ -137,7 +137,8 @@ public with sharing class AgentConnectorController {
     @AuraEnabled(cacheable=true)
     public static List<CustomMcpServer__c> listCustomMcpServers() {
         return [
-            SELECT Id, Name, McpServerUrl__c, Description__c, Category__c, CatalogType__c, IsActive__c
+            SELECT Id, Name, McpServerUrl__c, Description__c, Category__c, CatalogType__c, IsActive__c,
+                   AuthStyle__c, PrincipalTypes__c
             FROM CustomMcpServer__c
             WITH USER_MODE
             ORDER BY Name ASC
@@ -148,6 +149,15 @@ public with sharing class AgentConnectorController {
     public static Id saveCustomMcpServer(
         String recordId, String serverName, String mcpServerUrl,
         String description, String category, String catalogType
+    ) {
+        return saveCustomMcpServer(recordId, serverName, mcpServerUrl, description, category, catalogType, null, null);
+    }
+
+    /** authStyle: none | api-key | mcp-oauth | provider-token:<provider>; principalTypes: "org,group,user". */
+    public static Id saveCustomMcpServer(
+        String recordId, String serverName, String mcpServerUrl,
+        String description, String category, String catalogType,
+        String authStyle, String principalTypes
     ) {
         if (String.isBlank(serverName))   throw new AuraHandledException('Server name is required.');
         if (String.isBlank(mcpServerUrl)) throw new AuraHandledException('MCP Server URL is required.');
@@ -162,6 +172,8 @@ public with sharing class AgentConnectorController {
         rec.Description__c   = description;
         rec.Category__c      = category;
         rec.CatalogType__c   = catalogType;
+        if (authStyle != null)      rec.AuthStyle__c      = authStyle;
+        if (principalTypes != null) rec.PrincipalTypes__c = principalTypes;
 
         upsert as user rec;
         return rec.Id;

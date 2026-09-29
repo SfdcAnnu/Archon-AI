@@ -14,7 +14,7 @@ import type { ChatActivity, ChatActivityInput } from '@/lib/chat-activity';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
-import { openChatSocket, continuationText, isStageFrame, isTextDelta, isTextReset, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary, type StageFrame } from '@/lib/ws-chat';
+import { openChatSocket, continuationText, isStageFrame, isTextDelta, isTextReset, type ChatTurnResult, type ChatHistoryEntry, type ChatAttachmentRef, type ChatToolCallSummary, type StageFrame, type NeedsConnection } from '@/lib/ws-chat';
 import { listChatApprovals, type ChatApproval } from '@/lib/chat-approvals-data';
 import { ChatApprovalCard } from './ChatApprovalCard';
 import { ToolResultCards, flattenCalls } from './ToolResultCards';
@@ -27,7 +27,8 @@ import { controlChip, UPDATE_PREFIX } from '@/lib/control-messages';
 import {
   startChatSession,
   getConnectionGate,
-  startMyConnection,
+  getConnectionRequirements,
+  startMyConnectionFor,
   uploadChatFile,
   endChatSession,
   discardChatSessionIfEmpty,
@@ -36,7 +37,10 @@ import {
   type RawChatMessage,
   type RawChatSession,
   type ConnectionGate,
+  type ConnectionRequirement,
+  type ConnectionRequirements,
 } from '@/lib/chat-data';
+import { ConnectRow, NeedsConnectionCard } from './ConnectionCards';
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACHMENTS_PER_TURN = 5;
@@ -70,6 +74,9 @@ interface DisplayMessage {
   /** The turn's tool calls (a specialist's own calls nested) — drawn as
    *  result cards under the reply. */
   toolCalls?: ChatToolCallSummary[];
+  /** Connectors the turn went without, for want of the person's account —
+   *  drawn as a connect card under the reply. */
+  needsConnection?: NeedsConnection[];
   /** The page was left while this build ran — its progress lives on the
    *  New agent page now, not here. */
   buildInterrupted?: boolean;
@@ -389,6 +396,11 @@ export function ChatPanel({
 
   const [gate, setGate] = useState<ConnectionGate>({ accessMode: 'Org', connected: true, accountEmail: null });
   const [connectPolling, setConnectPolling] = useState(false);
+  /** What this person must connect for this agent (whose account each
+   *  connector runs as). Null until answered, or on an org whose Apex only
+   *  knows the older Salesforce-only gate above. */
+  const [reqs, setReqs] = useState<ConnectionRequirements | null>(null);
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   // Suspended agent actions for THIS session (approval-as-suspension) —
   // rendered as inline decision cards in the transcript.
   const [approvals, setApprovals] = useState<ChatApproval[]>([]);
@@ -562,41 +574,68 @@ export function ChatPanel({
     [onSessionChange]
   );
 
-  // ── Access gate (PerUser agents) ────────────────────────────────
+  // ── Access gate: what this person must connect for this agent ────
   const refreshGate = useCallback(() => {
     if (isCopilot) return; // Archon runs on the org connection Setup made; there is no per-user gate
-    getConnectionGate(agentApiName)
-      .then(g => setGate(g))
-      .catch(() => setGate({ accessMode: 'Org', connected: true, accountEmail: null }));
+    getConnectionRequirements(agentApiName)
+      .then(r => { setReqs(r); setGate({ accessMode: 'Org', connected: true, accountEmail: null }); })
+      .catch(() => {
+        // An org whose Apex predates identity answers only the older
+        // Salesforce-only gate; anything else must never block the chat.
+        getConnectionGate(agentApiName)
+          .then(g => setGate(g))
+          .catch(() => setGate({ accessMode: 'Org', connected: true, accountEmail: null }));
+      });
   }, [agentApiName, isCopilot]);
 
   useEffect(() => {
     refreshGate();
   }, [refreshGate]);
 
-  const handleConnectMyAccount = useCallback(() => {
-    startMyConnection(window.location.href)
+  /** Opens the provider's sign-in for the person's OWN account and waits
+   *  for the gate to say it is connected. The popup is opened before the
+   *  request so a blocker does not eat it. */
+  const handleConnectMyAccount = useCallback((providerKey = 'salesforce_mcp', displayName: string | null = 'Salesforce') => {
+    const popup = window.open('about:blank', `archon_oauth_${providerKey}`, 'width=620,height=720,scrollbars=yes');
+    setConnectingProvider(providerKey);
+    setConnectPolling(true);
+    startMyConnectionFor(window.location.href, providerKey, displayName ? `${displayName} (my account)` : null)
       .then(res => {
-        window.open(res.authorizeUrl, 'archon_sf_oauth', 'width=620,height=720,scrollbars=yes');
-        setConnectPolling(true);
+        if (popup) popup.location.href = res.authorizeUrl;
+        else window.open(res.authorizeUrl, `archon_oauth_${providerKey}`, 'width=620,height=720,scrollbars=yes');
         let tries = 0;
         if (gatePollRef.current) clearInterval(gatePollRef.current);
+        const stop = () => {
+          if (gatePollRef.current) clearInterval(gatePollRef.current);
+          setConnectPolling(false);
+          setConnectingProvider(null);
+        };
         gatePollRef.current = setInterval(() => {
           tries++;
-          getConnectionGate(agentApiName).then(g => {
-            setGate(g);
-            if (g.connected || tries > 60) {
-              if (gatePollRef.current) clearInterval(gatePollRef.current);
-              setConnectPolling(false);
-            }
-          });
+          getConnectionRequirements(agentApiName)
+            .then(r => {
+              setReqs(r);
+              const mine = r.requirements.find(x => x.provider === providerKey);
+              const done = !!mine && (mine.status === 'connected' || mine.status === 'automatic');
+              if (done) {
+                stop();
+                emit({ kind: 'sys', text: `${mine!.displayName} connected${mine!.accountEmail ? ` as ${mine!.accountEmail}` : ''} — the agent now acts as you there.` });
+              } else if (tries > 60) stop();
+            })
+            .catch(() => {
+              // Older Apex: fall back to the Salesforce-only gate.
+              getConnectionGate(agentApiName).then(g => { setGate(g); if (g.connected || tries > 60) stop(); }).catch(() => { if (tries > 60) stop(); });
+            });
         }, 3000);
       })
       .catch(err => {
+        popup?.close();
         console.error('Failed to start connection:', err);
+        toast.error('Could not start the connection', { description: err instanceof Error ? err.message : undefined });
         setConnectPolling(false);
+        setConnectingProvider(null);
       });
-  }, [agentApiName]);
+  }, [agentApiName, emit]);
 
   // Approvals are additive UI — a fetch failure must never break the chat.
   const refreshApprovals = useCallback((sessionId: string) => {
@@ -674,6 +713,7 @@ export function ChatPanel({
           toolLabel: null,
           createdDate: new Date().toISOString(),
           toolCalls: result.toolCalls?.length ? result.toolCalls : undefined,
+          needsConnection: result.needsConnection?.length ? result.needsConnection : undefined,
           isStreaming: false,
         };
         setMessages(list => (
@@ -681,6 +721,12 @@ export function ChatPanel({
             ? list.map(m => (m.id === streamed ? { ...m, ...settled } : m))
             : [...list, { id: `assistant_${Date.now()}`, ...settled }]
         ));
+        // The turn went without a connector because the person has no
+        // account on it: say so; the card under the reply offers it.
+        if (result.needsConnection?.length) {
+          emit({ kind: 'sys', text: `Could not act as you on ${result.needsConnection.map(n => n.provider).join(', ')} — connect it under the reply.` });
+          refreshGate();
+        }
         // Answer in kind: aloud if this turn was spoken, unless the sound
         // preference says otherwise. When the reply finishes, the mic re-arms
         // if voice is on, so a spoken conversation keeps flowing.
@@ -788,7 +834,7 @@ export function ChatPanel({
       if (session) reportSessionChange({ sessionId: session.Id, ended: false });
       console.log('[ChatPanel] handleTurnResult done', { sessionId: session?.Id });
     },
-    [session, reportSessionChange, scrollToBottom, refreshApprovals, emit, clearLive]
+    [session, reportSessionChange, scrollToBottom, refreshApprovals, emit, clearLive, refreshGate]
   );
   useEffect(() => { handleTurnResultRef.current = handleTurnResult; }, [handleTurnResult]);
 
@@ -1111,10 +1157,15 @@ export function ChatPanel({
     });
   }, []);
 
+  // Connectors this person has not connected; the required ones hold the
+  // chat, the rest are offered above the composer.
+  const missingConnections = reqs ? reqs.requirements.filter(r => r.runAs !== 'org' && r.status !== 'connected' && r.status !== 'automatic') : [];
+  const needsConnection = reqs ? !reqs.ready : gate.accessMode === 'PerUser' && !gate.connected;
+  const providerNames: Record<string, string> = Object.fromEntries((reqs?.requirements ?? []).map(r => [r.provider, r.displayName]));
   const sendDisabled =
     sending ||
     wsStatus === 'connecting' ||
-    (gate.accessMode === 'PerUser' && !gate.connected) ||
+    needsConnection ||
     pendingAttachments.some(a => a.uploading) ||
     (!input.trim() && pendingAttachments.length === 0);
 
@@ -1516,7 +1567,9 @@ export function ChatPanel({
     [session]
   );
 
-  const needsConnection = gate.accessMode === 'PerUser' && !gate.connected;
+  // The header says so when the agent acts as the person: their own
+  // account is what every tool call carries.
+  const runsAs = reqs?.runsAsUser ? reqs.requirements.find(r => r.runAs === 'user' && (r.status === 'connected' || r.status === 'automatic')) ?? null : null;
   const phase: VoicePhase = speaking ? 'speak' : sending ? 'think' : isRecording ? 'listen' : 'ready';
   useEffect(() => { emit({ kind: 'phase', phase }); }, [phase, emit]);
 
@@ -1541,7 +1594,9 @@ export function ChatPanel({
               ? headerNote
               : isCopilot
                 ? 'Copilot — knows this platform and your org'
-                : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : wsStatus === 'closed' ? 'Ready — reconnects when you send' : 'Connection lost — retrying when you send'}
+                : runsAs
+                  ? `Runs as you${runsAs.accountEmail ? ` · ${runsAs.accountEmail}` : ''}${wsStatus === 'connecting' ? ' · connecting…' : ''}`
+                  : wsStatus === 'open' ? 'Connected' : wsStatus === 'connecting' ? 'Connecting…' : wsStatus === 'closed' ? 'Ready — reconnects when you send' : 'Connection lost — retrying when you send'}
           </div>
         </div>
         </div>
@@ -1691,6 +1746,9 @@ export function ChatPanel({
                 )}
               </div>
               {!isUser && m.toolCalls?.length ? <ToolResultCards calls={m.toolCalls} /> : null}
+              {!isUser && m.needsConnection?.length ? (
+                <NeedsConnectionCard items={m.needsConnection} names={providerNames} busy={connectPolling ? connectingProvider : null} onConnect={(p, name) => handleConnectMyAccount(p, name)} />
+              ) : null}
               <div className="mt-1 flex items-center gap-1.5 px-1">
                 {!isUser && !m.isError && !m.isStreaming && (
                   <button
@@ -1768,14 +1826,19 @@ export function ChatPanel({
       </div>
 
       {needsConnection ? (
-        <div className="border-t border-border p-4 text-center">
+        <div className="chat-connect-gate border-t border-border p-4">
           <p className="mb-2 text-[12px] text-muted-foreground">
-            This agent uses your own Salesforce access — connect your account to chat.
+            {agentName} works as you: what it reads and changes is what you could by hand, in your name.
+            Connect {missingConnections.filter(r => r.required).length > 1 ? 'these accounts' : 'your account'} to start — only you can see what you connect.
           </p>
-          <Button size="sm" className="h-8 text-xs" onClick={handleConnectMyAccount} disabled={connectPolling}>
-            {connectPolling && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
-            {connectPolling ? 'Waiting for Salesforce…' : 'Connect my Salesforce'}
-          </Button>
+          <div className="flex flex-col gap-2">
+            {(missingConnections.length
+              ? missingConnections
+              : [{ provider: 'salesforce_mcp', displayName: 'Salesforce', runAs: 'user', required: true, status: 'needed', accountEmail: null, message: null, connectorId: null } satisfies ConnectionRequirement]
+            ).map(r => (
+              <ConnectRow key={r.provider} r={r} busy={connectPolling && connectingProvider === r.provider} onConnect={() => handleConnectMyAccount(r.provider, r.displayName)} />
+            ))}
+          </div>
         </div>
       ) : (
         <div className={isStudio ? 'ax-composer' : isFull ? (isDrawer ? 'border-t border-border px-3 py-2.5' : 'border-t border-border px-6 py-3') : 'border-t border-border p-3'}>
@@ -1790,6 +1853,16 @@ export function ChatPanel({
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+          {missingConnections.length > 0 && !sending && (
+            <div className="chat-connect-bar" role="status">
+              <span className="txt">
+                <b>Optional:</b> connect {missingConnections.map(r => r.displayName).join(', ')} and {agentName} acts as you there too.
+              </span>
+              <button type="button" className="go" disabled={connectPolling} onClick={() => handleConnectMyAccount(missingConnections[0].provider, missingConnections[0].displayName)}>
+                {connectPolling && connectingProvider === missingConnections[0].provider ? 'Waiting for sign-in…' : `Connect ${missingConnections[0].displayName}`}
+              </button>
             </div>
           )}
           {pendingApprovals.length > 0 && !sending && (

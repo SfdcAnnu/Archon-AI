@@ -12,6 +12,7 @@ import {
   type RemoteTool,
 } from '@/lib/connectors-data';
 import type { AgentNode, CatalogNodeConfig } from '@/types/agent';
+import { IdentityFields } from './IdentityFields';
 
 export interface CatalogFormProps {
   node: AgentNode;
@@ -238,6 +239,8 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
           gate, use a Tool node instead.
         </p>
       </div>
+
+      {provider && <IdentityFields cfg={cfg ?? { description: '', connectorId: '', allowedTools: [] }} onConfigChange={onConfigChange} />}
     </div>
   );
 }

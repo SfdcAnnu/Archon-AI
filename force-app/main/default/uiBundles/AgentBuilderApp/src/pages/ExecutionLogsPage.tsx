@@ -20,6 +20,29 @@ import {
   type RawAgentExecution,
   type RunStepDto,
 } from '@/lib/executions-data';
+import { sendConnectionReminders } from '@/lib/identity-data';
+import { toast } from '@/components/ui/sonner';
+
+/** A run that could not act as its person carries this marker as its
+ *  reason: "NEEDS_CONNECTION:<provider>:<userId> — …". */
+function needsConnectionOf(reason: string | null): { provider: string; userId: string; text: string } | null {
+  const m = /^NEEDS_CONNECTION:([^:\s]+):([^\s]+)\s*(?:—|-)?\s*(.*)$/s.exec(reason ?? '');
+  return m ? { provider: m[1], userId: m[2], text: m[3] || 'The person has no connection for this connector.' } : null;
+}
+
+/** "gmail:send_email@user(Ann Lee)" → tool "gmail:send_email", ran as "user · Ann Lee". */
+function parseToolsUsed(raw: string | null): { tools: string[]; ranAs: string[] } {
+  const tools: string[] = [];
+  const ranAs = new Set<string>();
+  for (const part of (raw ?? '').split(/[,\n]/).map(s => s.trim()).filter(Boolean)) {
+    const at = part.indexOf('@');
+    if (at < 0) { tools.push(part); continue; }
+    tools.push(part.slice(0, at));
+    const p = /^(\w+)(?:\(([^)]*)\))?/.exec(part.slice(at + 1));
+    if (p) ranAs.add(p[1] === 'user' ? `the person${p[2] ? ` (${p[2]})` : ''}` : p[1] === 'group' ? `group ${p[2] ?? ''}`.trim() : 'the org');
+  }
+  return { tools, ranAs: [...ranAs] };
+}
 
 const PAGE_SIZE = 20;
 
@@ -597,17 +620,50 @@ export default function ExecutionLogsPage() {
                   </span>
                 </Field>
                 <Field label="Priority">{selected.AgentPriority__c ?? '—'}</Field>
-                <Field label="Tools used">{selected.ToolsUsed__c ?? '—'}</Field>
+                {(() => {
+                  const used = parseToolsUsed(selected.ToolsUsed__c);
+                  return (
+                    <>
+                      <Field label="Tools used">{used.tools.length ? used.tools.join(', ') : '—'}</Field>
+                      {used.ranAs.length > 0 && <Field label="Ran as">{used.ranAs.join(' · ')}</Field>}
+                    </>
+                  );
+                })()}
                 <Field label="Status">
                   <StatusBadge tone={statusTone(selected.Status__c)}>{selected.Status__c}</StatusBadge>
                 </Field>
                 <Field label="Date">{new Date(selected.CreatedDate).toLocaleString()}</Field>
-                {selected.AgentReason__c && (
-                  <div className="border-t border-border px-3.5 py-3">
-                    <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Reasoning</div>
-                    <p className="text-[12px] leading-relaxed text-muted-foreground">{selected.AgentReason__c}</p>
-                  </div>
-                )}
+                {(() => {
+                  const nc = needsConnectionOf(selected.AgentReason__c);
+                  if (nc) {
+                    return (
+                      <div className="border-t border-border px-3.5 py-3">
+                        <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-warning)]">Could not act as the person</div>
+                        <p className="text-[12px] leading-relaxed text-muted-foreground">
+                          The run needed the user's own <b className="text-foreground">{nc.provider}</b> account and they have not connected it. {nc.text}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-7 text-[11px]"
+                          onClick={() =>
+                            sendConnectionReminders(nc.provider, [nc.userId])
+                              .then(() => toast.success('Reminder sent.', { description: 'An email and a Salesforce notification, linking to My connections.' }))
+                              .catch(err => toast.error('Could not send the reminder', { description: err instanceof Error ? err.message : undefined }))
+                          }
+                        >
+                          Remind them to connect
+                        </Button>
+                      </div>
+                    );
+                  }
+                  return selected.AgentReason__c ? (
+                    <div className="border-t border-border px-3.5 py-3">
+                      <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Reasoning</div>
+                      <p className="text-[12px] leading-relaxed text-muted-foreground">{selected.AgentReason__c}</p>
+                    </div>
+                  ) : null;
+                })()}
                 {selected.OutputPayload__c && (
                   <div className="border-t border-border px-3.5 py-3">
                     <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Output payload</div>

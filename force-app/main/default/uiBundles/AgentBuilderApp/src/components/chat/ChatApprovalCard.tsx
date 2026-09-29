@@ -25,6 +25,10 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
 
 export interface ChatApprovalCardProps {
   approval: ChatApproval;
+  /** What the action will do, in words, when the conversation knows: a
+   *  deploy's change lists the components it holds. The raw arguments
+   *  alone ("changeId chg_x") told a person nothing. */
+  describe?: { summary: string; lines: string[] } | null;
   /** Fired with the updated row after a decision lands. */
   onChanged: (updated: ChatApproval) => void;
 }
@@ -33,7 +37,7 @@ export interface ChatApprovalCardProps {
  *  agent wants to run, with which values, and Approve/Reject. Approve
  *  executes the stored call on the server immediately, so the button stays
  *  busy until the real result comes back. */
-export function ChatApprovalCard({ approval, onChanged }: ChatApprovalCardProps) {
+export function ChatApprovalCard({ approval, describe, onChanged }: ChatApprovalCardProps) {
   const [busy, setBusy] = useState<'approved' | 'rejected' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +81,18 @@ export function ChatApprovalCard({ approval, onChanged }: ChatApprovalCardProps)
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{approval.toolName}</div>
         </div>
       </div>
+
+      {describe && (
+        <div className="mx-3 mt-2 rounded-md border border-border/70 bg-muted/30 px-2.5 py-1.5 text-[11px]">
+          <div className="font-medium text-foreground">{describe.summary}</div>
+          {describe.lines.length > 1 && (
+            <ul className="mt-1 list-disc pl-4 text-muted-foreground">
+              {describe.lines.slice(0, 12).map((l, i) => <li key={i}>{l}</li>)}
+              {describe.lines.length > 12 && <li>… and {describe.lines.length - 12} more</li>}
+            </ul>
+          )}
+        </div>
+      )}
 
       {args && Object.keys(args).length > 0 && (
         <div className="mx-3 mt-2 overflow-hidden rounded-md border border-border/70 bg-muted/30">

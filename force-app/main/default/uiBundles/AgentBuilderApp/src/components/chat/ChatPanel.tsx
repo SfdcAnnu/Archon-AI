@@ -197,6 +197,33 @@ function foldToolRows(display: DisplayMessage[], raw: RawChatMessage[]): Display
   return out;
 }
 
+/**
+ * What a parked action will do, in words, from this conversation's own
+ * tool results: an argument that is an id (a deploy's changeId) leads to
+ * the result that produced it (the serialize call), which names the
+ * components. Without this the card said "deploy · changeId chg_x", and
+ * the person went looking for the meaning on another page.
+ */
+function describeApproval(a: ChatApproval, messages: DisplayMessage[]): { summary: string; lines: string[] } | null {
+  const args = a.argsJson && typeof a.argsJson === 'object' && !Array.isArray(a.argsJson) ? (a.argsJson as Record<string, unknown>) : {};
+  const ids = Object.values(args).filter((v): v is string => typeof v === 'string' && v.length >= 8);
+  if (ids.length === 0) return null;
+  for (const c of messages.flatMap(m => flattenCalls(m.toolCalls))) {
+    let out: unknown = c.output;
+    if (typeof out === 'string') { try { out = JSON.parse(out); } catch { continue; } }
+    if (!out || typeof out !== 'object') continue;
+    const o = out as Record<string, unknown>;
+    if (!ids.some(id => o.changeId === id)) continue;
+    const lines = Array.isArray(o.components)
+      ? (o.components as Array<{ summary?: unknown }>).map(x => String(x.summary ?? '')).filter(Boolean)
+      : [];
+    const summary = typeof o.summary === 'string' ? o.summary : '';
+    if (!summary && lines.length === 0) continue;
+    return { summary: lines.length > 1 ? `${lines.length} components in one change` : summary || lines[0], lines: lines.length ? lines : [summary] };
+  }
+  return null;
+}
+
 export interface ChatPanelProps {
   agentApiName: string;
   agentName: string;
@@ -365,6 +392,11 @@ export function ChatPanel({
   // Suspended agent actions for THIS session (approval-as-suspension) —
   // rendered as inline decision cards in the transcript.
   const [approvals, setApprovals] = useState<ChatApproval[]>([]);
+  // Decided in this browser session: the card stays, with its result, until
+  // the chat is reopened — then the transcript's own audit line tells it.
+  const [decidedHere, setDecidedHere] = useState<string[]>([]);
+  // Pending requests already scrolled into view once.
+  const seenPendingRef = useRef(new Set<string>());
   /** What the agent is doing right now, from the server's stage frames.
    *  Advisory throughout: if none arrive — an older server, a slow link,
    *  a turn that runs no tools — the indicator reads exactly as it did
@@ -572,6 +604,24 @@ export function ChatPanel({
       .then(rows => setApprovals(rows))
       .catch(() => { /* stay with what we have */ });
   }, []);
+  // The cards a person acts on: what is waiting, plus what they decided
+  // just now. Every decided request of the session used to render as a
+  // card too — thirteen of them under one conversation.
+  const pendingApprovals = approvals.filter(a => a.status === 'Pending' || a.status === 'Approved');
+  const visibleApprovals = approvals.filter(a => a.status === 'Pending' || a.status === 'Approved' || decidedHere.includes(a.id));
+  // A NEW REQUEST IS NEVER LEFT BELOW THE FOLD. The cards sit after the
+  // last message; a long reply pushed them out of view and the person
+  // found the request on the Approvals page instead of in the chat.
+  useEffect(() => {
+    const fresh = pendingApprovals.filter(a => !seenPendingRef.current.has(a.id));
+    if (fresh.length === 0) return;
+    fresh.forEach(a => seenPendingRef.current.add(a.id));
+    followRef.current = true;
+    // Now, and again once the card has rendered; no cleanup, so a re-render
+    // in between cannot cancel it.
+    scrollToBottom();
+    setTimeout(scrollToBottom, 300);
+  }, [pendingApprovals, scrollToBottom]);
 
   // ── Send / receive ───────────────────────────────────────────────
   // Declared before the bootstrap effect below because that effect's
@@ -840,6 +890,9 @@ export function ChatPanel({
         refreshApprovals(result.session.Id);
         setLoading(false);
         scrollToBottom();
+        // The transcript renders after this frame; one more scroll once it
+        // has, so a reopened chat starts at its latest message, not its first.
+        setTimeout(scrollToBottom, 400);
 
         // A build carried over from the other surface — the Home dock or
         // the New agent page — is in this transcript as tool rows. Redraw
@@ -1682,11 +1735,13 @@ export function ChatPanel({
             </div>
           );
         })}
-        {approvals.map(a => (
+        {visibleApprovals.map(a => (
           <ChatApprovalCard
             key={a.id}
             approval={a}
+            describe={describeApproval(a, messages)}
             onChanged={u => {
+              setDecidedHere(list => (list.includes(u.id) ? list : [...list, u.id]));
               setApprovals(list => list.map(x => (x.id === u.id ? u : x)));
               if (u.status === 'Executed') continueAfterApproval(u);
             }}
@@ -1735,6 +1790,15 @@ export function ChatPanel({
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+          {pendingApprovals.length > 0 && !sending && (
+            <div className="chat-approval-bar" role="status">
+              <span className="txt">
+                <b>{pendingApprovals.length === 1 ? 'One action is waiting for your approval' : `${pendingApprovals.length} actions are waiting for your approval`}</b>
+                {(() => { const d = describeApproval(pendingApprovals[0], messages); return d ? ` — ${d.summary}` : ''; })()}
+              </span>
+              <button type="button" className="go" onClick={() => { followRef.current = true; scrollToBottom(); }}>Review &amp; approve</button>
             </div>
           )}
           <VoiceStrip phase={phase} voiceSupported={voiceSupported} />

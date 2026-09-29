@@ -40,7 +40,30 @@ public with sharing class AgentIdentityController {
     @AuraEnabled
     public static String getDetail(String providerKey) {
         requireProvider(providerKey);
-        return passThrough(ArchonServerClient.callout('GET', '/api/connectors/detail?providerKey=' + EncodingUtil.urlEncode(providerKey, 'UTF-8'), null), 'Could not read the connector');
+        String raw = passThrough(ArchonServerClient.callout('GET', '/api/connectors/detail?providerKey=' + EncodingUtil.urlEncode(providerKey, 'UTF-8'), null), 'Could not read the connector');
+        // The server knows who connected a row only as a user Id; the page
+        // wants a name.
+        try {
+            Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(raw);
+            List<Map<String, Object>> rows = new List<Map<String, Object>>();
+            if (body.get('org') instanceof Map<String, Object>) rows.add((Map<String, Object>) body.get('org'));
+            if (body.get('groups') instanceof List<Object>) for (Object g : (List<Object>) body.get('groups')) rows.add((Map<String, Object>) g);
+            Set<Id> ids = new Set<Id>();
+            for (Map<String, Object> r : rows) {
+                try { if (r.get('configuredBy') instanceof String) ids.add((Id) r.get('configuredBy')); } catch (Exception e) { /* not an Id */ }
+            }
+            if (ids.isEmpty()) return raw;
+            Map<Id, User> people = new Map<Id, User>([SELECT Id, Name FROM User WHERE Id IN :ids]);
+            for (Map<String, Object> r : rows) {
+                try {
+                    Id uid = (Id) r.get('configuredBy');
+                    if (people.containsKey(uid)) r.put('configuredByName', people.get(uid).Name);
+                } catch (Exception e) { /* not an Id */ }
+            }
+            return JSON.serialize(body);
+        } catch (Exception e) {
+            return raw;
+        }
     }
 
     @AuraEnabled

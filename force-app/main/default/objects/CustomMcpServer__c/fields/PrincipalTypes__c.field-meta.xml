@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>PrincipalTypes__c</fullName>
+    <label>Who may connect</label>
+    <type>Text</type>
+    <length>60</length>
+    <required>false</required>
+    <description>Comma-separated principal types this server admits: org, group, user. Empty means org only.</description>
+</CustomField>

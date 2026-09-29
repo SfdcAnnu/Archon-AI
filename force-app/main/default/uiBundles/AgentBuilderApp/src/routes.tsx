@@ -86,6 +86,13 @@ export const routes: RouteObject[] = [
     handle: { showInNavigation: true, label: 'Connectors' },
   },
   {
+    // The running user's own accounts, one per provider an agent runs as
+    // them on. Reminders deep-link here with #connect-<provider>.
+    path: '/my-connections',
+    lazy: page(() => import('./pages/MyConnectionsPage')),
+    handle: { showInNavigation: true, label: 'My connections' },
+  },
+  {
     path: '/setup',
     lazy: page(() => import('./pages/SetupPage')),
     handle: { showInNavigation: false, label: 'Setup' },

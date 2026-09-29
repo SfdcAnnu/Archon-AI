@@ -72,6 +72,8 @@ export interface ConnectionRow {
   subjectLabel: string | null;
   accountEmail: string | null;
   configuredBy: string | null;
+  /** The person behind configuredBy, resolved by Apex when it can. */
+  configuredByName?: string | null;
   lastConnectedAt: string | null;
   lastErrorMessage: string | null;
   tokenExpiresAt: string | null;

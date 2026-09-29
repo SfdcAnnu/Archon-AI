@@ -6,6 +6,7 @@
  *   GET  ?resource=detail&providerKey=
  *   GET  ?resource=roster&providerKey=
  *   GET  ?resource=groups&type=permissionSet|publicGroup|department
+ *   GET  ?resource=users&q=
  *   GET  ?resource=server&providerKey=
  *   POST { action: savePolicy | startPrincipalOAuth | saveServerOverride | deleteServerOverride | testServer | sendReminders, ... }
  */
@@ -31,6 +32,8 @@ global with sharing class AgentIdentityRestService {
                 body = JSON.serialize(AgentIdentityController.getRoster(providerKey));
             } else if (resource == 'groups') {
                 body = AgentIdentityController.listGroups(req.params.get('type'));
+            } else if (resource == 'users') {
+                body = AgentIdentityController.searchUsers(req.params.get('q'));
             } else if (resource == 'server') {
                 body = AgentIdentityController.getServerOverride(providerKey);
             } else {

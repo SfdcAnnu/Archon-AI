@@ -130,7 +130,7 @@ function AddUserDialog({ open, displayName, busy, onClose, onInvite, onSignIn }:
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader><DialogTitle>Add a user connection for {displayName}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-[12px] text-muted-foreground">
@@ -374,7 +374,7 @@ function AddGroupDialog({ open, entry, defaultType, busy, onClose, onConnect }: 
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader><DialogTitle>Add a group connection for {entry.displayName}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-[12px] text-muted-foreground">One shared {entry.displayName} account for a team. Everyone in the group uses it when an agent runs as their group; nobody outside can.</p>
@@ -462,7 +462,7 @@ function ChangeServerDialog({ open, entry, override, onClose, onSaved }: {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader><DialogTitle>Change the server behind {entry.displayName}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-[12px] text-muted-foreground">
@@ -607,7 +607,7 @@ export function ConnectorDetail({ entry, onBack, onChanged, onViewTools }: {
               <>
                 <Row label="Status"><StatusBadge tone={statusTone(detail.org.status)}>{detail.org.status}</StatusBadge></Row>
                 <Row label="Account">{detail.org.accountEmail ?? '—'}</Row>
-                <Row label="Connected by">{detail.org.configuredBy ?? '—'}</Row>
+                <Row label="Connected by">{detail.org.configuredByName ?? detail.org.configuredBy ?? '—'}</Row>
                 <Row label="Last connected">{fmtWhen(detail.org.lastConnectedAt)}</Row>
                 {detail.org.lastErrorMessage && <Row label="Last error"><span className="text-[var(--archon-error)]">{detail.org.lastErrorMessage}</span></Row>}
               </>

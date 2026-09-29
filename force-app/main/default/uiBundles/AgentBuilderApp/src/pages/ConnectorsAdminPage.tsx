@@ -741,7 +741,7 @@ export default function ConnectorsAdminPage() {
                   </Select>
                 </div>
                 {(usersProvider || directory[0]?.providerKey) ? (
-                  <Roster key={usersProvider || directory[0].providerKey} providerKey={usersProvider || directory[0].providerKey} />
+                  <Roster key={usersProvider || directory[0].providerKey} providerKey={usersProvider || directory[0].providerKey} displayName={directory.find(d => d.providerKey === (usersProvider || directory[0].providerKey))?.displayName} />
                 ) : (
                   <EmptyPanel>No connectors in the directory yet.</EmptyPanel>
                 )}

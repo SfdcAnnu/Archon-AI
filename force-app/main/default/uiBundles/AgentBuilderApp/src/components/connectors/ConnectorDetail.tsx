@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ArrowLeft, Bell, Building2, Loader2, Plug, Plus, RefreshCw, Server, Users, Wrench } from 'lucide-react';
+import { ArrowLeft, Bell, Building2, Loader2, Plug, Plus, RefreshCw, Server, UserPlus, Users, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ import {
   loadGroups,
   loadRoster,
   saveServerOverride,
+  searchUsers,
   sendConnectionReminders,
   startPrincipalOAuth,
   testServer,
@@ -29,6 +30,7 @@ import {
   type RosterStatus,
   type ServerOverride,
   type ServerTestResult,
+  type UserOption,
 } from '@/lib/identity-data';
 
 /**
@@ -98,22 +100,134 @@ type RosterFilter = 'all' | 'must' | 'missing' | 'expired';
 const ROSTER_TONE: Record<RosterStatus, BadgeTone> = { connected: 'ok', pending: 'warn', error: 'error', expired: 'warn', notConnected: 'muted', viaGroup: 'blue' };
 const ROSTER_LABEL: Record<RosterStatus, string> = { connected: 'Connected', pending: 'Pending', error: 'Error', expired: 'Expired', notConnected: 'Not connected', viaGroup: 'Via group' };
 
+/** Add a person to the roster by hand: invite them to connect, or — with
+ *  them beside you — sign in as them right now. */
+function AddUserDialog({ open, displayName, busy, onClose, onInvite, onSignIn }: {
+  open: boolean;
+  displayName: string;
+  busy: string | null;
+  onClose: () => void;
+  onInvite: (users: UserOption[]) => void;
+  onSignIn: (user: UserOption) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [users, setUsers] = useState<UserOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Map<string, UserOption>>(new Map());
+
+  useEffect(() => { if (open) { setQ(''); setPicked(new Map()); setUsers(null); setError(null); } }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      searchUsers(q).then(list => !cancelled && setUsers(list)).catch(err => !cancelled && setError(err instanceof Error ? err.message : String(err)));
+    }, q ? 250 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [open, q]);
+
+  const toggle = (u: UserOption) => setPicked(m => { const n = new Map(m); if (n.has(u.userId)) n.delete(u.userId); else n.set(u.userId, u); return n; });
+  const one = picked.size === 1 ? [...picked.values()][0] : null;
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Add a user connection for {displayName}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-[12px] text-muted-foreground">
+            A person's own {displayName} account. Invite them and they sign in from My connections or the chat that needs it; or, with them beside you, sign in as them now.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Find people</Label>
+            <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Name or email" className="h-8 text-xs" autoFocus />
+          </div>
+          <div className="max-h-56 overflow-y-auto rounded-md border border-border">
+            {users === null && !error && <div className="flex items-center gap-2 px-3 py-3 text-[11.5px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Listing from Salesforce…</div>}
+            {error && <div className="px-3 py-3 text-[11.5px] text-destructive">{error}</div>}
+            {users !== null && users.length === 0 && <div className="px-3 py-3 text-[11.5px] text-muted-foreground">No active user matches.</div>}
+            {(users ?? []).map(u => (
+              <label key={u.userId} className={cn('flex w-full cursor-pointer items-center gap-2.5 border-b border-border px-3 py-1.5 text-left text-[12px] last:border-b-0 hover:bg-secondary', picked.has(u.userId) && 'bg-accent')}>
+                <input type="checkbox" className="h-3.5 w-3.5" checked={picked.has(u.userId)} onChange={() => toggle(u)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold text-foreground">{u.name}</span>
+                  <span className="block truncate text-[10.5px] text-[var(--archon-faint)]">{u.email ?? ''}{u.department ? ` · ${u.department}` : ''}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {picked.size > 0 && <p className="text-[11px] text-muted-foreground">{picked.size} {picked.size === 1 ? 'person' : 'people'} selected{one ? ` — ${one.name}` : ''}.</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" disabled={picked.size === 0 || busy != null} onClick={() => onInvite([...picked.values()])}>
+            <Bell className="mr-1 h-3 w-3" /> Invite {picked.size > 1 ? `${picked.size} people` : 'to connect'}
+          </Button>
+          <Button disabled={!one || busy != null} title={picked.size > 1 ? 'Sign in one person at a time' : undefined} onClick={() => one && onSignIn(one)}>
+            {busy && one && busy === one.userId ? <><Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> Waiting for sign-in…</> : `Sign in as ${one ? one.name.split(' ')[0] : 'this person'} now`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Everyone who has used an agent that runs as the person on this
- *  provider, with their standing and a reminder button. */
-export function Roster({ providerKey, compact }: { providerKey: string; compact?: boolean }) {
+ *  provider, plus anyone an admin added, with their standing, a reminder
+ *  button, and a way to add a person by hand. */
+export function Roster({ providerKey, displayName, compact }: { providerKey: string; displayName?: string; compact?: boolean }) {
   const [roster, setRoster] = useState<RosterData | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [filter, setFilter] = useState<RosterFilter>('all');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [adding, setAdding] = useState(false);
+  /** The person whose sign-in window is open, while we wait for it. */
+  const [signingIn, setSigningIn] = useState<string | null>(null);
+  const name = displayName ?? providerKey;
 
   const load = useCallback(() => {
     setState('loading');
-    loadRoster(providerKey)
-      .then(r => { setRoster(r); setState('ready'); setPicked(new Set()); })
-      .catch(err => { console.error('Failed to load roster:', err); setState('error'); });
+    return loadRoster(providerKey)
+      .then(r => { setRoster(r); setState('ready'); setPicked(new Set()); return r; })
+      .catch(err => { console.error('Failed to load roster:', err); setState('error'); return null; });
   }, [providerKey]);
   useEffect(() => { load(); }, [load]);
+
+  /** Opens the provider's sign-in for ONE person's own account and waits
+   *  for their roster row to say connected (three minutes at most). */
+  const signInAs = useCallback((u: UserOption) => {
+    const popup = window.open('about:blank', `archon_oauth_${providerKey}_${u.userId}`, 'width=620,height=720,scrollbars=yes');
+    const startedAt = Date.now();
+    setSigningIn(u.userId);
+    startPrincipalOAuth({ providerKey, displayName: `${name} — ${u.name}`, returnUrl: window.location.href, principalType: 'user', subjectType: 'user', subjectKey: u.userId, subjectLabel: u.name })
+      .then(({ authorizeUrl }) => {
+        if (popup) popup.location.href = authorizeUrl;
+        else window.open(authorizeUrl, `archon_oauth_${providerKey}_${u.userId}`, 'width=620,height=720,scrollbars=yes');
+        setAdding(false);
+        toast.info(`${u.name} signs in to ${name} in the window that opened`, { description: 'Their own account, on their own row — this page updates by itself once access is allowed.' });
+        const until = Date.now() + 180_000;
+        const poll = () => {
+          loadRoster(providerKey)
+            .then(r => {
+              const row = r.users.find(x => x.userId === u.userId);
+              const at = row?.lastConnectedAt ? Date.parse(row.lastConnectedAt) : 0;
+              if (row && row.status === 'connected' && at >= startedAt - 60_000) {
+                setRoster(r); setSigningIn(null);
+                toast.success(`${u.name} connected ${name}${row.accountEmail ? ` as ${row.accountEmail}` : ''}.`);
+                return;
+              }
+              if (Date.now() < until) setTimeout(poll, 3000);
+              else { setSigningIn(null); toast.info(`${u.name} is not connected yet`, { description: 'If they finished signing in, press Refresh.' }); }
+            })
+            .catch(() => { if (Date.now() < until) setTimeout(poll, 4000); else setSigningIn(null); });
+        };
+        setTimeout(poll, 4000);
+      })
+      .catch(err => {
+        popup?.close();
+        setSigningIn(null);
+        toast.error(`Could not start the ${name} sign-in`, { description: err instanceof Error ? err.message : undefined });
+      });
+  }, [providerKey, name]);
 
   const rows = useMemo(() => {
     const all = roster?.users ?? [];
@@ -124,12 +238,12 @@ export function Roster({ providerKey, compact }: { providerKey: string; compact?
     return [...list].sort((a, b) => Number(b.neededBy.length > 0) - Number(a.neededBy.length > 0) || (a.name ?? '').localeCompare(b.name ?? ''));
   }, [roster, filter]);
 
-  const remind = useCallback((ids: string[]) => {
+  const remind = useCallback((ids: string[], verb = 'Reminded') => {
     if (!ids.length) return;
     setSending(true);
     sendConnectionReminders(providerKey, ids)
-      .then(n => { toast.success(`Reminded ${n} ${n === 1 ? 'person' : 'people'}.`, { description: 'An email and a Salesforce notification, linking to My connections.' }); load(); })
-      .catch(err => toast.error('Could not send reminders', { description: err instanceof Error ? err.message : undefined }))
+      .then(n => { toast.success(`${verb} ${n} ${n === 1 ? 'person' : 'people'}.`, { description: 'An email and a Salesforce notification, linking to My connections.' }); setAdding(false); load(); })
+      .catch(err => toast.error(`Could not send ${verb === 'Invited' ? 'invites' : 'reminders'}`, { description: err instanceof Error ? err.message : undefined }))
       .finally(() => setSending(false));
   }, [providerKey, load]);
 
@@ -148,10 +262,14 @@ export function Roster({ providerKey, compact }: { providerKey: string; compact?
             {sending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Bell className="mr-1 h-3 w-3" />}
             {picked.size ? `Remind ${picked.size}` : `Remind all not connected${missingIds.length ? ` (${missingIds.length})` : ''}`}
           </Button>
+          <Button size="sm" className="h-7 text-[11px]" onClick={() => setAdding(true)}>
+            <UserPlus className="mr-1 h-3 w-3" /> Add user connection
+          </Button>
           <button type="button" onClick={load} className="rounded p-1 text-muted-foreground hover:text-foreground" title="Refresh" aria-label="Refresh"><RefreshCw className="h-3.5 w-3.5" /></button>
         </div>
       }
     >
+      <AddUserDialog open={adding} displayName={name} busy={signingIn} onClose={() => setAdding(false)} onInvite={users => remind(users.map(u => u.userId), 'Invited')} onSignIn={signInAs} />
       {state === 'loading' && <div className="flex items-center gap-2 px-3.5 py-5 text-[12.5px] text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading who has used these agents…</div>}
       {state === 'error' && <div className="px-3.5 py-5 text-[12.5px] text-destructive">Couldn't load the roster. <button type="button" className="font-semibold underline" onClick={load}>Retry</button></div>}
       {state === 'ready' && roster && (
@@ -164,7 +282,7 @@ export function Roster({ providerKey, compact }: { providerKey: string; compact?
           )}
           {rows.length === 0 ? (
             <div className="px-3.5 py-5 text-[12px] text-muted-foreground">
-              {roster.users.length === 0 ? 'Nobody has used an agent that runs as the person on this connector yet, and nobody has connected their own account.' : 'No one matches this filter.'}
+              {roster.users.length === 0 ? 'Nobody has used an agent that runs as the person on this connector yet, and nobody has connected their own account. Add a user connection to invite someone, or sign in as them.' : 'No one matches this filter.'}
             </div>
           ) : (
             <table className={T.table}>
@@ -189,11 +307,25 @@ export function Roster({ providerKey, compact }: { providerKey: string; compact?
                         <div className="text-[12px] font-semibold text-foreground">{u.name ?? u.userId}</div>
                         <div className="text-[10.5px] text-[var(--archon-faint)]">{u.email ?? ''}</div>
                       </td>
-                      <td className={T.td}><StatusBadge tone={ROSTER_TONE[u.status]}>{ROSTER_LABEL[u.status]}</StatusBadge>{u.lastErrorMessage && <div className="mt-0.5 max-w-[220px] truncate text-[10px] text-[var(--archon-error)]" title={u.lastErrorMessage}>{u.lastErrorMessage}</div>}</td>
+                      <td className={T.td}>
+                        <StatusBadge tone={u.status === 'notConnected' && u.remindedCount > 0 ? 'blue' : ROSTER_TONE[u.status]}>
+                          {u.status === 'notConnected' && u.remindedCount > 0 ? 'Invited' : ROSTER_LABEL[u.status]}
+                        </StatusBadge>
+                        {u.lastErrorMessage && <div className="mt-0.5 max-w-[220px] truncate text-[10px] text-[var(--archon-error)]" title={u.lastErrorMessage}>{u.lastErrorMessage}</div>}
+                      </td>
                       <td className={cn(T.td, 'text-[11.5px] text-muted-foreground')}>{u.accountEmail ?? '—'}{u.lastConnectedAt && <div className="text-[10px] text-[var(--archon-faint)]">{fmtWhen(u.lastConnectedAt)}</div>}</td>
                       <td className={T.td}>{u.neededBy.length ? <div className="flex flex-wrap gap-1">{u.neededBy.map(a => <span key={a} className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground">{a}</span>)}</div> : <span className="text-[11px] text-[var(--archon-faint)]">—</span>}</td>
                       <td className={cn(T.td, 'text-[11px] text-muted-foreground')}>{u.remindedCount ? `${u.remindedCount}× · ${u.remindedAt ? new Date(u.remindedAt).toLocaleDateString() : ''}` : '—'}</td>
-                      <td className={cn(T.td, 'text-right')}>{missing && <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" disabled={sending} onClick={() => remind([u.userId])}>Remind</Button>}</td>
+                      <td className={cn(T.td, 'text-right')}>
+                        {(missing || (u.status !== 'connected' && u.status !== 'viaGroup')) && (
+                          <div className="flex justify-end gap-1.5">
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" disabled={sending} onClick={() => remind([u.userId])}>Remind</Button>
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" disabled={signingIn != null} onClick={() => signInAs({ userId: u.userId, name: u.name ?? u.userId, email: u.email, department: null, title: null })}>
+                              {signingIn === u.userId ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Sign in as them'}
+                            </Button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -515,7 +647,7 @@ export function ConnectorDetail({ entry, onBack, onChanged, onViewTools }: {
             )}
           </SpecCard>
 
-          <Roster providerKey={entry.providerKey} />
+          <Roster providerKey={entry.providerKey} displayName={entry.displayName} />
         </div>
       )}
 

@@ -37,6 +37,16 @@ async function tour(app, base, errors) {
     addGroup: await app.getByRole('button', { name: /Add group/ }).count(),
   });
 
+  // 2b · add-user dialog finds people by name or email
+  await app.getByRole('button', { name: /Add user connection/ }).first().click();
+  await pause(5000);
+  await app.locator('[role="dialog"] input[placeholder="Name or email"]').fill('an');
+  await pause(4000);
+  await shot(app, '2b-add-user');
+  console.log('people in add-user dialog:', await app.locator('[role="dialog"] input[type="checkbox"]').count());
+  await app.keyboard.press('Escape');
+  await pause(500);
+
   // 3 · add-group dialog lists the org's permission sets
   await app.getByRole('button', { name: /Add group/ }).first().click();
   await pause(6000);

@@ -214,11 +214,13 @@ public with sharing class AgentIdentityController {
                 u.lastErrorMessage = (String) c.get('lastErrorMessage');
                 u.connectionId = (String) c.get('id');
             }
+            // Someone an admin invited belongs on the roster before they
+            // connect, and before they have used an agent.
             for (Object o : (List<Object>) body.get('reminders')) {
                 Map<String, Object> r = (Map<String, Object>) o;
                 String uid = (String) r.get('userId');
-                if (String.isBlank(uid) || !byUser.containsKey(uid)) continue;
-                RosterUser u = byUser.get(uid);
+                if (String.isBlank(uid)) continue;
+                RosterUser u = ensureUser(byUser, uid);
                 u.remindedCount = r.get('count') == null ? 0 : Integer.valueOf(r.get('count'));
                 u.remindedAt = (String) r.get('lastSentAt');
             }
@@ -261,6 +263,23 @@ public with sharing class AgentIdentityController {
     private static Boolean expiredIso(String iso, Long now) {
         try { return JSON.deserialize('"' + iso + '"', Datetime.class) != null && ((Datetime) JSON.deserialize('"' + iso + '"', Datetime.class)).getTime() < now; }
         catch (Exception e) { return false; }
+    }
+
+    // ── people an admin adds by hand ──────────────────────────────────
+
+    /** Active people matching a name or email, for the add-user dialog. */
+    @AuraEnabled
+    public static String searchUsers(String q) {
+        String pattern = '%' + String.escapeSingleQuotes(q == null ? '' : q.trim()) + '%';
+        List<Map<String, Object>> out = new List<Map<String, Object>>();
+        for (User u : [
+            SELECT Id, Name, Email, Department, Title FROM User
+            WHERE IsActive = true AND UserType = 'Standard' AND (Name LIKE :pattern OR Email LIKE :pattern)
+            ORDER BY Name LIMIT 25
+        ]) {
+            out.add(new Map<String, Object>{ 'userId' => u.Id, 'name' => u.Name, 'email' => u.Email, 'department' => u.Department, 'title' => u.Title });
+        }
+        return JSON.serialize(new Map<String, Object>{ 'users' => out });
     }
 
     // ── reminders ─────────────────────────────────────────────────────

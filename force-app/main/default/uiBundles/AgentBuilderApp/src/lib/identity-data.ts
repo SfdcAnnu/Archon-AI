@@ -155,14 +155,28 @@ export async function loadGroups(type: GroupKeyType): Promise<GroupOption[]> {
   return body.groups ?? [];
 }
 
-/** The provider's sign-in page for a connection the ORG or a GROUP owns.
- *  The browser opens it; the server's callback stores the tokens on that
- *  principal's row. */
+/** A person an admin can add to the roster by hand. */
+export interface UserOption {
+  userId: string;
+  name: string;
+  email: string | null;
+  department: string | null;
+  title: string | null;
+}
+
+export async function searchUsers(q: string): Promise<UserOption[]> {
+  const body = await apexFetch<{ users: UserOption[] }>(`${BASE}?resource=users&q=${encodeURIComponent(q)}`, { method: 'GET' }, TIMEOUT_MS);
+  return body.users ?? [];
+}
+
+/** The provider's sign-in page for a connection the ORG, a GROUP, or —
+ *  when an admin signs in beside them — one PERSON owns. The browser opens
+ *  it; the server's callback stores the tokens on that principal's row. */
 export async function startPrincipalOAuth(input: {
   providerKey: string;
   displayName: string;
   returnUrl: string;
-  principalType: 'org' | 'group';
+  principalType: 'org' | 'group' | 'user';
   subjectType?: string | null;
   subjectKey?: string | null;
   subjectLabel?: string | null;

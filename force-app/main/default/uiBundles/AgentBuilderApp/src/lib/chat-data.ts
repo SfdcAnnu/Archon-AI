@@ -28,6 +28,8 @@ export interface RawChatMessage {
   Role__c: 'User' | 'Assistant' | 'Tool' | 'System';
   Content__c: string | null;
   ToolCallsJson__c: string | null;
+  /** Set on the System row that records a person's decision on a parked action. */
+  RequiredApproval__c?: boolean | null;
   /** The whole call as the server reported it (input, output, nested calls). */
   ToolResultsJson__c?: string | null;
   ModelUsed__c: string | null;
@@ -36,6 +38,12 @@ export interface RawChatMessage {
   SequenceNumber__c: number;
   Feedback__c?: string | null;
   CreatedDate: string;
+}
+
+/** The System row approval-audit writes when a parked action is decided:
+ *  "Approved by Ann · deploy(changeId=…) → Executed — …". */
+export function isApprovalOutcomeRow(m: RawChatMessage): boolean {
+  return m.Role__c === 'System' && m.RequiredApproval__c === true && /^(Approved|Rejected) by .+ · \w+\(/.test(m.Content__c ?? '');
 }
 
 export interface SessionWithMessages {

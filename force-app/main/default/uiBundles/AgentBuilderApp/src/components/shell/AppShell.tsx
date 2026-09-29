@@ -18,6 +18,7 @@ import {
   ChevronsLeft,
   RotateCw,
   Plus,
+  KeyRound,
 } from 'lucide-react';
 
 /** One icon per section, shared with the Home page's top bar so the two
@@ -34,6 +35,7 @@ export const NAV_ICON_BY_HREF: Record<string, typeof Home> = {
   '/conversations': MessageSquare,
   '/approvals': CheckSquare,
   '/cost': CircleDollarSign,
+  '/my-connections': KeyRound,
   '/setup': Sun,
 };
 import { useTheme } from '@/lib/theme';
@@ -172,6 +174,7 @@ export function AppShell({
   ];
   const MANAGE_ITEMS: NavItem[] = [
     { icon: NAV_ICON_BY_HREF['/cost'], label: 'Cost', href: '/cost' },
+    { icon: NAV_ICON_BY_HREF['/my-connections'], label: 'My connections', href: '/my-connections' },
     { icon: NAV_ICON_BY_HREF['/setup'], label: 'Setup', href: '/setup' },
   ];
   const ALL_ITEMS = [...HOME_ITEMS, ...BUILD_ITEMS, ...MONITOR_ITEMS, ...MANAGE_ITEMS];

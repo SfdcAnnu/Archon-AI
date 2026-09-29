@@ -71,6 +71,11 @@ public with sharing class AgentRunner {
         }
 
         if (!logs.isEmpty()) insert logs;
+        // A run that could not act as its person is a reminder to them, not
+        // a silent failure in a log nobody reads.
+        for (Integer i = 0; i < logs.size(); i++) {
+            ConnectionReminderQueueable.remindFromReason(logs[i].AgentReason__c, inputs[i].agentApiName);
+        }
         return results;
     }
 

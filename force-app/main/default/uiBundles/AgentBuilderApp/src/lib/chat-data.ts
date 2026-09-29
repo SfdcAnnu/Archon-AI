@@ -11,6 +11,10 @@ export interface ChatAgentSummary {
   name: string;
   department: string;
   description: string | null;
+  /** Connectors this agent runs as the person or their group. Absent
+   *  from an org whose Apex predates identity, which reads as none. */
+  needs?: string[];
+  runsAsUser?: boolean;
 }
 
 export interface RawChatSession {
@@ -82,6 +86,61 @@ export async function getConnectionGate(agentApiName: string): Promise<Connectio
   return apexFetch<ConnectionGate>(`${CHAT_BASE}?resource=gate&agentApiName=${encodeURIComponent(agentApiName)}`, {
     method: 'GET',
   });
+}
+
+/** One connector the agent runs as the person (or their group), with the
+ *  running user's standing on it. */
+export type RequirementStatus = 'connected' | 'automatic' | 'needed' | 'expired' | 'wrong_account' | 'needs_group' | 'org';
+
+export interface ConnectionRequirement {
+  provider: string;
+  displayName: string;
+  runAs: 'user' | 'group' | 'org';
+  required: boolean;
+  status: RequirementStatus;
+  accountEmail: string | null;
+  message: string | null;
+  connectorId: string | null;
+}
+
+export interface ConnectionRequirements {
+  requirements: ConnectionRequirement[];
+  runsAsUser: boolean;
+  /** Nothing required is missing: the chat may start. */
+  ready: boolean;
+  blocking: string[];
+}
+
+/** What the RUNNING user must connect before this agent can act as them —
+ *  the chat gate. Crosses to the Archon server, so it gets more time. */
+export async function getConnectionRequirements(agentApiName: string): Promise<ConnectionRequirements> {
+  return apexFetch<ConnectionRequirements>(`${CHAT_BASE}?resource=requirements&agentApiName=${encodeURIComponent(agentApiName)}`, {
+    method: 'GET',
+  }, 45000);
+}
+
+/** The running user's own connections across providers — My connections. */
+export interface MyConnection {
+  providerKey: string;
+  displayName: string;
+  status: string;
+  accountEmail: string | null;
+  lastConnectedAt: string | null;
+  lastErrorMessage: string | null;
+  connectionId: string | null;
+  /** Active agents that run as the person on this provider. */
+  neededBy: string[];
+}
+
+export async function loadMyConnections(): Promise<{ providers: MyConnection[]; serverUnreachable: boolean }> {
+  return apexFetch<{ providers: MyConnection[]; serverUnreachable: boolean }>(`${CHAT_BASE}?resource=mine`, { method: 'GET' }, 45000);
+}
+
+export async function disconnectMyConnection(connectionId: string): Promise<void> {
+  await apexFetch<{ success: boolean }>(CHAT_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'disconnectMine', connectionId }),
+  }, 45000);
 }
 
 /** A large tool result the runtime stored by reference (an `art_…` id in
@@ -178,4 +237,13 @@ export async function startMyConnection(returnUrl: string): Promise<{ authorizeU
     method: 'POST',
     body: JSON.stringify({ action: 'startMyConnection', returnUrl }),
   });
+}
+
+/** The sign-in page for the running user's OWN account on any provider.
+ *  The server's callback stores the tokens on this person's row. */
+export async function startMyConnectionFor(returnUrl: string, providerKey: string, displayName?: string | null): Promise<{ authorizeUrl: string }> {
+  return apexFetch<{ authorizeUrl: string }>(CHAT_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'startMyConnection', returnUrl, providerKey, displayName: displayName ?? null }),
+  }, 45000);
 }

@@ -28,6 +28,18 @@ global with sharing class AgentChatRestService {
                 res.responseBody = Blob.valueOf(ArchonArtifactReader.read(req.params.get('id')));
                 return;
             }
+            if (req.params.get('resource') == 'mine') {
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(AgentUserConnectionController.getMyConnections());
+                return;
+            }
+            if (req.params.get('resource') == 'requirements') {
+                // What the running user must connect for this agent — the
+                // server's JSON, passed through.
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(AgentUserConnectionController.getRequirements(req.params.get('agentApiName')));
+                return;
+            }
             if (req.params.get('resource') == 'gate') {
                 AgentUserConnectionController.ConnectionGate gate =
                     AgentUserConnectionController.getGate(req.params.get('agentApiName'));
@@ -122,9 +134,18 @@ global with sharing class AgentChatRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, String>{ 'messageId' => savedId }));
                 return;
             }
+            if (action == 'disconnectMine') {
+                AgentUserConnectionController.disconnectMine((String) body.get('connectionId'));
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
+                return;
+            }
             if (action == 'startMyConnection') {
-                AgentUserConnectionController.StartResult startResult =
-                    AgentUserConnectionController.startMyConnection((String) body.get('returnUrl'));
+                // providerKey optional: an older bundle only ever asked for Salesforce.
+                String providerKey = (String) body.get('providerKey');
+                AgentUserConnectionController.StartResult startResult = String.isBlank(providerKey)
+                    ? AgentUserConnectionController.startMyConnection((String) body.get('returnUrl'))
+                    : AgentUserConnectionController.startMyConnectionFor((String) body.get('returnUrl'), providerKey, (String) body.get('displayName'));
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(startResult));
                 return;

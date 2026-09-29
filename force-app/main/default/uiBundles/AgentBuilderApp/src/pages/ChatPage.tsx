@@ -173,6 +173,7 @@ export default function ChatPage() {
                     <div className="cp-card-ft">
                       <span className={`cp-dot${a.status === 'Active' ? ' on' : ''}`} aria-hidden="true" />
                       {a.status}
+                      {a.needs?.length ? <span className="cp-you" title={`Acts as you on ${a.needs.join(', ')}`}>as you</span> : null}
                       <span className="r">
                         {st ? `${plural(st.count, 'chat')}${st.last ? ` · last ${formatLastTurn(st.last)}` : ''}` : 'No chats yet'}
                       </span>

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { loadGuardrails, saveGuardrails, type GuardrailsStatus } from '@/lib/guardrails-data';
 import { loadAccessStatus, type AccessStatus } from '@/lib/access-data';
+import { IdentityPolicyCard } from '@/components/connectors/IdentityPolicyCard';
 
 function accessPillStyle(status: string) {
   const s = status.toLowerCase();
@@ -203,6 +204,8 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          <IdentityPolicyCard />
 
           <Card>
             <CardHeader>

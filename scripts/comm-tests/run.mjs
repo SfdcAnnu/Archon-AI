@@ -48,7 +48,7 @@ const state = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8
 const save = () => writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 const caseState = id => (state.cases[id] ??= {});
 const spent = () =>
-  Object.values(state.cases).reduce((s, c) => s + (c.build?.costUsd ?? 0) + (c.chat?.costUsd ?? 0), 0);
+  Object.values(state.cases).reduce((s, c) => s + (c.build?.costUsd ?? 0) + (c.chat?.costUsd ?? 0) + (c.previousChats ?? []).reduce((p, x) => p + (x.costUsd ?? 0), 0), 0);
 
 // ── Apex plumbing ────────────────────────────────────────────────────
 function sf(args) {
@@ -262,6 +262,8 @@ function chat(ids) {
       apex(`AgentDefinition__c a = [SELECT Id FROM AgentDefinition__c WHERE ApiName__c = '${apiName}']; a.Status__c = 'Active'; update a;`, 'activate');
       cs.activated = true;
     }
+    // A rerun keeps the earlier attempt for the report.
+    if (cs.chat) (cs.previousChats ??= []).push({ ...cs.chat, reason: process.env.COMM_TEST_RERUN_REASON ?? 'rerun' });
     const [s] = apex(`AgentChatController.SessionWithMessages s = AgentChatController.startFreshSession('${apiName}', null, null);
 System.debug('RES::' + JSON.serialize(new Map<String,Object>{ 'sessionId' => s.session.Id }));`, 'session');
     const run = (cs.chat = { sessionId: s.sessionId, turns: [], costUsd: 0 });
@@ -286,8 +288,9 @@ System.debug('RES::' + JSON.serialize(new Map<String,Object>{ 'status' => r.stat
         t.reply = assistant.map(m => m.content ?? '').join('\n').trim();
         t.status = r.status;
         t.ms = r.ms;
-        t.tools = r.messages.flatMap(m => { try { return (JSON.parse(m.toolCalls || '[]') ?? []).map(x => x.name ?? x.toolName ?? x.tool ?? '?'); } catch { return []; } });
-        t.toolErrors = r.messages.map(m => m.toolResults).filter(x => x && /"(error|isError)"\s*:\s*(true|")|INVALID|MALFORMED|exception/i.test(x)).map(x => x.slice(0, 300));
+        // A Tool row holds ONE call as an object, not a list.
+        t.tools = r.messages.flatMap(m => { try { const v = JSON.parse(m.toolCalls || 'null'); return v == null ? [] : (Array.isArray(v) ? v : [v]).map(x => x.name ?? x.toolName ?? '?'); } catch { return []; } });
+        t.toolErrors = r.messages.map(m => m.toolResults).filter(x => x && /"isError"\s*:\s*true|INVALID_|MALFORMED_|Exception/.test(x)).map(x => x.slice(0, 300));
         t.tokensIn = r.messages.reduce((s, m) => s + Number(m.tin || 0), 0);
         t.tokensOut = r.messages.reduce((s, m) => s + Number(m.tout || 0), 0);
         t.model = r.messages.map(m => m.model).find(Boolean);
@@ -356,6 +359,9 @@ function report() {
     L.push(`| ${c.id} | ${c.level} | ${c.title}${cs.score?.apiName ? `<br>\`${cs.score.apiName}\`` : ''} | ${cs.build?.status ?? '-'} | $${(cs.build?.costUsd ?? 0).toFixed(3)} | ${cs.build?.elapsedMs ? Math.round(cs.build.elapsedMs / 1000) + ' s' : '-'} | ${cs.score?.pct != null ? cs.score.pct + '%' : cs.score?.error ?? '-'} | ${checks.length ? `${pass}/${checks.length} (${pct(pass, checks.length)})` : '-'} | $${(cs.chat?.costUsd ?? 0).toFixed(3)} |`);
   }
   L.push('', `**Builder accuracy:** ${bN ? Math.round(bPts / bN) + '%' : '-'} (average scorecard) · **Conversation accuracy:** ${pct(tPass, tAll)} (${tPass}/${tAll} checks)`, '');
+  // The person-written reading of the run (root causes, priorities), when there is one.
+  const analysis = join(RESULTS, 'analysis.md');
+  if (existsSync(analysis)) L.push(readFileSync(analysis, 'utf8').trim(), '');
 
   L.push('## Issue log', '', '| # | Case | Where | Severity | What went wrong | Evidence |', '|---|---|---|---|---|---|');
   let n = 0;
@@ -370,6 +376,11 @@ function report() {
       for (const te of t.toolErrors ?? []) L.push(`| ${++n} | ${c.id} T${t.n} | Tool | Medium | Tool returned an error | ${esc(te)} |`);
       if (t.approvalError) L.push(`| ${++n} | ${c.id} T${t.n} | Approval | Medium | Could not read/decide approvals | ${esc(t.approvalError)} |`);
       for (const ap of t.approvals ?? []) if (ap.code !== 200 || /Failed|error/i.test(ap.body)) L.push(`| ${++n} | ${c.id} T${t.n} | Approval | High | Approved write failed to execute | ${esc(ap.tool + ': ' + ap.body)} |`);
+    }
+    for (const p of cs.previousChats ?? []) {
+      const all = p.turns.flatMap(t => t.checks ?? []);
+      const sample = p.turns.find(t => (t.checks ?? []).some(x => !x.pass));
+      L.push(`| ${++n} | ${c.id} (earlier run) | Runtime | High | ${esc(p.reason)} - ${all.filter(x => !x.pass).length}/${all.length} checks failed, ${p.turns.reduce((s, t) => s + (t.tools?.length ?? 0), 0)} tool calls | ${esc(sample ? `T${sample.n}: ${sample.reply}` : '')} |`);
     }
   }
   if (!n) L.push('| - | - | - | - | No issues | - |');

@@ -1,0 +1,1 @@
+System.debug('LEFT leads=' + [SELECT COUNT() FROM Lead WHERE Email LIKE '%@archontest.example'] + ' accounts=' + [SELECT COUNT() FROM Account WHERE Name LIKE '[ARCHON TEST]%'] + ' contacts=' + [SELECT COUNT() FROM Contact WHERE Email LIKE '%@archontest.example'] + ' products=' + [SELECT COUNT() FROM Product2 WHERE ProductCode LIKE 'ARCHON-TEST-%']);

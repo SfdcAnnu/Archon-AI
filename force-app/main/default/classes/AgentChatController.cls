@@ -467,25 +467,20 @@ public with sharing class AgentChatController {
         List<Map<String, Object>> connectorsPayload = buildConnectorsPayload(session.AgentDefinition__c);
         if (!connectorsPayload.isEmpty()) payload.put('connectors', connectorsPayload);
 
-        // Resolve engine credentials for this turn.
-        // May be null → Node falls back to its .env keys (dev/staging path).
+        // The agent runs on the key bound to its AI node and nothing else:
+        // no key, no turn (the server has no fallback key either).
         AgentNode__c aiNode = findAiNode(session.AgentDefinition__c);
-        Id resolvedConnectionId = null;
-        if (aiNode != null && String.isNotBlank(aiNode.NodeSubType__c)) {
-            AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime(
-                aiNode.NodeSubType__c, aiNode.AiEngineConnection__c
-            );
-            if (cred != null) {
-                resolvedConnectionId = cred.Id;
-                payload.put('engineOverride', new Map<String, Object>{
-                    'engineType'   => cred.EngineType__c,
-                    'apiKey'       => cred.ApiKey__c,
-                    'endpoint'     => cred.Endpoint__c,
-                    'defaultModel' => cred.DefaultModel__c,
-                    'connectionId' => cred.Id
-                });
-            }
-        }
+        AiEngineConnection__c cred = aiNode == null ? null
+            : AiEngineConnectionController.resolveForRuntime(aiNode.NodeSubType__c, aiNode.AiEngineConnection__c);
+        if (cred == null) throw new ChatException(AiEngineConnectionController.noKeyMessage(agent.Name));
+        Id resolvedConnectionId = cred.Id;
+        payload.put('engineOverride', new Map<String, Object>{
+            'engineType'   => cred.EngineType__c,
+            'apiKey'       => cred.ApiKey__c,
+            'endpoint'     => cred.Endpoint__c,
+            'defaultModel' => cred.DefaultModel__c,
+            'connectionId' => cred.Id
+        });
 
         HttpResponse res = null;
         String errorMessage = null;

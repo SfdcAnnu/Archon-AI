@@ -269,20 +269,17 @@ public with sharing class AgentBuilderController {
             ORDER BY SortOrder__c ASC
             LIMIT 1
         ];
-        if (!aiNodes.isEmpty() && String.isNotBlank(aiNodes[0].NodeSubType__c)) {
-            AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime(
-                aiNodes[0].NodeSubType__c, aiNodes[0].AiEngineConnection__c
-            );
-            if (cred != null) {
-                payload.put('engineOverride', new Map<String, Object>{
-                    'engineType'   => cred.EngineType__c,
-                    'apiKey'       => cred.ApiKey__c,
-                    'endpoint'     => cred.Endpoint__c,
-                    'defaultModel' => cred.DefaultModel__c,
-                    'connectionId' => cred.Id
-                });
-            }
-        }
+        // The agent runs on the key bound to its AI node and nothing else.
+        AiEngineConnection__c cred = aiNodes.isEmpty() ? null
+            : AiEngineConnectionController.resolveForRuntime(aiNodes[0].NodeSubType__c, aiNodes[0].AiEngineConnection__c);
+        if (cred == null) throw new AuraHandledException(AiEngineConnectionController.noKeyMessage(agentApiName));
+        payload.put('engineOverride', new Map<String, Object>{
+            'engineType'   => cred.EngineType__c,
+            'apiKey'       => cred.ApiKey__c,
+            'endpoint'     => cred.Endpoint__c,
+            'defaultModel' => cred.DefaultModel__c,
+            'connectionId' => cred.Id
+        });
 
         HttpResponse res = ArchonServerClient.callout('POST', '/api/agent/execute', JSON.serialize(payload));
         Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());

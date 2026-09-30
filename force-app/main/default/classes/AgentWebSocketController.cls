@@ -55,9 +55,12 @@ global with sharing class AgentWebSocketController {
             // at all, so every WS turn failed with "no connection configured"
             // regardless of what was actually set up.
             Map<String, Object> engineOverride = resolveEngineOverride(agentApiName);
-            if (engineOverride != null) {
-                payload.put('engineOverride', engineOverride);
+            // The agent runs on the key bound to its AI node and nothing else.
+            if (engineOverride == null) {
+                writeError(res, 400, AiEngineConnectionController.noKeyMessage(agentApiName));
+                return;
             }
+            payload.put('engineOverride', engineOverride);
 
             HttpResponse calloutRes = callout('POST', '/api/ws/ticket', JSON.serialize(payload));
             if (calloutRes.getStatusCode() != 200) {

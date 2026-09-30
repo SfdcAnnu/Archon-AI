@@ -380,6 +380,7 @@
     <fieldPermissions><field>AiEngineConnection__c.IsActive__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.IsPreferred__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.IsPublicShared__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
+    <fieldPermissions><field>AiEngineConnection__c.UsedForEmbeddings__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.LastValidatedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.LastUsedAt__c</field><readable>true</readable><editable>true</editable></fieldPermissions>
     <fieldPermissions><field>AiEngineConnection__c.ValidationStatus__c</field><readable>true</readable><editable>true</editable></fieldPermissions>

@@ -90,22 +90,24 @@ public with sharing class AgentRunner {
                                 : new Map<String, Object>()
         };
 
-        // Resolve the running user's AI Engine Connection — may be null,
-        // in which case the Node server falls back to its .env keys.
-        if (aiNode != null && String.isNotBlank(aiNode.NodeSubType__c)) {
-            AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime(
-                aiNode.NodeSubType__c, aiNode.AiEngineConnection__c
-            );
-            if (cred != null) {
-                payload.put('engineOverride', new Map<String, Object>{
-                    'engineType'   => cred.EngineType__c,
-                    'apiKey'       => cred.ApiKey__c,
-                    'endpoint'     => cred.Endpoint__c,
-                    'defaultModel' => cred.DefaultModel__c,
-                    'connectionId' => cred.Id
-                });
-            }
+        // The agent runs on the key bound to its AI node and nothing else:
+        // no key, the run fails with the reason instead of calling out.
+        AiEngineConnection__c cred = aiNode == null ? null
+            : AiEngineConnectionController.resolveForRuntime(aiNode.NodeSubType__c, aiNode.AiEngineConnection__c);
+        if (cred == null) {
+            AgentOutput noKey = new AgentOutput();
+            noKey.success     = false;
+            noKey.agentStatus = 'ERROR';
+            noKey.agentReason = 'NO_AI_KEY: ' + AiEngineConnectionController.noKeyMessage(inp.agentApiName);
+            return noKey;
         }
+        payload.put('engineOverride', new Map<String, Object>{
+            'engineType'   => cred.EngineType__c,
+            'apiKey'       => cred.ApiKey__c,
+            'endpoint'     => cred.Endpoint__c,
+            'defaultModel' => cred.DefaultModel__c,
+            'connectionId' => cred.Id
+        });
 
         HttpResponse res = ArchonServerClient.callout('POST', '/api/agent/execute', JSON.serialize(payload));
         if (res.getStatusCode() >= 400) {

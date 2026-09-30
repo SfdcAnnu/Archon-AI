@@ -98,6 +98,12 @@ global with sharing class AgentEngineConnectionsRestService {
                 res.responseBody = Blob.valueOf(JSON.serialize(result));
                 return;
             }
+            if (action == 'setEmbeddingKey') {
+                AiEngineConnectionController.setEmbeddingKey((String) body.get('recordId'));
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Boolean>{ 'success' => true }));
+                return;
+            }
             writeError(res, 400, 'Unknown action "' + action + '".');
         } catch (Exception e) {
             writeError(res, 400, e.getMessage());

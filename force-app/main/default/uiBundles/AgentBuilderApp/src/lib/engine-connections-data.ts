@@ -21,6 +21,8 @@ export interface ConnectionSummary {
   isActive: boolean;
   isPreferred: boolean;
   isPublicShared: boolean;
+  /** The org's one key for knowledge embeddings (OpenAI). */
+  usedForEmbeddings?: boolean;
   isMine: boolean;
   validationStatus: string | null;
   lastValidatedAt: string | null;
@@ -148,6 +150,14 @@ export async function bindEngineConnectionToNode(agentNodeId: string, connection
   await apexFetch<{ success: boolean }>(ENGINE_CONNECTIONS_BASE, {
     method: 'POST',
     body: JSON.stringify({ action: 'bind', agentNodeId, connectionId }),
+  });
+}
+
+/** Makes this key the org's one embedding key (clears the flag elsewhere). */
+export async function setEmbeddingKey(recordId: string): Promise<void> {
+  await apexFetch<{ success: boolean }>(ENGINE_CONNECTIONS_BASE, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'setEmbeddingKey', recordId }),
   });
 }
 

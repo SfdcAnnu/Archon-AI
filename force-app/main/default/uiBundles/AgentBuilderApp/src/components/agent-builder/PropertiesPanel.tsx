@@ -13,6 +13,7 @@ import { SubagentForm } from './properties/SubagentForm';
 import { ToolForm } from './properties/ToolForm';
 import { CatalogForm } from './properties/CatalogForm';
 import { AiRootForm } from './properties/AiRootForm';
+import { AiEngineConnectionPicker } from './properties/AiEngineConnectionPicker';
 import { GuardrailForm } from './properties/GuardrailForm';
 import { AutomationForm } from './properties/AutomationForm';
 import { ReadOnlySummary } from './properties/ReadOnlySummary';
@@ -182,7 +183,24 @@ export function PropertiesPanel({
               )}
 
               {readOnly ? (
-                <ReadOnlySummary node={node} />
+                <>
+                  <ReadOnlySummary node={node} />
+                  {/* The one thing the org owns on a built-in agent: the key
+                      it runs on. The platform carries it across upgrades. */}
+                  {node.nodeType === 'ai' && !isAiStep(node) && (
+                    <div className="mt-4 space-y-2 rounded-lg border border-border p-3">
+                      <AiEngineConnectionPicker
+                        nodeId={node.id}
+                        nodeSubType={node.nodeSubType}
+                        currentConnectionId={node.aiEngineConnectionId}
+                        onBound={connectionId => onConnectionBound(node.id, connectionId)}
+                      />
+                      <p className="text-[10px] leading-snug text-muted-foreground">
+                        This agent runs on the key chosen here and nothing else; without one it does not run.
+                      </p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <>
                   {node.nodeType === 'subagent' && (

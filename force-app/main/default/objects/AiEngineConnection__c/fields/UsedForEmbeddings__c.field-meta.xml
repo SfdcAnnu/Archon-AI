@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>UsedForEmbeddings__c</fullName>
+    <label>Used for knowledge embeddings</label>
+    <description>The one key the org embeds knowledge-base documents and questions with. Embeddings must share a single model across agents, so this is org-wide, not per agent; only one connection may carry it, and the Apex controller enforces that. OpenAI only.</description>
+    <defaultValue>false</defaultValue>
+    <type>Checkbox</type>
+</CustomField>

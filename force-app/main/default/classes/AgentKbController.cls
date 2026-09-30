@@ -153,8 +153,10 @@ public with sharing class AgentKbController {
     }
 
     private static Map<String, Object> buildEmbeddingEngineOverride() {
-        AiEngineConnection__c cred = AiEngineConnectionController.resolveForRuntime('openai', null);
-        if (cred == null) return null;
+        // Embeddings must share one model across every agent, so they run
+        // on the org's one embedding key — no per-user or per-agent choice.
+        AiEngineConnection__c cred = AiEngineConnectionController.resolveEmbeddingKey();
+        if (cred == null) throw new KbException('No key is marked for knowledge embeddings. On AI Models, choose an OpenAI key and press "Use for embeddings".');
         return new Map<String, Object>{
             'engineType'   => cred.EngineType__c,
             'apiKey'       => cred.ApiKey__c,

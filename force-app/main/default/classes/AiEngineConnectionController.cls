@@ -26,7 +26,7 @@ public with sharing class AiEngineConnectionController {
         for (AiEngineConnection__c c : [
             SELECT Id, Name, Label__c, User__c, User__r.Name, OwnershipType__c, EngineType__c,
                    Endpoint__c, DefaultModel__c, IsActive__c, IsPreferred__c,
-                   ValidationStatus__c, LastValidatedAt__c, LastUsedAt__c, IsPublicShared__c,
+                   ValidationStatus__c, LastValidatedAt__c, LastUsedAt__c, IsPublicShared__c, UsedForEmbeddings__c,
                    AvailableModelsJson__c, OwnerId
             FROM AiEngineConnection__c
             WHERE EngineType__c = :engineType
@@ -215,66 +215,74 @@ public with sharing class AiEngineConnectionController {
     // ── RESOLVE — used by AgentChatController.sendTurn ────────────
 
     /**
-     * Runs the resolution chain and returns the ID of the connection the
-     * caller should use (or null → fall back to Node .env).
-     *
-     * Order:
-     *   1. Running user's Preferred + Active Personal for engineType
-     *   2. Any Active Personal for the running user + engineType
-     *   3. Node-bound connection (if user has access)
-     *   4. Any Shared connection accessible to the user for engineType
+     * The key an agent runs on: the one bound to its AI node, and nothing
+     * else. No personal, preferred or shared fallback, and the server holds
+     * no default key — an agent with no bound key does not run, and every
+     * caller says so. Personal/Shared only decide who may PICK a key in the
+     * builder (record access); whoever uses the agent then spends it.
      */
     public static AiEngineConnection__c resolveForRuntime(String engineType, Id nodeBoundId) {
-        Id userId = UserInfo.getUserId();
-        // Every caller passes the AI node's NodeSubType__c verbatim ('claude'/
-        // 'gpt4'/'gemini'), but AiEngineConnection__c.EngineType__c is saved
-        // using the connection admin UI's own vocabulary ('claude'/'openai'/
-        // 'gemini') — 'gpt4' never matched 'openai', so every OpenAI node
-        // silently found zero personal/shared connections no matter how many
-        // times a key was saved. Normalize once, here, so every caller is
-        // fixed without hunting down each call site.
+        if (nodeBoundId == null) return null;
+        // The key belongs to the AGENT, not to whoever is chatting: a public
+        // website chat or a teammate who cannot see the key record still runs
+        // on it, because the builder chose it. Hence read without sharing.
+        AiEngineConnection__c bound = new KeyReader().byId(nodeBoundId);
+        if (bound == null || bound.IsActive__c != true) return null;
         String normalizedEngineType = normalizeEngineType(engineType);
-
-        // 1 & 2 — Personal, prefer IsPreferred
-        List<AiEngineConnection__c> personal = [
-            SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, IsPreferred__c, User__c
-            FROM AiEngineConnection__c
-            WHERE User__c = :userId
-              AND EngineType__c = :normalizedEngineType
-              AND OwnershipType__c = 'Personal'
-              AND IsActive__c = true
-            WITH USER_MODE
-            ORDER BY IsPreferred__c DESC, LastUsedAt__c DESC NULLS LAST
-            LIMIT 1
-        ];
-        if (!personal.isEmpty()) return personal[0];
-
-        // 3 — Node-bound
-        if (nodeBoundId != null) {
-            List<AiEngineConnection__c> bound = [
-                SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, User__c
-                FROM AiEngineConnection__c
-                WHERE Id = :nodeBoundId AND IsActive__c = true
-                WITH USER_MODE
-                LIMIT 1
-            ];
-            if (!bound.isEmpty()) return bound[0];
+        if (String.isNotBlank(normalizedEngineType) && bound.EngineType__c != normalizedEngineType) {
+            // A gpt4 node bound to a Claude key: the node's provider is what
+            // runs, so the key cannot serve it. Refuse rather than guess.
+            return null;
         }
+        return bound;
+    }
 
-        // 4 — Shared
-        List<AiEngineConnection__c> shared = [
-            SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, User__c
-            FROM AiEngineConnection__c
-            WHERE OwnershipType__c = 'Shared'
-              AND EngineType__c = :normalizedEngineType
-              AND IsActive__c = true
-            WITH USER_MODE
-            ORDER BY LastUsedAt__c DESC NULLS LAST
-            LIMIT 1
-        ];
-        if (!shared.isEmpty()) return shared[0];
+    /** The message every execution path shows when an agent has no usable key. */
+    public static String noKeyMessage(String agentName) {
+        return (String.isBlank(agentName) ? 'This agent' : agentName) + ' has no AI key. Open it in the builder, select its AI node and choose a key — it runs on that key only.';
+    }
 
-        return null;
+    /** The org's one embedding key (AI Models → "Use for embeddings"), or null. */
+    public static AiEngineConnection__c resolveEmbeddingKey() {
+        return new KeyReader().embedding();
+    }
+
+    /** Makes this key the org's embedding key, clearing the flag elsewhere.
+     *  The caller must be able to read the key they pick. */
+    @AuraEnabled
+    public static void setEmbeddingKey(Id recordId) {
+        List<AiEngineConnection__c> mine = [SELECT Id, EngineType__c FROM AiEngineConnection__c WHERE Id = :recordId WITH USER_MODE LIMIT 1];
+        if (mine.isEmpty()) throw new EngineConnectionException('That key is not visible to you.');
+        if (mine[0].EngineType__c != 'openai') throw new EngineConnectionException('Knowledge embeddings run on OpenAI; pick an OpenAI key.');
+        new KeyReader().setEmbedding(recordId);
+    }
+
+    /** Runtime reads of a key as the agent's own credential — the only
+     *  place this object is read without sharing. Never returns to a UI. */
+    private without sharing class KeyReader {
+        AiEngineConnection__c byId(Id recordId) {
+            List<AiEngineConnection__c> rows = [
+                SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, IsActive__c, User__c
+                FROM AiEngineConnection__c WHERE Id = :recordId LIMIT 1
+            ];
+            return rows.isEmpty() ? null : rows[0];
+        }
+        AiEngineConnection__c embedding() {
+            List<AiEngineConnection__c> rows = [
+                SELECT Id, EngineType__c, ApiKey__c, Endpoint__c, DefaultModel__c, IsActive__c
+                FROM AiEngineConnection__c WHERE UsedForEmbeddings__c = true AND IsActive__c = true
+                ORDER BY LastModifiedDate DESC LIMIT 1
+            ];
+            return rows.isEmpty() ? null : rows[0];
+        }
+        void setEmbedding(Id recordId) {
+            List<AiEngineConnection__c> changes = new List<AiEngineConnection__c>();
+            for (AiEngineConnection__c c : [SELECT Id FROM AiEngineConnection__c WHERE UsedForEmbeddings__c = true AND Id != :recordId]) {
+                changes.add(new AiEngineConnection__c(Id = c.Id, UsedForEmbeddings__c = false));
+            }
+            changes.add(new AiEngineConnection__c(Id = recordId, UsedForEmbeddings__c = true));
+            update changes;
+        }
     }
 
     /** Maps an AgentNode__c.NodeSubType__c value to the vocabulary
@@ -308,6 +316,7 @@ public with sharing class AiEngineConnectionController {
         s.isActive         = c.IsActive__c == true;
         s.isPreferred      = c.IsPreferred__c == true;
         s.isPublicShared   = c.IsPublicShared__c == true;
+        s.usedForEmbeddings = c.UsedForEmbeddings__c == true;
         s.isMine           = c.OwnerId == UserInfo.getUserId();
         s.validationStatus = c.ValidationStatus__c;
         s.lastValidatedAt  = c.LastValidatedAt__c;
@@ -442,6 +451,7 @@ public with sharing class AiEngineConnectionController {
         @AuraEnabled public Boolean  isActive;
         @AuraEnabled public Boolean  isPreferred;
         @AuraEnabled public Boolean  isPublicShared;
+        @AuraEnabled public Boolean  usedForEmbeddings;
         @AuraEnabled public Boolean  isMine;
         @AuraEnabled public String   validationStatus;
         @AuraEnabled public DateTime lastValidatedAt;

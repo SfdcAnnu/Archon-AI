@@ -30,6 +30,7 @@ import {
   parseEnabledModels,
   saveConnectionModels,
   testEngineConnection,
+  setEmbeddingKey,
   saveEngineConnection,
   type ConnectionSummary,
   type ProviderModel,
@@ -328,6 +329,19 @@ export default function AiConnectionsPage() {
       .finally(() => setBusyId(null));
   }, []);
 
+  // Embeddings share one model across every agent, so the org has ONE
+  // embedding key; this makes the row that key.
+  const handleUseForEmbeddings = useCallback(
+    (row: ConnectionSummary) => {
+      setBusyId(row.id);
+      setEmbeddingKey(row.id)
+        .then(() => { toast.success(`Knowledge embeddings now run on "${row.label}".`); load(); })
+        .catch(err => toast.error("Couldn't set the embedding key", { description: err instanceof Error ? err.message : undefined }))
+        .finally(() => setBusyId(null));
+    },
+    [load]
+  );
+
   const handleTest = useCallback(
     (row: ConnectionSummary) => {
       setBusyId(row.id);
@@ -512,6 +526,7 @@ export default function AiConnectionsPage() {
                           )}
                           <StatusBadge tone="muted">{r.ownershipType}</StatusBadge>
                           {r.isPublicShared && <StatusBadge tone="blue">Public</StatusBadge>}
+                          {r.usedForEmbeddings && <StatusBadge tone="purple">Embeddings</StatusBadge>}
                           <span className="ml-auto flex items-center gap-2">
                             <KeyStatusBadge status={r.validationStatus} />
                             <Switch
@@ -560,6 +575,18 @@ export default function AiConnectionsPage() {
                           >
                             Edit
                           </Button>
+                          {r.engineType === 'openai' && r.isActive && !r.usedForEmbeddings && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px]"
+                              disabled={busyId === r.id}
+                              title="Knowledge-base documents and questions are embedded with this key"
+                              onClick={() => handleUseForEmbeddings(r)}
+                            >
+                              Use for embeddings
+                            </Button>
+                          )}
                           <button
                             type="button"
                             disabled={busyId === r.id}

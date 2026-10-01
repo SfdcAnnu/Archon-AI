@@ -164,7 +164,7 @@ function startBuilds(ids) {
     const prev = caseState(c.id);
     if (prev.build) {
       (prev.previousRuns ??= []).push({ build: prev.build, score: prev.score, chat: prev.chat, previousChats: prev.previousChats, activated: prev.activated });
-      delete prev.score; delete prev.chat; delete prev.previousChats; delete prev.activated;
+      delete prev.score; delete prev.chat; delete prev.previousChats; delete prev.activated; delete prev.keyBoundByTest;
     }
     const body = JSON.stringify({ requirement: c.requirement, maxCostUsd: BUILD_CAP_USD });
     const [r] = apex(`HttpResponse r = ArchonServerClient.callout('POST', '/api/architect/build', ${str(body)}, 60000);

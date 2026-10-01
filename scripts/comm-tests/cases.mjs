@@ -159,6 +159,10 @@ export const CASES = [
         // The agent may ask before opening a case; this answers it. If it
         // already opened one, the checks below still hold.
         say: 'Yes, please open a new case for it.',
+      },
+      {
+        // A description, in case the agent asks for one before creating.
+        say: 'The robot arm will not power on, so our whole production line is stopped.',
         soql: [
           { label: 'new High-priority Web Case on Priya', query: c => `SELECT Id, Priority, Origin, AccountId FROM Case WHERE ContactId = '${c.ids.contactPriya}' AND CreatedDate >= ${c.start}`, check: (r, c) => r.length >= 1 && r.some(x => x.Priority === 'High' && x.Origin === 'Web' && x.AccountId === c.ids.accountAcme), detail: r => JSON.stringify(r) },
           { label: 'follow-up Task on the new Case', query: c => `SELECT Subject, ActivityDate FROM Task WHERE WhatId IN (SELECT Id FROM Case WHERE ContactId = '${c.ids.contactPriya}' AND CreatedDate >= ${c.start})`, check: r => r.some(x => /^Follow up:/i.test(x.Subject ?? '')), detail: r => JSON.stringify(r) },
@@ -169,6 +173,9 @@ export const CASES = [
       { say: 'One more thing - my September invoice amount is wrong.' },
       {
         say: 'Yes, open a new case for the invoice please.',
+      },
+      {
+        say: 'The September invoice shows 52,000 but our contract says 48,000.',
         soql: [{ label: 'billing Case opened with Low priority', query: c => `SELECT Priority, Subject FROM Case WHERE ContactId = '${c.ids.contactPriya}' AND CreatedDate >= ${c.start}`, check: r => r.some(x => x.Priority === 'Low'), detail: r => JSON.stringify(r) }],
       },
     ],

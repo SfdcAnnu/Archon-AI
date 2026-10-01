@@ -210,6 +210,8 @@ export interface CanvasProps {
   initialViewport?: CanvasViewport | null;
   /** Every pan or zoom the person finishes, so the view is saved with the graph. */
   onViewportChange?: (viewport: CanvasViewport) => void;
+  /** Bump to fit the view to the graph again (after Tidy up, or on request). */
+  fitSeq?: number;
 }
 
 export function Canvas({
@@ -227,6 +229,7 @@ export function Canvas({
   ready = true,
   initialViewport = null,
   onViewportChange,
+  fitSeq = 0,
 }: CanvasProps) {
   // React Flow owns node/edge state internally (useNodesState/useEdgesState)
   // so dragging is smooth — handled entirely inside the library with no
@@ -288,6 +291,19 @@ export function Canvas({
   // property edit — so the canvas snapped back to the default view the
   // moment anything moved. Now wherever the person pans, zooms or drags
   // stays put until they leave, and Save keeps it for next time.
+  // A big graph fitted whole is a cloud of unreadable boxes: when the fit
+  // would zoom out past 0.6, the view opens on the START of the flow
+  // instead — the leftmost nodes, readable — and the rest is a pan away.
+  const fitReadable = useCallback(async () => {
+    const rf = rfInstanceRef.current;
+    if (!rf || nodes.length === 0) return;
+    await rf.fitView({ padding: 0.25, maxZoom: 1 });
+    if (rf.getViewport().zoom >= 0.6) return;
+    const minX = Math.min(...nodes.map(n => n.positionX));
+    const entry = nodes.filter(n => n.positionX < minX + 1100).map(n => ({ id: n.id }));
+    await rf.fitView({ nodes: entry, padding: 0.2, minZoom: 0.6, maxZoom: 1 });
+  }, [nodes]);
+
   const viewSetRef = useRef(false);
   useEffect(() => {
     if (viewSetRef.current || !ready || !rfInstanceRef.current || nodes.length === 0) return;
@@ -296,10 +312,25 @@ export function Canvas({
       const rf = rfInstanceRef.current;
       if (!rf) return;
       if (initialViewport) rf.setViewport(initialViewport);
-      else rf.fitView({ padding: 0.25, maxZoom: 1 });
+      else void fitReadable();
     });
     return () => cancelAnimationFrame(raf);
-  }, [nodes, ready, initialViewport]);
+  }, [nodes, ready, initialViewport, fitReadable]);
+
+  // Asked for explicitly (Tidy up, Fit): the one other time the view moves
+  // by itself, and it tells the host where it landed so Save keeps it.
+  const fitSeqSeen = useRef(0);
+  useEffect(() => {
+    if (!fitSeq || fitSeq === fitSeqSeen.current) return;
+    fitSeqSeen.current = fitSeq;
+    const raf = requestAnimationFrame(() => {
+      void fitReadable().then(() => {
+        const vp = rfInstanceRef.current?.getViewport();
+        if (vp) onViewportChange?.({ x: vp.x, y: vp.y, zoom: vp.zoom });
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [fitSeq, fitReadable, onViewportChange]);
 
   // React Flow pushes this through an SVG attribute, which does not reliably
   // read var(); hand it the computed token and re-read when the theme flips.

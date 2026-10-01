@@ -46,6 +46,11 @@ if (!apiName) { console.log('usage: node scripts/node-shot.cjs <agentApiName> "<
   const node = app.locator('.react-flow__node').filter({ hasText: nodeTitle }).first();
   if (await node.count()) { await node.click(); await app.waitForTimeout(9000); }
   else console.log('no node matching', JSON.stringify(nodeTitle), '— nodes:', await app.locator('.react-flow__node').allInnerTexts().then(t => t.map(s => s.replace(/\s+/g, ' ').slice(0, 40))));
+  // TIDY=1 presses Tidy up before the shot (nothing is saved).
+  if (process.env.TIDY) {
+    const tidy = app.getByRole('button', { name: 'Tidy up' }).first();
+    if (await tidy.count()) { await tidy.click(); await app.waitForTimeout(2500); } else console.log('no Tidy up button');
+  }
   await app.screenshot({ path: path.join(OUT, `shot-${name}-node.png`) });
   // The panel scrolls on its own; shoot its bottom too.
   await app.evaluate(() => { for (const el of document.querySelectorAll('aside, [data-panel], div')) { if (el.scrollHeight > el.clientHeight + 50 && el.clientWidth < 520) el.scrollTop = el.scrollHeight; } });

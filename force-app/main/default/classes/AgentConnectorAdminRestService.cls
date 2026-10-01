@@ -10,9 +10,17 @@ global with sharing class AgentConnectorAdminRestService {
 
     @HttpGet
     global static void listCustomMcpServers() {
+        RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
         try {
+            // ?resource=usable&providerKey= — the connections the running
+            // user may pin on a canvas node (their own, their groups', the org's).
+            if (req.params.get('resource') == 'usable') {
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(AgentConnectorController.listUsableConnections(req.params.get('providerKey')));
+                return;
+            }
             List<CustomMcpServer__c> rows = AgentConnectorController.listCustomMcpServers();
             res.statusCode = 200;
             res.responseBody = Blob.valueOf(JSON.serialize(rows));

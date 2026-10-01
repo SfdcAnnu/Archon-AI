@@ -90,12 +90,12 @@ export async function getConnectionGate(agentApiName: string): Promise<Connectio
 
 /** One connector the agent runs as the person (or their group), with the
  *  running user's standing on it. */
-export type RequirementStatus = 'connected' | 'automatic' | 'needed' | 'expired' | 'wrong_account' | 'needs_group' | 'org';
+export type RequirementStatus = 'connected' | 'automatic' | 'needed' | 'expired' | 'wrong_account' | 'needs_group' | 'org' | 'pinned';
 
 export interface ConnectionRequirement {
   provider: string;
   displayName: string;
-  runAs: 'user' | 'group' | 'org';
+  runAs: 'user' | 'group' | 'org' | 'connection';
   required: boolean;
   status: RequirementStatus;
   accountEmail: string | null;

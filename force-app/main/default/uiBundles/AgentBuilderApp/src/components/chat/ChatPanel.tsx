@@ -1579,6 +1579,18 @@ export function ChatPanel({
   const phase: VoicePhase = speaking ? 'speak' : sending ? 'think' : isRecording ? 'listen' : 'ready';
   useEffect(() => { emit({ kind: 'phase', phase }); }, [phase, emit]);
 
+  // The studio's text box: four lines on the empty screen, one line once
+  // the conversation has started, and from there it grows with what is
+  // typed up to its cap rather than scrolling inside a fixed box.
+  const started = messages.some(m => m.role === 'User' || m.role === 'Assistant');
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el || !isStudio) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+  }, [input, isStudio, started]);
+
   // The composer's parts, built once and laid out per variant: the studio
   // stacks them in one box (text on top, the controls in a row beneath);
   // the panels keep their single row.
@@ -1631,11 +1643,12 @@ export function ChatPanel({
   );
   const textareaEl = (
     <textarea
+      ref={taRef}
       value={input}
       onChange={e => { lastInputVoiceRef.current = false; stopSpeaking(); setInput(e.target.value); }}
       onKeyDown={handleKeyDown}
       placeholder={voiceSupported ? 'Type here, or just talk…' : 'Type a message…'}
-      rows={isStudio ? 4 : 1}
+      rows={isStudio && !started ? 4 : 1}
       className={isStudio
         ? 'ax-ta w-full resize-none bg-transparent px-4 pb-1 pt-3 text-[13.5px] outline-none'
         : 'flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-[12.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'}

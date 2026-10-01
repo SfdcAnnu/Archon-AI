@@ -204,6 +204,9 @@ export interface ChecklistItem {
   title: string;
   description: string;
   category: 'connector' | 'ai_engine' | 'review' | 'knowledge_base' | 'other';
+  /** Ticked off by a person. Kept in SetupChecklistJson__c with the rest
+   *  of the item, so everyone who opens the agent sees the same list. */
+  done?: boolean;
 }
 
 export interface AgentDefinition {

@@ -627,9 +627,12 @@ export default function AgentBuilder() {
                 className="relative flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
               >
                 <ListChecks className="h-3.5 w-3.5" />
-                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--archon-warning,var(--archon-warning))] px-0.5 text-[8.5px] font-bold text-white">
-                  {graph.agent.setupChecklist.length}
-                </span>
+                {/* The badge counts what is still to do; ticked items drop out of it. */}
+                {graph.agent.setupChecklist.some(i => !i.done) && (
+                  <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--archon-warning,var(--archon-warning))] px-0.5 text-[8.5px] font-bold text-white">
+                    {graph.agent.setupChecklist.filter(i => !i.done).length}
+                  </span>
+                )}
               </button>
             )}
             <Button
@@ -747,7 +750,11 @@ export default function AgentBuilder() {
           />
         )}
         {checklistOpen && (
-          <SetupChecklistPanel items={graph.agent.setupChecklist} onClose={() => setChecklistOpen(false)} />
+          <SetupChecklistPanel
+            items={graph.agent.setupChecklist}
+            onChange={items => setGraph(g => ({ ...g, agent: { ...g.agent, setupChecklist: items } }))}
+            onClose={() => setChecklistOpen(false)}
+          />
         )}
       </div>
     </AppShell>

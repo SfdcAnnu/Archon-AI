@@ -12,7 +12,7 @@ import {
   type RemoteTool,
 } from '@/lib/connectors-data';
 import type { AgentNode, CatalogNodeConfig } from '@/types/agent';
-import { IdentityFields } from './IdentityFields';
+import { ConnectionPicker } from './ConnectionPicker';
 
 export interface CatalogFormProps {
   node: AgentNode;
@@ -107,7 +107,7 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-[11px] font-bold">MCP server</Label>
+        <Label className="text-[11px] font-bold">Connector</Label>
         {directory === null ? (
           <div className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -240,7 +240,14 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
         </p>
       </div>
 
-      {provider && <IdentityFields cfg={cfg ?? { description: '', connectorId: '', allowedTools: [] }} onConfigChange={onConfigChange} />}
+      {provider && (
+        <ConnectionPicker
+          cfg={cfg ?? { description: '', connectorId: '', allowedTools: [] }}
+          provider={provider}
+          providerName={directory?.find(d => d.providerKey === provider)?.displayName ?? provider}
+          onConfigChange={onConfigChange}
+        />
+      )}
     </div>
   );
 }

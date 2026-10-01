@@ -103,9 +103,10 @@ export interface CatalogNodeConfig {
   provider?: string;
   allowedTools: string[];
   /** Whose account this connector runs as. Unset means the org's default
-   *  policy (Settings → Identity & access). Read by the server's identity
-   *  resolver (server-langchain/src/identity/policy.ts). */
-  runAs?: 'user' | 'group' | 'org';
+   *  policy (Settings → Identity & access). 'connection' pins the one in
+   *  connectorId: everyone who uses the agent acts as it. Read by the
+   *  server's identity resolver (server-langchain/src/identity/policy.ts). */
+  runAs?: 'user' | 'group' | 'org' | 'connection';
   /** When the person has no connection: refuse ('none') or use the org's. */
   fallback?: 'none' | 'org';
   /** A missing connection blocks the chat until it is connected. */

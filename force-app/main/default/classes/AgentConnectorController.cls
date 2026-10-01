@@ -134,6 +134,27 @@ public with sharing class AgentConnectorController {
     // User/client-added servers — see DirectoryEntry.isCustom above for how
     // they surface in the same directory as the packaged catalog.
 
+    /**
+     * The connections the RUNNING user may pin on a canvas node for a
+     * provider: their own, their groups', and the org's — plus the groups
+     * they belong to. The server's JSON, passed through:
+     * { mine: [...], team: [...], org: {...}|null, groups: [{type,key,label}] }
+     */
+    @AuraEnabled
+    public static String listUsableConnections(String providerKey) {
+        if (String.isBlank(providerKey)) throw new EngineConnectionLikeException('providerKey is required.');
+        HttpResponse res = callout('POST', '/api/connectors/usable',
+            JSON.serialize(new Map<String, Object>{ 'userId' => UserInfo.getUserId(), 'providerKey' => providerKey }));
+        String raw = res.getBody();
+        if (res.getStatusCode() >= 400 || (raw != null && raw.trim().startsWith('<'))) {
+            throw new EngineConnectionLikeException('SERVER_WAKING: The Archon server did not answer — it may be waking up. Try again in a moment.');
+        }
+        return raw;
+    }
+
+    /** REST-safe error (AuraHandledException cannot be thrown from Apex REST). */
+    public class EngineConnectionLikeException extends Exception {}
+
     @AuraEnabled(cacheable=true)
     public static List<CustomMcpServer__c> listCustomMcpServers() {
         return [

@@ -99,18 +99,20 @@ export function continuationText(toolName: string, resultText: string): string {
 
 /** Whose account a tool call ran under. */
 export interface RanAs {
-  type: 'user' | 'group' | 'org';
+  type: 'user' | 'group' | 'org' | 'connection';
   subjectKey?: string | null;
   subjectLabel?: string | null;
   accountEmail?: string | null;
   via?: 'connection' | 'jwt' | 'setup' | 'platform' | null;
+  /** The node pinned this connection: everyone acts as it, not as themselves. */
+  pinned?: boolean;
 }
 
 /** A connector the turn could not use: the person has no identity for it. */
 export interface NeedsConnection {
   provider: string;
   reason: 'needs_connection' | 'needs_group_connection' | 'wrong_account' | 'expired';
-  wanted: 'user' | 'group' | 'org';
+  wanted: 'user' | 'group' | 'org' | 'connection';
   message: string;
 }
 

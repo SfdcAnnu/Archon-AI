@@ -14,6 +14,8 @@ const BASE = '/services/apexrest/agent-builder/identity/';
 const TIMEOUT_MS = 45000;
 
 export type RunAs = 'user' | 'group' | 'org';
+/** A node may also pin one stored connection ('connection'). */
+export type NodeRunAs = RunAs | 'connection';
 export type GroupKeyType = 'permissionSet' | 'publicGroup' | 'department';
 
 export interface IdentityPolicy {
@@ -231,6 +233,24 @@ export async function testServer(input: { providerKey: string; mcpServerUrl: str
   return apexFetch<ServerTestResult>(BASE, { method: 'POST', body: JSON.stringify({ action: 'testServer', ...input }) }, 95000);
 }
 
+// ── what a builder may pin on a node ───────────────────────────────
+
+export interface UsableConnections {
+  /** My own accounts for this provider. */
+  mine: ConnectionRow[];
+  /** Accounts of groups I belong to. */
+  team: ConnectionRow[];
+  /** The org's shared account, when connected. */
+  org: ConnectionRow | null;
+  /** The groups I belong to — for connecting a new team account. */
+  groups: Array<{ type: GroupKeyType; key: string; label: string }>;
+}
+
+/** The connections the running user can choose for a provider on the canvas. */
+export async function loadUsableConnections(providerKey: string): Promise<UsableConnections> {
+  return apexFetch<UsableConnections>(`/services/apexrest/agent-builder/connectors-admin/?resource=usable&providerKey=${encodeURIComponent(providerKey)}`, { method: 'GET' }, TIMEOUT_MS);
+}
+
 // ── labels ─────────────────────────────────────────────────────────
 
 export const RUN_AS_LABEL: Record<RunAs, string> = { user: 'Each person', group: 'A group', org: 'The org' };
@@ -241,8 +261,10 @@ export const GROUP_TYPE_LABEL: Record<GroupKeyType, string> = {
   department: 'Department',
 };
 
-/** "as you · ann@acme.com" / "as Sales · sales@acme.com" / "as the org". */
-export function ranAsLabel(r: { type: RunAs; subjectLabel?: string | null; accountEmail?: string | null; via?: string | null }, me = true): string {
+/** "as you · ann@acme.com" / "as Sales · sales@acme.com" / "as the org" /
+ *  a pinned connection: "as sales@acme.com" (the agent's own account). */
+export function ranAsLabel(r: { type: NodeRunAs; subjectLabel?: string | null; accountEmail?: string | null; via?: string | null; pinned?: boolean }, me = true): string {
+  if (r.pinned) return `as ${r.accountEmail ?? r.subjectLabel ?? 'the agent’s account'}`;
   const who = r.type === 'user' ? (me ? 'you' : r.subjectLabel ?? 'the person') : r.type === 'group' ? (r.subjectLabel ?? 'a group') : 'the org';
   const via = r.via === 'jwt' ? ' · automatic' : '';
   return `as ${who}${r.accountEmail && r.type !== 'org' ? ` · ${r.accountEmail}` : ''}${via}`;

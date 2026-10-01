@@ -15,7 +15,7 @@ import { loadArchonData, type ArchonData } from '@/lib/archon-data';
 import { loadHomeStats } from '@/lib/home-stats-data';
 import { useBuildReports } from '@/hooks/useBuildReports';
 import { useMicLevel } from '@/hooks/useMicLevel';
-import type { ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
+import type { ReportedRows, ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { formatLastTurn, groupSessionsByDay, sessionsForAgent } from '@/lib/chat-list';
 import { backFromPrefix } from '@/lib/control-messages';
@@ -60,7 +60,6 @@ const STATUS_COPY: Record<OrbPhase, string> = { ready: 'Ready', listen: 'Listeni
 const VIEW_TO_SURFACE: Record<ScreenView, Surface> = { dashboard: 'dash', usage: 'usage', failures: 'failures', drafts: 'drafts', approvals: 'approvals', cost: 'chart', build: 'build' };
 /** A build's 'moment': which build, and whether it is running, waiting for the person, finished or failed. */
 const buildMoment = (b: HostedBuild): string => `${b.messageId}:${b.view?.status === 'paused' || b.view?.status === 'done' || b.view?.status === 'failed' ? b.view.status : 'live'}`;
-const isListSurface = (s: string | null): s is Exclude<Surface, 'build'> => s === 'dash' || s === 'usage' || s === 'failures' || s === 'drafts' || s === 'approvals' || s === 'chart';
 
 export default function ArchonPage() {
   const navigate = useNavigate();
@@ -84,6 +83,8 @@ export default function ArchonPage() {
   const [data, setData] = useState<ArchonData | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [report, setReport] = useState<UsageReport | null>(null);
+  /** The rows the copilot's tool read for the view it opened. */
+  const [reported, setReported] = useState<ReportedRows | null>(null);
   const [command, setCommand] = useState<{ text: string; how: 'talk' | 'type'; seq: number } | null>(null);
   const [full, setFull] = useState(() => !!document.fullscreenElement);
   // Recent: the copilot's own conversations, and the one being read back.
@@ -134,8 +135,9 @@ export default function ArchonPage() {
       }))
       .catch(() => { /* the surface says it has nothing */ });
   }, []);
-  const open = useCallback((s: Surface, opts?: { days?: number | null; usage?: UsageReport }) => {
+  const open = useCallback((s: Surface, opts?: { days?: number | null; usage?: UsageReport; reported?: ReportedRows }) => {
     setSurface(s);
+    setReported(opts?.reported ?? null);
     if (opts?.usage) setReport(opts.usage);
     else if (s === 'usage' || s === 'chart') loadUsage(opts?.days ?? 31);
     if (s !== 'build') refresh();
@@ -151,11 +153,12 @@ export default function ArchonPage() {
     setSurface(null);
   }, [surface, hosted]);
 
-  /** What the person just said decides whether the screen divides. */
+  /** The little the page does from the person's words alone: close what
+   *  is showing, and keep a build request tidy. Whether a view opens is
+   *  the copilot's decision (onShow below), never a phrase match. */
   const route = useCallback((text: string) => {
     const it = intentOf(text);
     if (it === 'close') { close(); return; }
-    if (isListSurface(it)) { open(it); return; }
     if (it === 'build-back') { if (hosted) { dismissedBuildRef.current = null; open('build'); } return; }
     if (it === 'build') {
       // A change to the agent being built keeps the build in view; a new
@@ -166,12 +169,13 @@ export default function ArchonPage() {
     }
   }, [close, open, hosted, surface]);
 
-  /** The copilot asked for a view itself (show_on_screen). Its choice wins
-   *  over the phrase match, and its rows travel with it. */
+  /** The copilot decided a view answers better than words (show_on_screen);
+   *  the rows its tool read travel with it, so the surface shows what the
+   *  reply quotes. */
   const onShow = useCallback((s: ScreenRequest) => {
     const target = VIEW_TO_SURFACE[s.view];
     if (target === 'build') { if (!hosted) return; dismissedBuildRef.current = null; }
-    open(target, { days: s.days, usage: s.usage });
+    open(target, { days: s.days, usage: s.usage, reported: s.reported });
   }, [open, hosted]);
 
   const onActivity = useCallback((e: ChatActivity) => {
@@ -281,7 +285,7 @@ export default function ArchonPage() {
     : surface === 'usage' || surface === 'chart'
       ? report ? `last ${report.days} day${report.days === 1 ? '' : 's'}${report.source === 'archon' ? ' · as Archon reported it' : ''}` : ''
       : data ? `read ${new Date(data.loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
-  const sp: SurfaceProps = { data, loading: dataLoading, now, report, onGo: href => navigate(href), onAsk: ask, onRefresh: refresh };
+  const sp: SurfaceProps = { data, loading: dataLoading, now, report, reported, onGo: href => navigate(href), onAsk: ask, onRefresh: refresh };
 
   return (
     <AppShell hideRail>

@@ -2,44 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { editsCurrentBuild, intentOf, stripWake, WAKE_RE } from './archon-intent';
 
 describe('intentOf', () => {
-  it('reads today as a dashboard', () => {
-    expect(intentOf('What happened today?')).toBe('dash');
-    expect(intentOf("Give me today's briefing")).toBe('dash');
-    expect(intentOf('show me the dashboard')).toBe('dash');
+  it('never opens a data view from words — that is the copilot\'s call', () => {
+    expect(intentOf('What happened today?')).toBe(null);
+    expect(intentOf('what you can do for me today')).toBe(null);
+    expect(intentOf('Show the failures')).toBe(null);
+    expect(intentOf('Show my drafts')).toBe(null);
+    expect(intentOf('what is waiting for approval')).toBe(null);
+    expect(intentOf('Cost by agent as a chart')).toBe(null);
+    expect(intentOf('show me a report of all my agents and how much each has used till now')).toBe(null);
+    expect(intentOf('How is the lead intake agent doing?')).toBe(null);
   });
-  it('reads failures, drafts, approvals and charts', () => {
-    expect(intentOf('Show the failures')).toBe('failures');
-    expect(intentOf('what went wrong this morning')).toBe('failures');
-    expect(intentOf('Show my drafts')).toBe('drafts');
-    expect(intentOf('what is waiting for approval')).toBe('approvals');
-    expect(intentOf('Cost by agent as a chart')).toBe('chart');
-  });
-  it('does not open the approvals list for a yes', () => {
-    expect(intentOf('Approved')).toBe(null);
-    expect(intentOf('yes I approve it')).toBe(null);
-    expect(intentOf('show the approvals')).toBe('approvals');
-  });
-  it('never opens a data view for an agent description', () => {
+  it('reads a request for an agent, however it is worded', () => {
     expect(intentOf('Note 10 agent I want to single agent that will show opportunity details their activities and on accounts and on their account activities details')).toBe('build');
     expect(intentOf('an agent that reports failures to the owner every morning')).toBe('build');
     expect(intentOf('show me the recent activities on this opportunity')).toBe(null);
-  });
-  it('reads a usage or token report', () => {
-    expect(intentOf('show me a report of all my agents and how much each has used till now')).toBe('usage');
-    expect(intentOf('too many tokens taken by the lead intake qualifier')).toBe('usage');
-    expect(intentOf('Cost by agent as a chart')).toBe('chart');
-  });
-  it('does not mistake a booking approval for the approvals list', () => {
-    expect(intentOf('Book the meeting only after a human approves')).toBe(null);
   });
   it('reads a build, and a request to see it again', () => {
     expect(intentOf('Build a WhatsApp support agent for property customers')).toBe('build');
     expect(intentOf('create a new agent that scores deals')).toBe('build');
     expect(intentOf('show me the graph again')).toBe('build-back');
-  });
-  it('reads how-is-it-doing as words only', () => {
-    expect(intentOf('How is the lead intake agent doing?')).toBe('how');
-    expect(intentOf('is the risk scorer ok')).toBe('how');
   });
   it('reads close', () => {
     expect(intentOf('close')).toBe('close');
@@ -49,6 +30,7 @@ describe('intentOf', () => {
   it('gives nothing for plain conversation', () => {
     expect(intentOf('hello')).toBe(null);
     expect(intentOf('Also send a welcome email through Gmail')).toBe(null);
+    expect(intentOf('Approved')).toBe(null);
     expect(intentOf('')).toBe(null);
   });
 });

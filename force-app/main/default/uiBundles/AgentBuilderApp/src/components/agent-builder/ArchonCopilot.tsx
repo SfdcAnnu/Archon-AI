@@ -36,6 +36,20 @@ export interface ArchonCopilotProps {
   onClose: () => void;
 }
 
+/** A refusal from the server arrives as a JSON body; say it in words. */
+function sayError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : '';
+  if (msg.trimStart().startsWith('{')) {
+    try {
+      const j = JSON.parse(msg) as { error?: string; message?: string; details?: { formErrors?: string[]; fieldErrors?: Record<string, string[]> } };
+      const fields = Object.entries(j.details?.fieldErrors ?? {}).map(([k, v]) => `${k}: ${v.join('; ')}`);
+      const what = j.message ?? [...(j.details?.formErrors ?? []), ...fields].join(' · ');
+      return `Archon could not take that request${what ? ` — ${what}` : ''}.`;
+    } catch { /* not JSON after all */ }
+  }
+  return msg || "Something went wrong and I couldn't answer that.";
+}
+
 export function ArchonCopilot({ graph, onApplyOperations, onClose }: ArchonCopilotProps) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
@@ -75,16 +89,7 @@ export function ArchonCopilot({ graph, onApplyOperations, onClose }: ArchonCopil
         .then(res =>
           setTurns(t => [...t, { role: 'assistant', content: res.reply, operations: res.operations }]),
         )
-        .catch(err =>
-          setTurns(t => [
-            ...t,
-            {
-              role: 'assistant',
-              content:
-                err instanceof Error ? err.message : "Something went wrong and I couldn't answer that.",
-            },
-          ]),
-        )
+        .catch(err => setTurns(t => [...t, { role: 'assistant', content: sayError(err) }]))
         .finally(() => setBusy(false));
     },
     [busy, turns, graph],

@@ -14,6 +14,7 @@ import { editsCurrentBuild, intentOf } from '@/lib/archon-intent';
 import { loadArchonData, type ArchonData } from '@/lib/archon-data';
 import { loadHomeStats } from '@/lib/home-stats-data';
 import { useBuildReports } from '@/hooks/useBuildReports';
+import { useMicLevel } from '@/hooks/useMicLevel';
 import type { ScreenRequest, ScreenView, UsageReport } from '@/lib/archon-screen';
 import { listMySessions, type SessionSummary } from '@/lib/conversations-data';
 import { formatLastTurn, groupSessionsByDay, sessionsForAgent } from '@/lib/chat-list';
@@ -265,6 +266,10 @@ export default function ArchonPage() {
   // ── derived ──────────────────────────────────────────────────────────
   const building = !!hosted?.view && (hosted.view.status === 'running' || hosted.view.status === 'queued');
   const orbPhase: OrbPhase = building && phase === 'ready' ? 'build' : phase;
+  // While the mic is open the rings around the orb follow the voice: the
+  // hook writes the level onto this element, the CSS does the rest.
+  const orbWrapRef = useRef<HTMLDivElement>(null);
+  useMicLevel(orbPhase === 'listen', orbWrapRef);
   const working = useMemo(() => {
     const s = hosted?.view?.steps.find(x => x.state === 'running');
     return s ? (s.detail || s.label) : '';
@@ -325,7 +330,14 @@ export default function ArchonPage() {
               {/* The orb is the room's light, not a fixture: a faint glow
                   behind the words that takes no space of its own. */}
               <div className="ax-orbhead" aria-hidden="true">
-                <ArchonOrb size="xl" phase={orbPhase} />
+                {/* Listening and speaking show on the orb itself: rings
+                    leave it while the mic is open, one of them sized by
+                    the voice; blue and quicker while the reply is read. */}
+                <div className="ax-orbwrap" data-phase={orbPhase} ref={orbWrapRef}>
+                  <span className="ax-rings"><i /><i /><i /><i className="lvl" /></span>
+                  <ArchonOrb size="xl" phase={orbPhase} />
+                  <span className="ax-orbcap">{orbPhase === 'listen' ? 'Listening' : orbPhase === 'speak' ? 'Speaking' : ''}</span>
+                </div>
                 <div className="ax-greet">
                   <h1>Hello. I'm Archon.</h1>
                   <p>What are we doing today? Ask for anything, or describe an agent to build.</p>

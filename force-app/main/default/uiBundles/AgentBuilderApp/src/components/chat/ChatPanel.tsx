@@ -1579,6 +1579,74 @@ export function ChatPanel({
   const phase: VoicePhase = speaking ? 'speak' : sending ? 'think' : isRecording ? 'listen' : 'ready';
   useEffect(() => { emit({ kind: 'phase', phase }); }, [phase, emit]);
 
+  // The composer's parts, built once and laid out per variant: the studio
+  // stacks them in one box (text on top, the controls in a row beneath);
+  // the panels keep their single row.
+  const attachBtn = !isCopilot && (
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      disabled={sending || pendingAttachments.length >= MAX_ATTACHMENTS_PER_TURN}
+      className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted disabled:opacity-40"
+      aria-label="Attach file"
+      title="Attach a file"
+    >
+      <Paperclip className="h-4 w-4" />
+    </button>
+  );
+  const micBtn = voiceSupported && (
+    <button
+      type="button"
+      onClick={handleMicClick}
+      disabled={sending}
+      className={`shrink-0 rounded-md p-2 hover:bg-muted disabled:opacity-40 ${isRecording ? 'chat-mic-on' : 'text-muted-foreground'}`}
+      aria-label={isRecording ? 'Stop listening' : 'Voice input'}
+      title={isRecording ? 'Stop listening' : 'Talk'}
+    >
+      {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+    </button>
+  );
+  const soundBtn = (
+    <button
+      type="button"
+      onClick={() => { const n = nextSoundPref(sound); setSoundPref(n); setSound(n); if (n === 'off') stopSpeaking(); }}
+      className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted"
+      title={SOUND_LABEL[sound]}
+      aria-label={SOUND_LABEL[sound]}
+    >
+      {sound === 'off' ? <VolumeX className="h-4 w-4" /> : sound === 'always' ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
+    </button>
+  );
+  const liveSwitch = (
+    <button
+      type="button"
+      onClick={toggleStreaming}
+      className={`ax-live${streaming ? ' on' : ''}`}
+      title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+      aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
+      aria-pressed={streaming}
+    >
+      <span className="sw" aria-hidden="true" />Live
+    </button>
+  );
+  const textareaEl = (
+    <textarea
+      value={input}
+      onChange={e => { lastInputVoiceRef.current = false; stopSpeaking(); setInput(e.target.value); }}
+      onKeyDown={handleKeyDown}
+      placeholder={voiceSupported ? 'Type here, or just talk…' : 'Type a message…'}
+      rows={isStudio ? 4 : 1}
+      className={isStudio
+        ? 'ax-ta w-full resize-none bg-transparent px-4 pb-1 pt-3 text-[13.5px] outline-none'
+        : 'flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-[12.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'}
+    />
+  );
+  const sendBtn = (
+    <Button size="icon" className={`h-9 w-9 shrink-0${isStudio ? ' ml-auto' : ''}`} onClick={handleSend} disabled={sendDisabled} aria-label="Send">
+      <Send className="h-4 w-4" />
+    </Button>
+  );
+
   return (
     <div
       className={
@@ -1880,70 +1948,40 @@ export function ChatPanel({
               <button type="button" className="go" onClick={() => { followRef.current = true; scrollToBottom(); }}>Review &amp; approve</button>
             </div>
           )}
-          <VoiceStrip phase={phase} voiceSupported={voiceSupported} />
-          <div className="mt-2 flex items-end gap-1.5">
-            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesPicked} />
-            {!isCopilot && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={sending || pendingAttachments.length >= MAX_ATTACHMENTS_PER_TURN}
-                className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted disabled:opacity-40"
-                aria-label="Attach file"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-            )}
-            {voiceSupported && (
-              <button
-                type="button"
-                onClick={handleMicClick}
-                disabled={sending}
-                className={`shrink-0 rounded-md p-2 hover:bg-muted disabled:opacity-40 ${isRecording ? 'chat-mic-on' : 'text-muted-foreground'}`}
-                aria-label="Voice input"
-              >
-                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </button>
-            )}
-            {isStudio && (
-              <>
-                {/* The studio has no panel header, so the two choices that
-                    lived there sit with the composer: read aloud, and live
-                    (streamed) replies. */}
-                <button
-                  type="button"
-                  onClick={() => { const n = nextSoundPref(sound); setSoundPref(n); setSound(n); if (n === 'off') stopSpeaking(); }}
-                  className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted"
-                  title={SOUND_LABEL[sound]}
-                  aria-label={SOUND_LABEL[sound]}
-                >
-                  {sound === 'off' ? <VolumeX className="h-4 w-4" /> : sound === 'always' ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleStreaming}
-                  className={`ax-live${streaming ? ' on' : ''}`}
-                  title={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
-                  aria-label={streaming ? STREAM_LABEL.on : STREAM_LABEL.off}
-                  aria-pressed={streaming}
-                >
-                  {streaming ? <Zap className="h-3.5 w-3.5" /> : <Gauge className="h-3.5 w-3.5" />}
-                  <span>{streaming ? 'Live' : 'Live off'}</span>
-                </button>
-              </>
-            )}
-            <textarea
-              value={input}
-              onChange={e => { lastInputVoiceRef.current = false; stopSpeaking(); setInput(e.target.value); }}
-              onKeyDown={handleKeyDown}
-              placeholder={voiceSupported ? 'Type here, or just talk…' : 'Type a message…'}
-              rows={isStudio ? 4 : 1}
-              className="flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-[12.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            />
-            <Button size="icon" className="h-9 w-9 shrink-0" onClick={handleSend} disabled={sendDisabled} aria-label="Send">
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+          {isStudio ? (
+            /* One box: the text on top, the controls in a row beneath. The
+               studio has no panel header and no status strip: what the
+               agent is doing shows on the orb, and the one line that
+               matters while it applies sits by the mic. */
+            <div className={`ax-cx${phase === 'listen' || phase === 'speak' ? ` ${phase}` : ''}`}>
+              <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesPicked} />
+              {textareaEl}
+              <div className="ax-cx-bar">
+                {attachBtn}
+                {micBtn}
+                {soundBtn}
+                {(phase === 'listen' || phase === 'speak') && (
+                  <span className={`ax-hint ${phase}`} role="status" aria-live="polite">
+                    <i />{phase === 'listen' ? 'Listening · sends when you pause' : 'Speaking · talk or type to interrupt'}
+                  </span>
+                )}
+                <span className="ax-vsep" aria-hidden="true" />
+                {liveSwitch}
+                {sendBtn}
+              </div>
+            </div>
+          ) : (
+            <>
+              <VoiceStrip phase={phase} voiceSupported={voiceSupported} />
+              <div className="mt-2 flex items-end gap-1.5">
+                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesPicked} />
+                {attachBtn}
+                {micBtn}
+                {textareaEl}
+                {sendBtn}
+              </div>
+            </>
+          )}
           {!isStudio && (
             <p className="mt-1.5 text-center text-[9.5px] text-muted-foreground/60">
               Responses are AI-generated and may be inaccurate.

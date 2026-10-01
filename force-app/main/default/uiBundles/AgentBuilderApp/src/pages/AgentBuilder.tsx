@@ -36,7 +36,9 @@ export default function AgentBuilder() {
   const navigate = useNavigate();
   const [graph, setGraph] = useState<AgentGraph>(MOCK_AGENT_GRAPH);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<'loading' | 'live' | 'mock'>('loading');
+  const [dataSource, setDataSource] = useState<'loading' | 'live' | 'mock' | 'error'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadSeq, setReloadSeq] = useState(0);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [chatOpen, setChatOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -50,6 +52,7 @@ export default function AgentBuilder() {
     if (!apiName) return;
     let cancelled = false;
     setDataSource('loading');
+    setLoadError(null);
     loadAgentGraph(apiName)
       .then(real => {
         if (cancelled) return;
@@ -57,17 +60,26 @@ export default function AgentBuilder() {
         setDataSource('live');
       })
       .catch(err => {
-        // Expected in local `npm run dev` — the platform SDK has no real
-        // Salesforce surface to talk to outside a deployed UI Bundle.
-        // Falls back to mock data rather than leaving the canvas blank.
         if (cancelled) return;
+        // Deployed: a failed load is said plainly, with a retry. Showing the
+        // stand-in agent instead made a slow Apex call look like someone
+        // else's agent — and a Save of it could only fail.
+        if (typeof (globalThis as { SFDC_ENV?: unknown }).SFDC_ENV !== 'undefined') {
+          console.error('Failed to load agent:', err);
+          setLoadError(err instanceof Error ? err.message : String(err));
+          setDataSource('error');
+          return;
+        }
+        // Local `npm run dev` — the platform SDK has no real Salesforce
+        // surface to talk to outside a deployed UI Bundle. Fall back to
+        // mock data rather than leaving the canvas blank.
         console.warn('Falling back to mock agent data:', err);
         setDataSource('mock');
       });
     return () => {
       cancelled = true;
     };
-  }, [apiName]);
+  }, [apiName, reloadSeq]);
 
   const handleSave = useCallback(() => {
     // A built-in agent is managed by the platform — nothing here is saved
@@ -489,7 +501,7 @@ export default function AgentBuilder() {
               >
                 Agents /
               </button>
-              <span className="truncate text-[14px] font-bold text-foreground">{graph.agent.name}</span>
+              <span className="truncate text-[14px] font-bold text-foreground">{dataSource === 'error' ? apiName : graph.agent.name}</span>
             </div>
             <AgentKindBadge executeType={graph.agent.executeType} />
             <span className="shrink-0 rounded-full bg-[var(--node-blue-tint)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--node-blue)]">
@@ -515,6 +527,11 @@ export default function AgentBuilder() {
                 Mock data
               </span>
             )}
+            {dataSource === 'error' && (
+              <span className="shrink-0 rounded-full bg-[var(--archon-error-tint)] px-2 py-0.5 text-[10px] font-bold text-[var(--archon-error)]">
+                Couldn't load
+              </span>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
             {saveState === 'saving' ? (
@@ -537,7 +554,7 @@ export default function AgentBuilder() {
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={dataSource === 'loading'}
+                disabled={dataSource === 'loading' || dataSource === 'error'}
                 title="Save"
                 aria-label="Save"
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -623,6 +640,19 @@ export default function AgentBuilder() {
         )}
         <div className="relative flex min-h-0 flex-1">
           <div className="min-w-0 flex-1">
+            {dataSource === 'error' ? (
+              <div className="flex h-full w-full items-center justify-center p-8">
+                <div className="max-w-md rounded-lg border border-border bg-card p-5 text-center">
+                  <div className="text-[13px] font-bold text-foreground">Couldn't load this agent</div>
+                  <p className="mt-1.5 text-[12px] text-muted-foreground">{loadError ?? 'Salesforce did not answer in time.'}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Nothing was changed. Try again, or go back to the agent list.</p>
+                  <div className="mt-3 flex justify-center gap-2">
+                    <button type="button" onClick={() => navigate('/')} className="h-8 rounded-md border border-border bg-card px-3 text-[12px] font-semibold text-foreground hover:bg-secondary">Agents</button>
+                    <button type="button" onClick={() => setReloadSeq(s => s + 1)} className="h-8 rounded-md bg-primary px-3 text-[12px] font-semibold text-primary-foreground hover:bg-[var(--primary-hover)]">Try again</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <Canvas
               readOnly={isSystem}
               ready={dataSource !== 'loading'}
@@ -639,6 +669,7 @@ export default function AgentBuilder() {
               onCanvasDoubleClick={handleCanvasDoubleClick}
               onDeleteConnection={handleDeleteConnection}
             />
+            )}
             {!isSystem && (
             <button
               type="button"

@@ -38,6 +38,7 @@ if (!apiName) { console.log('usage: node scripts/node-shot.cjs <agentApiName> "<
   const t1 = Date.now();
   while (Date.now() - t1 < 60_000 && !(await app.locator('#root').count())) await app.waitForTimeout(1000);
   app.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+  app.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   const base = app.url().replace(/[?#].*$/, '').replace(/\/$/, '');
   await app.evaluate(r => { window.history.pushState({}, '', r); window.dispatchEvent(new PopStateEvent('popstate')); }, `${new URL(base).pathname}/agent/${apiName}`);
   await app.waitForTimeout(12_000);

@@ -130,7 +130,10 @@ function fromRaw(raw: RawAgentWithNodes): AgentGraph {
     setupChecklist: parseSetupChecklist(raw.agent.SetupChecklistJson__c),
   };
 
-  return { agent, nodes, connections, system: canvasJson.system ?? null };
+  // The view the builder saved with the graph, when it is a real one.
+  const vp = canvasJson.viewport;
+  const viewport = vp && typeof vp.x === 'number' && typeof vp.y === 'number' && typeof vp.zoom === 'number' && vp.zoom > 0 ? { x: vp.x, y: vp.y, zoom: vp.zoom } : null;
+  return { agent, nodes, connections, system: canvasJson.system ?? null, viewport };
 }
 
 export async function loadAgentGraph(apiName: string): Promise<AgentGraph> {
@@ -172,7 +175,12 @@ export async function saveAgentGraph(graph: AgentGraph): Promise<string> {
       // A built-in's marker travels with its wiring, so a save (the status
       // switch goes through here) never turns a managed agent into an
       // ordinary one.
-      canvasJson: JSON.stringify(graph.system ? { connections: indexedConnections, system: graph.system } : { connections: indexedConnections }),
+      canvasJson: JSON.stringify({
+        connections: indexedConnections,
+        ...(graph.system ? { system: graph.system } : {}),
+        // The pan and zoom the builder left the canvas at, so it opens the same way next time.
+        ...(graph.viewport ? { viewport: graph.viewport } : {}),
+      }),
       setupChecklistJson: JSON.stringify(graph.agent.setupChecklist ?? []),
     },
     nodes: graph.nodes.map(n => ({

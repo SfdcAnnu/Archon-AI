@@ -20,7 +20,7 @@ import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import { loadAgentGraph, saveAgentGraph } from '@/lib/salesforce-data';
 import { updateAgentStatus, updateAgentStreaming } from '@/lib/agents-data';
 import type { DirectoryEntry } from '@/lib/connectors-data';
-import type { AgentGraph, NodeConfig } from '@/types/agent';
+import type { AgentGraph, CanvasViewport, NodeConfig } from '@/types/agent';
 
 interface QuickAddState {
   canvasX: number;
@@ -91,6 +91,13 @@ export default function AgentBuilder() {
       ...g,
       nodes: g.nodes.map(n => (n.id === id ? { ...n, positionX: x, positionY: y } : n)),
     }));
+  }, []);
+
+  // Where the canvas is panned and zoomed travels with the graph: it stays
+  // put while editing and is written with Save, so the agent opens the same
+  // way next time.
+  const handleViewportChange = useCallback((viewport: CanvasViewport) => {
+    setGraph(g => ({ ...g, viewport }));
   }, []);
 
   const handleConnect = useCallback(
@@ -618,6 +625,9 @@ export default function AgentBuilder() {
           <div className="min-w-0 flex-1">
             <Canvas
               readOnly={isSystem}
+              ready={dataSource !== 'loading'}
+              initialViewport={graph.viewport ?? null}
+              onViewportChange={handleViewportChange}
               nodes={graph.nodes}
               connections={graph.connections}
               selectedNodeId={selectedNodeId}

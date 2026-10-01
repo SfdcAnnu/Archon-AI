@@ -159,6 +159,7 @@ export const CASES = [
         // The agent may ask before opening a case; this answers it. If it
         // already opened one, the checks below still hold.
         say: 'Yes, please open a new case for it.',
+        mustNot: [[/(short |brief )?description|describe (the|your) (issue|problem)|summar/i, 'does not ask again for a description it was given']],
       },
       {
         // A description, in case the agent asks for one before creating.
@@ -173,6 +174,7 @@ export const CASES = [
       { say: 'One more thing - my September invoice amount is wrong.' },
       {
         say: 'Yes, open a new case for the invoice please.',
+        mustNot: [[/(short |brief )?description|describe (the|your) (issue|problem)|summar/i, 'does not ask again for a description it was given']],
       },
       {
         say: 'The September invoice shows 52,000 but our contract says 48,000.',

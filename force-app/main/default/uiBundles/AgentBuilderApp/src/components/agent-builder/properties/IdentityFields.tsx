@@ -3,7 +3,7 @@ import { UserRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cachedIdentityPolicy, RUN_AS_LABEL, type IdentityPolicy } from '@/lib/identity-data';
+import { cachedIdentityPolicy, type IdentityPolicy } from '@/lib/identity-data';
 import type { CatalogNodeConfig } from '@/types/agent';
 
 /** The node's identity policy: whose account this connector runs as.
@@ -24,30 +24,12 @@ export function IdentityFields({ cfg, onConfigChange }: { cfg: CatalogNodeConfig
     <div className="space-y-3 rounded-lg border border-border p-3">
       <div className="flex items-center gap-1.5">
         <UserRound className="h-3.5 w-3.5 text-[var(--node-blue)]" />
-        <Label className="text-[11px] font-bold">Runs as</Label>
+        <Label className="text-[11px] font-bold">Options</Label>
+        <span className="text-[10px] text-muted-foreground">— for each user's own account</span>
       </div>
+      {isSalesforce && <p className="text-[10px] leading-snug text-muted-foreground">For Salesforce, automatic sign-in (JWT) spares people a personal connection when it is set up.</p>}
 
-      <div className="space-y-1.5">
-        <Select value={cfg.runAs ?? 'default'} onValueChange={v => onConfigChange({ runAs: v === 'default' ? undefined : (v as CatalogNodeConfig['runAs']) })}>
-          <SelectTrigger className="h-8 w-full text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="default">Org default{org ? ` — ${RUN_AS_LABEL[org.defaultRunAs].toLowerCase()}` : ''}</SelectItem>
-            <SelectItem value="user">Each person — their own account</SelectItem>
-            <SelectItem value="group">A group — the team's shared account</SelectItem>
-            <SelectItem value="org">The org — one shared connection</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          {effectiveRunAs === 'user'
-            ? 'Every tool call carries the person\'s own token: they see and change only what they could by hand, and the audit trail names them.'
-            : effectiveRunAs === 'group'
-              ? 'One account per team, bound to a Permission Set, Public Group or Department. People in the team share it; nobody else can reach it.'
-              : 'Everyone shares the org\'s connection. Fine for read-only lookups; a write is attributed to the integration user.'}
-          {isSalesforce && effectiveRunAs === 'user' && ' For Salesforce, automatic sign-in (JWT) spares people a personal connection when it is set up.'}
-        </p>
-      </div>
-
-      {effectiveRunAs !== 'org' && (
+      {effectiveRunAs !== 'org' && effectiveRunAs !== 'connection' && (
         <>
           <div className="space-y-1.5">
             <Label className="text-[10.5px] font-semibold text-muted-foreground">When the person has no connection</Label>

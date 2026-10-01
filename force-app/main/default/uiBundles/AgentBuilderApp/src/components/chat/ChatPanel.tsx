@@ -1159,7 +1159,7 @@ export function ChatPanel({
 
   // Connectors this person has not connected; the required ones hold the
   // chat, the rest are offered above the composer.
-  const missingConnections = reqs ? reqs.requirements.filter(r => r.runAs !== 'org' && r.status !== 'connected' && r.status !== 'automatic') : [];
+  const missingConnections = reqs ? reqs.requirements.filter(r => r.runAs !== 'org' && r.status !== 'connected' && r.status !== 'automatic' && r.status !== 'pinned') : [];
   const needsConnection = reqs ? !reqs.ready : gate.accessMode === 'PerUser' && !gate.connected;
   const providerNames: Record<string, string> = Object.fromEntries((reqs?.requirements ?? []).map(r => [r.provider, r.displayName]));
   const sendDisabled =

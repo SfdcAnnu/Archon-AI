@@ -95,13 +95,13 @@
 /* the orb head: a faint glow behind the conversation, the greeting over it until the first message */
 .ax-orbhead{position:absolute;inset:0;display:grid;place-items:center;align-content:center;padding:0 16px 300px;text-align:center;pointer-events:none;z-index:0;overflow:hidden}
 .ax-orbhead>*{grid-area:1 / 1}
-.ax-orbhead .ax-orb.xl{opacity:.26}
-.ax-orbhead .ax-greet{margin-top:170px}
+.ax-orbhead .ax-orb.xl{opacity:.55}
+.ax-orbhead .ax-greet{margin-top:250px}
 .ax-greet{position:relative;z-index:1;transition:opacity .3s}
 .ax-greet h1{margin:0;font:600 30px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--foreground);text-wrap:balance}
 .ax-greet p{margin:6px 0 0;color:var(--muted-foreground);font-size:15px;max-width:60ch}
 .ax-conv.talking .ax-greet{display:none}
-.ax-conv.talking .ax-orbhead .ax-orb.xl{opacity:.09}
+.ax-conv.talking .ax-orbhead .ax-orb.xl{opacity:.3}
 /* before the first message the text box joins the centre; afterwards it drops to the foot */
 .ax-conv:not(.talking) .ax-convmain{justify-content:center}
 .ax-conv:not(.talking) .ax-chat{flex:0 0 auto;padding-top:210px;transition:padding .4s}
@@ -207,3 +207,11 @@
 :root:not([data-theme="hud"]) .ax-talk:hover{box-shadow:none;background:color-mix(in srgb,var(--primary) 12%,transparent)}
 :root:not([data-theme="hud"]) .ax-talk .tt b{font-family:var(--font-sans);letter-spacing:0;text-transform:none;font-size:13px}
 :root:not([data-theme="hud"]) .ax-kbd{font-family:var(--font-sans)}
+
+/* The conversation uses the whole width: no centred 900px column. Bubbles keep their own cap. */
+.ax-area[data-layout="full"] .ax-list{max-width:none;padding-left:24px;padding-right:24px}
+.ax-area[data-layout="full"] .ax-composer{max-width:none;padding:8px 24px 0}
+/* Four lines to start with; it still grows to its cap after that. */
+.ax-composer textarea{max-height:220px}
+/* Once the conversation has started the orb is a watermark: dead centre of the pane, not lifted for a greeting that is no longer there. */
+.ax-conv.talking .ax-orbhead{padding-bottom:180px}

@@ -858,16 +858,22 @@ export function ChatPanel({
   /** Reply text as it is written. Appends into one row with a stable id,
    *  the same in-place update the build card has always used. */
   const handleDelta = useCallback((delta: string) => {
-    setMessages(list => {
-      const id = streamRowRef.current;
-      if (id) return list.map(m => (m.id === id ? { ...m, content: m.content + delta } : m));
-      const fresh = `assistant_${Date.now()}`;
-      streamRowRef.current = fresh;
-      return [...list, {
-        id: fresh, role: 'Assistant' as const, content: delta, toolLabel: null,
+    // Which row this delta belongs to is decided NOW, not inside the state
+    // updater. React runs updaters later, at render; the turn result, which
+    // often lands in the same burst as the last delta of a short reply,
+    // clears the ref synchronously in between. An updater that read the ref
+    // then found it empty, opened a second row for the final token and left
+    // a lone "." with a caret under the finished reply.
+    let id = streamRowRef.current;
+    const opening = !id;
+    if (!id) { id = `assistant_${Date.now()}`; streamRowRef.current = id; }
+    const row = id;
+    setMessages(list => (opening
+      ? [...list, {
+        id: row, role: 'Assistant' as const, content: delta, toolLabel: null,
         createdDate: new Date().toISOString(), isStreaming: true,
-      }];
-    });
+      }]
+      : list.map(m => (m.id === row ? { ...m, content: m.content + delta } : m))));
     maybeScrollToBottom();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1931,7 +1937,7 @@ export function ChatPanel({
               onChange={e => { lastInputVoiceRef.current = false; stopSpeaking(); setInput(e.target.value); }}
               onKeyDown={handleKeyDown}
               placeholder={voiceSupported ? 'Type here, or just talk…' : 'Type a message…'}
-              rows={1}
+              rows={isStudio ? 4 : 1}
               className="flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-[12.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
             <Button size="icon" className="h-9 w-9 shrink-0" onClick={handleSend} disabled={sendDisabled} aria-label="Send">

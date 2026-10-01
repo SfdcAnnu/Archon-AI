@@ -6,7 +6,7 @@ import { decideChatApproval } from '@/lib/chat-approvals-data';
 import {
   agentHealth, costByAgent, failedRunsToday, runsByHour, todayEvents, todayTotals, USD_PER_M_IN, USD_PER_M_OUT, type ArchonData,
 } from '@/lib/archon-data';
-import type { UsageReport, UsageRow } from '@/lib/archon-screen';
+import type { ReportedRows, UsageReport, UsageRow } from '@/lib/archon-screen';
 
 /**
  * The shapes an answer can take beside the conversation. Each is a pure
@@ -21,6 +21,9 @@ export interface SurfaceProps {
   /** The usage report for a period: the rows the copilot sent, or the
    *  org's aggregate when the person asked in their own words. */
   report: UsageReport | null;
+  /** The rows the copilot's tool read for a list view: shown first, as
+   *  what Archon reported; the org read fills in around them. */
+  reported: ReportedRows | null;
   onGo: (href: string) => void;
   /** Put words in the person's mouth: sent into the conversation. */
   onAsk: (text: string) => void;
@@ -156,14 +159,15 @@ export function UsageSurface({ report, onGo }: SurfaceProps) {
 }
 
 // ── what failed today ──────────────────────────────────────────────────
-export function FailuresSurface({ data, loading, now, onGo, onAsk }: SurfaceProps) {
-  const failed = useMemo(() => failedRunsToday(data?.runs ?? [], now), [data, now]);
+export function FailuresSurface({ data, loading, now, reported, onGo, onAsk }: SurfaceProps) {
+  const runs = reported?.runs ?? data?.runs ?? [];
+  const failed = useMemo(() => failedRunsToday(runs, now), [runs, now]);
   const turnsFailed = todayTotals(data?.stats ?? null).turnsFailed;
-  if (loading && !data) return <Wait text="Reading today's runs…" />;
+  if (loading && !data && !reported?.runs) return <Wait text="Reading today's runs…" />;
   return (
     <div className="ax-scroll">
       <div className="ax-dcard in">
-        <div className="hd">Failed runs today <span className="m">{failed.length} of the last {data?.runs.length ?? 0} runs read</span><button type="button" className="ax-link" onClick={() => onGo('/executions')}>All runs <ExternalLink /></button></div>
+        <div className="hd">Failed runs today <span className="m">{reported?.runs ? 'the runs Archon reported' : `${failed.length} of the last ${runs.length} runs read`}</span><button type="button" className="ax-link" onClick={() => onGo('/executions')}>All runs <ExternalLink /></button></div>
         {failed.length === 0 ? <div className="ax-empty">No run failed today.</div> : (
           <div className="ax-tablewrap"><table className="ax-table">
             <thead><tr><th>Time</th><th>Agent</th><th>Status</th><th>What the agent said</th><th></th></tr></thead>
@@ -187,13 +191,13 @@ export function FailuresSurface({ data, loading, now, onGo, onAsk }: SurfaceProp
 }
 
 // ── drafts ─────────────────────────────────────────────────────────────
-export function DraftsSurface({ data, loading, onGo, onAsk }: SurfaceProps) {
-  const drafts = (data?.agents ?? []).filter(a => a.status === 'Draft').sort((a, b) => b.lastModifiedDate.localeCompare(a.lastModifiedDate));
-  if (loading && !data) return <Wait text="Reading your agents…" />;
+export function DraftsSurface({ data, loading, reported, onGo, onAsk }: SurfaceProps) {
+  const drafts = (reported?.agents ?? data?.agents ?? []).filter(a => a.status === 'Draft').sort((a, b) => b.lastModifiedDate.localeCompare(a.lastModifiedDate));
+  if (loading && !data && !reported?.agents) return <Wait text="Reading your agents…" />;
   return (
     <div className="ax-scroll">
       <div className="ax-dcard in">
-        <div className="hd">Drafts <span className="m">{drafts.length} not yet active</span><button type="button" className="ax-link" onClick={() => onGo('/')}>All agents <ExternalLink /></button></div>
+        <div className="hd">Drafts <span className="m">{drafts.length} not yet active{reported?.agents ? ' · as Archon reported' : ''}</span><button type="button" className="ax-link" onClick={() => onGo('/')}>All agents <ExternalLink /></button></div>
         {drafts.length === 0 ? <div className="ax-empty">Every agent is active.</div> : (
           <div className="ax-tablewrap"><table className="ax-table">
             <thead><tr><th>Agent</th><th>Type</th><th>Department</th><th>Last change</th><th></th></tr></thead>
@@ -219,11 +223,11 @@ export function DraftsSurface({ data, loading, onGo, onAsk }: SurfaceProps) {
 }
 
 // ── approvals ──────────────────────────────────────────────────────────
-export function ApprovalsSurface({ data, loading, onGo, onRefresh }: SurfaceProps) {
+export function ApprovalsSurface({ data, loading, reported, onGo, onRefresh }: SurfaceProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, 'approved' | 'rejected' | 'failed'>>({});
-  const runs = data?.approvals ?? [];
-  const chats = data?.chatApprovals ?? [];
+  const runs = reported?.approvals ?? data?.approvals ?? [];
+  const chats = reported?.chatApprovals ?? data?.chatApprovals ?? [];
   const decideRun = async (id: string, decision: 'approved' | 'rejected') => {
     setBusy(id);
     try { await decideApproval(id, decision); setDone(d => ({ ...d, [id]: decision })); onRefresh(); }
@@ -236,7 +240,7 @@ export function ApprovalsSurface({ data, loading, onGo, onRefresh }: SurfaceProp
     catch { setDone(d => ({ ...d, [id]: 'failed' })); }
     finally { setBusy(null); }
   };
-  if (loading && !data) return <Wait text="Reading what is waiting…" />;
+  if (loading && !data && !reported) return <Wait text="Reading what is waiting…" />;
   const total = runs.length + chats.length;
   const Acts = ({ id, onDecide }: { id: string; onDecide: (d: 'approved' | 'rejected') => void }) => (
     done[id] ? <span className={`ax-st ${done[id] === 'approved' ? 'ok' : done[id] === 'rejected' ? 'er' : 'wn'}`}>{done[id] === 'failed' ? 'Could not decide' : done[id] === 'approved' ? 'Approved' : 'Rejected'}</span> : (

@@ -12,8 +12,15 @@ const name = process.argv[3] || route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-
 (async () => {
   const { execSync } = require('child_process');
   const minted = JSON.parse(execSync('sf org open --url-only --json', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], shell: 'powershell.exe', cwd: 'C:/Users/Annu/Documents/Sfdx/AIAgentBuilder' }));
+  // THEME=hud|light picks the app theme; WIDTH/HEIGHT the viewport.
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: Number(process.env.WIDTH) || 1440, height: Number(process.env.HEIGHT) || 900 } });
+  if (process.env.THEME) {
+    // The app opens in a popup on its own domain: the script must apply to
+    // every page of the context, not just this first one.
+    const theme = process.env.THEME;
+    await page.context().addInitScript(t => { try { localStorage.setItem('archon:theme', t); } catch { /* fine */ } }, theme);
+  }
   const errors = [];
   page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
   await page.goto(`${minted.result.url}&retURL=${encodeURIComponent('/lightning/page/home')}`, { waitUntil: 'domcontentloaded', timeout: 90_000 });

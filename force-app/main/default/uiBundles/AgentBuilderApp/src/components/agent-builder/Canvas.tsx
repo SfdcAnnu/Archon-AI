@@ -24,7 +24,7 @@ import {
 import { useThemeToken } from '@/lib/theme';
 import { HelpCircle, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
-import type { AgentConnection, AgentNode } from '@/types/agent';
+import type { AgentConnection, AgentNode, CanvasViewport } from '@/types/agent';
 import type { DirectoryEntry } from '@/lib/connectors-data';
 import { AiRootNode } from './nodes/AiRootNode';
 import { SubagentNode } from './nodes/SubagentNode';
@@ -203,6 +203,13 @@ export interface CanvasProps {
    *  selection (to view read-only details in the properties panel) still
    *  works. */
   readOnly?: boolean;
+  /** The real graph has loaded (the placeholder is gone): the one moment
+   *  the canvas sets its view — to `initialViewport` when the graph was
+   *  saved with one, else fitted to the nodes. */
+  ready?: boolean;
+  initialViewport?: CanvasViewport | null;
+  /** Every pan or zoom the person finishes, so the view is saved with the graph. */
+  onViewportChange?: (viewport: CanvasViewport) => void;
 }
 
 export function Canvas({
@@ -217,6 +224,9 @@ export function Canvas({
   onCanvasDoubleClick,
   onDeleteConnection,
   readOnly = false,
+  ready = true,
+  initialViewport = null,
+  onViewportChange,
 }: CanvasProps) {
   // React Flow owns node/edge state internally (useNodesState/useEdgesState)
   // so dragging is smooth — handled entirely inside the library with no
@@ -271,25 +281,25 @@ export function Canvas({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [selectedEdgeId, handleDeleteConnection, readOnly]);
 
-  // The declarative `fitView` prop only ever fires once, on Canvas's very
-  // first mount — which happens with AgentBuilder's MOCK_AGENT_GRAPH
-  // placeholder, before loadAgentGraph's real data arrives. Without this,
-  // the viewport stays fitted to the MOCK graph's node coordinates forever;
-  // once the real graph replaces it, its nodes can land anywhere relative
-  // to that stale viewport, including clipped above the canvas's own
-  // overflow:hidden boundary. Re-fit explicitly whenever the real node set
-  // changes, one frame after the DOM commit so layout has settled first.
-  // maxZoom 1: fitView on a SMALL graph (e.g. a freshly-generated 3-node
-  // agent) otherwise zooms IN until the cluster fills the viewport — up to
-  // the canvas's 1.8x ceiling, which reads as comically magnified. Fitting
-  // may zoom out as far as needed for big graphs, but never past 100% in.
+  // The view is set ONCE, when the real graph is in: restored to the pan
+  // and zoom saved with it, else fitted to the nodes (maxZoom 1, so a
+  // three-node agent is not magnified to the 1.8x ceiling). It used to
+  // re-fit on every change to `nodes` — which includes every drag and every
+  // property edit — so the canvas snapped back to the default view the
+  // moment anything moved. Now wherever the person pans, zooms or drags
+  // stays put until they leave, and Save keeps it for next time.
+  const viewSetRef = useRef(false);
   useEffect(() => {
-    if (!rfInstanceRef.current || nodes.length === 0) return;
+    if (viewSetRef.current || !ready || !rfInstanceRef.current || nodes.length === 0) return;
+    viewSetRef.current = true;
     const raf = requestAnimationFrame(() => {
-      rfInstanceRef.current?.fitView({ padding: 0.25, maxZoom: 1 });
+      const rf = rfInstanceRef.current;
+      if (!rf) return;
+      if (initialViewport) rf.setViewport(initialViewport);
+      else rf.fitView({ padding: 0.25, maxZoom: 1 });
     });
     return () => cancelAnimationFrame(raf);
-  }, [nodes]);
+  }, [nodes, ready, initialViewport]);
 
   // React Flow pushes this through an SVG attribute, which does not reliably
   // read var(); hand it the computed token and re-read when the theme flips.
@@ -366,6 +376,7 @@ export function Canvas({
           setSelectedEdgeId(null);
         }}
         onInit={handleInit}
+        onMoveEnd={(_, viewport) => onViewportChange?.({ x: viewport.x, y: viewport.y, zoom: viewport.zoom })}
         zoomOnDoubleClick={false}
         minZoom={0.3}
         maxZoom={1.8}

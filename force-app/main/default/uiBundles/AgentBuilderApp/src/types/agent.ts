@@ -222,10 +222,20 @@ export interface AgentDefinition {
   setupChecklist: ChecklistItem[];
 }
 
+/** Where the canvas was left: pan and zoom, saved with the graph so the
+ *  agent opens the way its builder last saw it. */
+export interface CanvasViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 export interface AgentGraph {
   agent: AgentDefinition;
   nodes: AgentNode[];
   connections: AgentConnection[];
+  /** The view saved with the graph; null fits the nodes on open. */
+  viewport?: CanvasViewport | null;
   /** Present on an agent the platform ships and manages (the Archon
    *  Copilot): the canvas is read-only and the platform rewrites the nodes
    *  when a newer version ships. Written by the server's sync, never here. */

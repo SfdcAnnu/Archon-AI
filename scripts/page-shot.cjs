@@ -54,6 +54,9 @@ const name = process.argv[3] || route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-
   if (!app.url().endsWith(route)) await app.goto(`${base}${route}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   console.log('route url:', app.url().slice(0, 160));
   await app.waitForTimeout(12_000);
+  // EVAL='<js>' runs in the page before the shot, e.g. to put a screen into
+  // a state that would otherwise need a live turn to reach.
+  if (process.env.EVAL) { await app.evaluate(process.env.EVAL); await app.waitForTimeout(800); }
   await app.screenshot({ path: path.join(OUT, `shot-${name}-1.png`) });
   await app.evaluate(() => { for (const el of document.querySelectorAll('*')) { if (el.scrollHeight > el.clientHeight + 50) el.scrollTop = el.scrollHeight; } });
   await app.waitForTimeout(600);

@@ -325,3 +325,40 @@ div:has(> .home.cc){display:flex;flex-direction:column}
 @media (max-width:760px){
   .cc-fleet{grid-template-columns:1fr}
 }
+
+/* ── Salesforce-light theme: a dashboard, not a console. The HUD keeps its
+   monospace readouts and scanner line; the light theme reads in the app's
+   own sans face, with the same tokens. ── */
+:root:not([data-theme="hud"]) .home .home-eyebrow,
+:root:not([data-theme="hud"]) .home .home-empty,
+:root:not([data-theme="hud"]) .home .home-tile .k,
+:root:not([data-theme="hud"]) .home .home-tile .v,
+:root:not([data-theme="hud"]) .home .home-ag .s,
+:root:not([data-theme="hud"]) .home .home-ag .m,
+:root:not([data-theme="hud"]) .home .home-att .t small,
+:root:not([data-theme="hud"]) .home .home-att .go,
+:root:not([data-theme="hud"]) .home .home-sf-sum b,
+:root:not([data-theme="hud"]) .home .home-sf-sum span,
+:root:not([data-theme="hud"]) .home .home-legend,
+:root:not([data-theme="hud"]) .home .home-bar-row,
+:root:not([data-theme="hud"]) .home .home-picker-list .q,
+:root:not([data-theme="hud"]) .home .cc-big,
+:root:not([data-theme="hud"]) .home .cc-delta,
+:root:not([data-theme="hud"]) .home .cc-sub3 b,
+:root:not([data-theme="hud"]) .home .cc-badge,
+:root:not([data-theme="hud"]) .home .cc-note,
+:root:not([data-theme="hud"]) .home .cc-day small,
+:root:not([data-theme="hud"]) .home .cc-dh .n,
+:root:not([data-theme="hud"]) .home .cc-di i,
+:root:not([data-theme="hud"]) .home .cc-di small,
+:root:not([data-theme="hud"]) .home .cc-empty,
+:root:not([data-theme="hud"]) .home .cc-count,
+:root:not([data-theme="hud"]) .home .cc-ai .ic,
+:root:not([data-theme="hud"]) .home .cc-ag small{font-family:var(--font-sans);letter-spacing:0;text-transform:none}
+:root:not([data-theme="hud"]) .home .home-chart text{font-family:var(--font-sans);font-size:10px}
+:root:not([data-theme="hud"]) .home .cc-big{font-size:28px;letter-spacing:-.02em}
+:root:not([data-theme="hud"]) .home .cc-ag small,
+:root:not([data-theme="hud"]) .home .cc-empty,
+:root:not([data-theme="hud"]) .home .cc-di small{font-size:12px}
+/* The bar sits over the end of a long page; leave room so the last card can scroll clear of it. */
+:root:not([data-theme="hud"]) .home .cc-main{padding-bottom:12px}

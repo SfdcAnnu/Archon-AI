@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { BookOpen, Check, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles, Zap } from 'lucide-react';
+import { BookOpen, Check, LayoutGrid, ListChecks, Loader2, Play, Plus, Save, Share2, Sparkles, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/sonner';
@@ -18,6 +18,7 @@ import type { CopilotOperation } from '@/lib/architect-data';
 import { MOCK_AGENT_GRAPH } from '@/data/mock-agent';
 import { NODE_PALETTE, type PaletteItem } from '@/data/node-catalog';
 import { loadAgentGraph, saveAgentGraph } from '@/lib/salesforce-data';
+import { autoLayout } from '@/lib/auto-layout';
 import { updateAgentStatus, updateAgentStreaming } from '@/lib/agents-data';
 import type { DirectoryEntry } from '@/lib/connectors-data';
 import type { AgentGraph, CanvasViewport, NodeConfig } from '@/types/agent';
@@ -110,6 +111,14 @@ export default function AgentBuilder() {
   // way next time.
   const handleViewportChange = useCallback((viewport: CanvasViewport) => {
     setGraph(g => ({ ...g, viewport }));
+  }, []);
+
+  // Tidy up: lay the nodes out in ranks with nothing overlapping, then fit
+  // the view to the result. Positions only; Save persists them.
+  const [fitSeq, setFitSeq] = useState(0);
+  const handleTidy = useCallback(() => {
+    setGraph(g => ({ ...g, nodes: autoLayout(g) }));
+    setFitSeq(s => s + 1);
   }, []);
 
   const handleConnect = useCallback(
@@ -534,6 +543,17 @@ export default function AgentBuilder() {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
+            {!isSystem && dataSource === 'live' && (
+              <button
+                type="button"
+                onClick={handleTidy}
+                title="Tidy up — lay the nodes out in order with nothing overlapping"
+                aria-label="Tidy up"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+            )}
             {saveState === 'saving' ? (
               <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" /> Saving…
@@ -658,6 +678,7 @@ export default function AgentBuilder() {
               ready={dataSource !== 'loading'}
               initialViewport={graph.viewport ?? null}
               onViewportChange={handleViewportChange}
+              fitSeq={fitSeq}
               nodes={graph.nodes}
               connections={graph.connections}
               selectedNodeId={selectedNodeId}

@@ -47,8 +47,10 @@ mkdirSync(RESULTS, { recursive: true });
 const state = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8')) : { cases: {}, spentUsd: 0 };
 const save = () => writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 const caseState = id => (state.cases[id] ??= {});
+const chatCost = c => (c.chat?.costUsd ?? 0) + (c.previousChats ?? []).reduce((p, x) => p + (x.costUsd ?? 0), 0);
 const spent = () =>
-  Object.values(state.cases).reduce((s, c) => s + (c.build?.costUsd ?? 0) + (c.chat?.costUsd ?? 0) + (c.previousChats ?? []).reduce((p, x) => p + (x.costUsd ?? 0), 0), 0);
+  Object.values(state.cases).reduce((s, c) => s + (c.build?.costUsd ?? 0) + chatCost(c)
+    + (c.previousRuns ?? []).reduce((p, r) => p + (r.build?.costUsd ?? 0) + chatCost(r), 0), 0);
 
 // ── Apex plumbing ────────────────────────────────────────────────────
 function sf(args) {
@@ -158,6 +160,12 @@ System.debug('RES::' + JSON.serialize(new Map<String,Object>{ 'leads' => leads.s
 function startBuilds(ids) {
   for (const c of CASES.filter(c => (ids.length ? ids.includes(c.id) : !caseState(c.id).build))) {
     if (spent() + BUILD_CAP_USD > BUDGET_USD) { console.log(`Budget brake: not starting ${c.id} (spent $${spent().toFixed(3)}).`); break; }
+    // A rebuild keeps the earlier build, its score and its conversations for the before/after report.
+    const prev = caseState(c.id);
+    if (prev.build) {
+      (prev.previousRuns ??= []).push({ build: prev.build, score: prev.score, chat: prev.chat, previousChats: prev.previousChats, activated: prev.activated });
+      delete prev.score; delete prev.chat; delete prev.previousChats; delete prev.activated; delete prev.keyBoundByTest;
+    }
     const body = JSON.stringify({ requirement: c.requirement, maxCostUsd: BUILD_CAP_USD });
     const [r] = apex(`HttpResponse r = ArchonServerClient.callout('POST', '/api/architect/build', ${str(body)}, 60000);
 System.debug('RES::' + JSON.serialize(new Map<String,Object>{ 'code' => r.getStatusCode(), 'body' => r.getBody() }));`, `build-${c.id}`);
@@ -264,6 +272,15 @@ function chat(ids) {
     }
     // A rerun keeps the earlier attempt for the report.
     if (cs.chat) (cs.previousChats ??= []).push({ ...cs.chat, reason: process.env.COMM_TEST_RERUN_REASON ?? 'rerun' });
+    // An agent runs only on the key chosen on its AI node (2b3a694), and the
+    // builder does not choose one. Choose the org's preferred OpenAI key, as
+    // a person would in the builder, and record that the test did it.
+    const [bound] = apex(`AgentDefinition__c a = [SELECT Id FROM AgentDefinition__c WHERE ApiName__c = '${apiName}'];
+List<AgentNode__c> ns = [SELECT Id FROM AgentNode__c WHERE AgentDefinition__c = :a.Id AND NodeType__c IN ('ai','subagent') AND AiEngineConnection__c = null];
+List<AiEngineConnection__c> k = [SELECT Id, Label__c FROM AiEngineConnection__c WHERE IsActive__c = true AND IsPreferred__c = true AND EngineType__c = 'openai' LIMIT 1];
+if (!ns.isEmpty() && !k.isEmpty()) { for (AgentNode__c n : ns) n.AiEngineConnection__c = k[0].Id; update ns; }
+System.debug('RES::' + JSON.serialize(new Map<String,Object>{ 'nodes' => ns.size(), 'key' => k.isEmpty() ? null : k[0].Label__c }));`, 'bindkey');
+    if (bound.nodes > 0) cs.keyBoundByTest = bound.key;
     const [s] = apex(`AgentChatController.SessionWithMessages s = AgentChatController.startFreshSession('${apiName}', null, null);
 System.debug('RES::' + JSON.serialize(new Map<String,Object>{ 'sessionId' => s.session.Id }));`, 'session');
     const run = (cs.chat = { sessionId: s.sessionId, turns: [], costUsd: 0 });
@@ -416,6 +433,21 @@ function report() {
 
 // ── main ─────────────────────────────────────────────────────────────
 const [cmd, ...rest] = process.argv.slice(2);
-const cmds = { seed, cleanup, build: () => startBuilds(rest), poll: pollBuilds, score, chat: () => chat(rest), report };
+// Re-grade stored replies after a pattern fix -- free, no turns re-run.
+function regrade() {
+  for (const c of CASES) {
+    const cs = caseState(c.id);
+    for (const t of cs.chat?.turns ?? []) {
+      const turn = c.turns[t.n - 1];
+      if (!turn || turn.say !== t.say) continue;
+      const kept = (t.checks ?? []).filter(x => x.kind !== 'reply');
+      t.checks = [...checkReply(turn, t.reply ?? ''), ...kept];
+    }
+  }
+  save();
+  console.log('Re-graded stored replies.');
+}
+
+const cmds = { seed, cleanup, regrade, build: () => startBuilds(rest), poll: pollBuilds, score, chat: () => chat(rest), report };
 if (!cmds[cmd]) { console.log('Commands: seed | build [ids] | poll | score | chat [ids] | report | cleanup'); process.exit(1); }
 await cmds[cmd]();

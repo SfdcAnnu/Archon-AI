@@ -469,6 +469,8 @@ export default function KnowledgePage() {
   const [docsLoaded, setDocsLoaded] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [busyDocId, setBusyDocId] = useState<string | null>(null);
+  /** Filter for the knowledge-base list — by agent name or department. */
+  const [agentFilter, setAgentFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
@@ -559,28 +561,53 @@ export default function KnowledgePage() {
           <EmptyPanel>No agents yet — create an agent first, then give it knowledge to search here.</EmptyPanel>
         ) : (
           <div className="grid grid-cols-[220px_1fr] items-start gap-3.5">
-            {/* left: per-agent knowledge bases */}
-            <SpecCard title="Knowledge bases">
-              {agents.map(a => {
-                const count = docsByAgent[a.apiName]?.length;
-                const on = a.apiName === selected;
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => setSelected(a.apiName)}
-                    className={cn(
-                      'block w-full border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-secondary',
-                      on && 'bg-accent shadow-[inset_3px_0_0_var(--primary)]'
-                    )}
-                  >
-                    <div className="truncate text-[12px] font-bold text-foreground">{a.name}</div>
-                    <div className="font-mono text-[10.5px] text-[var(--archon-faint)]">
-                      {!docsLoaded ? '…' : count === 0 ? 'no documents' : `${count} document${count === 1 ? '' : 's'}`}
-                    </div>
-                  </button>
-                );
-              })}
+            {/* left: per-agent knowledge bases — its own scroll, so a long
+                list of agents never stretches the page under the detail */}
+            <SpecCard title="Knowledge bases" className="sticky top-0 flex max-h-[calc(100vh-7rem)] flex-col overflow-hidden">
+              <div className="border-b border-border p-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                  <label htmlFor="kb-agent-search" className="sr-only">Search knowledge bases</label>
+                  <Input
+                    id="kb-agent-search"
+                    type="search"
+                    value={agentFilter}
+                    onChange={e => setAgentFilter(e.target.value)}
+                    placeholder="Search agents"
+                    className="h-7 pl-7 text-[12px]"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {(() => {
+                  const q = agentFilter.trim().toLowerCase();
+                  const shown = q ? agents.filter(a => `${a.name} ${a.department ?? ''}`.toLowerCase().includes(q)) : agents;
+                  if (shown.length === 0) {
+                    return <div className="px-3 py-4 text-[11.5px] text-muted-foreground">No agent matches "{agentFilter}".</div>;
+                  }
+                  return shown.map(a => {
+                    const count = docsByAgent[a.apiName]?.length;
+                    const on = a.apiName === selected;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setSelected(a.apiName)}
+                        className={cn(
+                          'block w-full border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-secondary',
+                          on && 'bg-accent shadow-[inset_3px_0_0_var(--primary)]'
+                        )}
+                      >
+                        <div className="truncate text-[12px] font-bold text-foreground">{a.name}</div>
+                        <div className="font-mono text-[10.5px] text-[var(--archon-faint)]">
+                          {!docsLoaded ? '…' : count === 0 ? 'no documents' : `${count} document${count === 1 ? '' : 's'}`}
+                        </div>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
             </SpecCard>
 
             {/* right: stats · sources · storage · retrieval test */}

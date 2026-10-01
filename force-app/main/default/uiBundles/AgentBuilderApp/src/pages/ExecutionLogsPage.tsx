@@ -30,6 +30,15 @@ function needsConnectionOf(reason: string | null): { provider: string; userId: s
   return m ? { provider: m[1], userId: m[2], text: m[3] || 'The person has no connection for this connector.' } : null;
 }
 
+/** A run's stored payload, pretty-printed when it is JSON; the raw text otherwise. */
+function prettyPayload(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 /** "gmail:send_email@user(Ann Lee)" → tool "gmail:send_email", ran as "user · Ann Lee". */
 function parseToolsUsed(raw: string | null): { tools: string[]; ranAs: string[] } {
   const tools: string[] = [];
@@ -317,7 +326,7 @@ export default function ExecutionLogsPage() {
   return (
     <AppShell title="Runs">
       <PageBody width="wide">
-        <div className="grid items-start gap-3.5 md:grid-cols-[240px_1fr]">
+        <div className="grid items-start gap-3.5 md:grid-cols-[240px_minmax(0,1fr)]">
           {/* ── Left: runs list ─────────────────────────────── */}
           <SpecCard
             title="Runs"
@@ -435,7 +444,7 @@ export default function ExecutionLogsPage() {
               <div />
             )
           ) : (
-            <div className="grid gap-3.5">
+            <div className="grid min-w-0 gap-3.5">
               <div className="grid grid-cols-3 gap-3">
                 <StatCard
                   label="Took"
@@ -660,15 +669,18 @@ export default function ExecutionLogsPage() {
                   return selected.AgentReason__c ? (
                     <div className="border-t border-border px-3.5 py-3">
                       <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Reasoning</div>
-                      <p className="text-[12px] leading-relaxed text-muted-foreground">{selected.AgentReason__c}</p>
+                      <p className="break-words text-[12px] leading-relaxed text-muted-foreground">{selected.AgentReason__c}</p>
                     </div>
                   ) : null;
                 })()}
                 {selected.OutputPayload__c && (
                   <div className="border-t border-border px-3.5 py-3">
                     <div className="mb-1 text-[10.5px] font-semibold text-[var(--archon-faint)]">Output payload</div>
-                    <pre className="max-h-56 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-[10.5px]">
-                      {selected.OutputPayload__c}
+                    {/* Wrapped and pretty-printed: a one-line JSON payload used to
+                        push the whole card past the viewport and drag every value
+                        column off-screen. Its own box scrolls; the page never does. */}
+                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted/50 p-2 font-mono text-[10.5px] leading-relaxed">
+                      {prettyPayload(selected.OutputPayload__c)}
                     </pre>
                   </div>
                 )}

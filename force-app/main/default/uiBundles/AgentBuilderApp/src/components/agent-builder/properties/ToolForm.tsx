@@ -550,7 +550,23 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
         </div>
         <Switch
           checked={cfg?.requiresApproval ?? false}
-          onCheckedChange={v => onConfigChange({ requiresApproval: v })}
+          onCheckedChange={v => onConfigChange({ requiresApproval: v, ...(v ? { runInBackground: false } : {}) })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+        <div>
+          <div className="text-[11px] font-bold text-foreground">Run in the background</div>
+          <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+            The reply does not wait for this tool: the call is queued and runs right after the customer's
+            message goes out, in order. For writes whose result the customer does not need to see —
+            updating the record, creating a Task. Not for reads, and not with approval.
+          </p>
+        </div>
+        <Switch
+          checked={(cfg?.runInBackground ?? false) && !(cfg?.requiresApproval ?? false)}
+          disabled={cfg?.requiresApproval ?? false}
+          onCheckedChange={v => onConfigChange({ runInBackground: v })}
         />
       </div>
     </div>

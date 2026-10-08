@@ -216,11 +216,11 @@ export function CatalogForm({ node, onConfigChange }: CatalogFormProps) {
                     {checked && isWriteTool(t.name) && (
                       <span
                         className="ml-1 flex shrink-0 items-center gap-1 self-center rounded-full border border-border px-1.5 py-0.5 text-[9.5px] font-semibold text-muted-foreground"
-                        title="Run in the background: the reply does not wait for this write; it runs right after, in order. Not for reads or approval-gated tools."
+                        title="Background: the agent replies first and runs this write right after, in order, so the customer never waits for it. If it fails, the next reply says so and a Task is left on the record. Not for reads or approval-gated tools."
                         onClick={e => { e.preventDefault(); e.stopPropagation(); toggleBackground(t.name); }}
                       >
                         <input type="checkbox" readOnly checked={background.includes(t.name)} className="h-3 w-3" tabIndex={-1} />
-                        bg
+                        background
                       </span>
                     )}
                   </label>

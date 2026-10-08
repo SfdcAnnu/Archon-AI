@@ -554,20 +554,30 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
         />
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-        <div>
-          <div className="text-[11px] font-bold text-foreground">Run in the background</div>
+      <div className="flex items-start justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold text-foreground">Background</div>
           <p className="mt-0.5 text-[10.5px] text-muted-foreground">
-            The reply does not wait for this tool: the call is queued and runs right after the customer's
-            message goes out, in order. For writes whose result the customer does not need to see —
-            updating the record, creating a Task. Not for reads, and not with approval.
+            Foreground (off): the agent runs this tool, waits for the result, then replies. Background (on): the
+            agent replies first and runs this tool right after, in the order it was called, so the customer never
+            waits for the write. About two seconds faster per reply on a model that sends text and tool calls together.
           </p>
+          <ul className="mt-1.5 space-y-0.5 text-[10.5px] text-muted-foreground">
+            <li><b className="font-semibold text-foreground">Use it for</b> writes the customer does not need to see finish: updating the record, logging a note, creating a Task or an Event.</li>
+            <li><b className="font-semibold text-foreground">Not for</b> reads, which the reply depends on, or tools that need approval. The first record a conversation creates always runs in the foreground, because later writes need its Id.</li>
+            <li><b className="font-semibold text-foreground">If it fails</b> the next reply tells the customer it did not save, a high-priority Task is left on the record, and a line is added to the conversation. If it is still running when the customer writes again, the agent says it is being processed.</li>
+          </ul>
         </div>
-        <Switch
-          checked={(cfg?.runInBackground ?? false) && !(cfg?.requiresApproval ?? false)}
-          disabled={cfg?.requiresApproval ?? false}
-          onCheckedChange={v => onConfigChange({ runInBackground: v })}
-        />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Switch
+            checked={(cfg?.runInBackground ?? false) && !(cfg?.requiresApproval ?? false)}
+            disabled={cfg?.requiresApproval ?? false}
+            onCheckedChange={v => onConfigChange({ runInBackground: v })}
+          />
+          <span className="text-[9.5px] font-semibold text-muted-foreground">
+            {(cfg?.runInBackground ?? false) && !(cfg?.requiresApproval ?? false) ? 'Background' : 'Foreground'}
+          </span>
+        </div>
       </div>
     </div>
   );

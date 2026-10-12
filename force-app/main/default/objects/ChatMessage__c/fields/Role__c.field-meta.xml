@@ -10,6 +10,7 @@
             <value><fullName>Assistant</fullName><default>false</default></value>
             <value><fullName>Tool</fullName><default>false</default></value>
             <value><fullName>System</fullName><default>false</default></value>
+            <value><fullName>Human</fullName><default>false</default></value>
         </valueSetDefinition>
     </valueSet>
     <required>true</required>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>AuthorUser__c</fullName>
+    <label>Author</label>
+    <description>The person who wrote this message while the conversation was handed off to them (Role = Human).</description>
+    <type>Lookup</type>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>Chat Messages Written</relationshipLabel>
+    <relationshipName>ChatMessagesWritten</relationshipName>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

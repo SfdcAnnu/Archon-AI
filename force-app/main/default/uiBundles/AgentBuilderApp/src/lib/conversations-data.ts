@@ -68,6 +68,14 @@ interface RawChatSession {
   Title__c: string | null;
   Status__c: string;
   'AgentDefinition__r.Name': string;
+  /** A conversation a person took (Status 'Handed off'), and the last return. */
+  HandoffReason__c?: string | null;
+  HandedOffAt__c?: string | null;
+  HandoffReturnAt__c?: string | null;
+  HandoffReturnHours__c?: number | null;
+  HandoffAssigneeType__c?: string | null;
+  HandoffAssigneeLabel__c?: string | null;
+  HandoffReturnNote__c?: string | null;
   TotalTurns__c: number | null;
   TokensIn__c: number | null;
   TokensOut__c: number | null;
@@ -78,7 +86,11 @@ interface RawChatSession {
 
 interface RawChatMessage {
   Id: string;
-  Role__c: 'User' | 'Assistant' | 'Tool' | 'System';
+  Role__c: 'User' | 'Assistant' | 'Tool' | 'System' | 'Human';
+  /** Set on Human rows: the person who replied during a handoff. */
+  AuthorUser__c?: string | null;
+  'AuthorUser__r.Name'?: string | null;
+  AuthorUser__r?: { Name?: string | null } | null;
   Content__c: string | null;
   ToolCallsJson__c: string | null;
   ToolResultsJson__c: string | null;

@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Cloud, GitMerge, PackageCheck, Wrench } from 'lucide-react';
+import { Cloud, GitMerge, PackageCheck, UserRound, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AgentNode, ToolNodeConfig } from '@/types/agent';
 import { HANDLE_BASE, NODE_CARD_BASE, NODE_ICON_SQUARE, accentStyle, selectedRing, typeStripStyle, type NodeAccent } from './node-styles';
@@ -9,6 +9,7 @@ const ACTION_TYPE_META: Record<ToolNodeConfig['actionType'], { accent: NodeAccen
   MCP: { accent: 'blue', icon: Cloud, badge: 'MCP' },
   Apex: { accent: 'amber', icon: Wrench, badge: 'APEX' },
   Flow: { accent: 'green', icon: GitMerge, badge: 'FLOW' },
+  Handoff: { accent: 'purple', icon: UserRound, badge: 'HANDOFF' },
 };
 
 /** One individually-named callable action — a leaf in the graph (no

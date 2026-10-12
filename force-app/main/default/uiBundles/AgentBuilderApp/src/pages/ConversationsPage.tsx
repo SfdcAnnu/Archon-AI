@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, MessageSquare, Settings2, ShieldAlert } from 'lucide-react';
-import { useHref } from 'react-router';
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, MessageSquare, Send, Settings2, ShieldAlert, Undo2, UserRound } from 'lucide-react';
+import { useHref, useSearchParams } from 'react-router';
+import { getHandoffStatus, replyAsHuman, returnToAgent, type HandoffStatus } from '@/lib/handoff-data';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageBody } from '@/components/shell/PageBody';
 import { IconSquare, SpecCard, StatusBadge, T } from '@/components/spec/blocks';
@@ -21,8 +22,109 @@ import { ChatApprovalCard } from '@/components/chat/ChatApprovalCard';
  *  are shown instead), and the same detail transcript as before: tool
  *  bubbles, raw request/response toggles, and chat-approval cards. */
 
-function sessionTone(status: string): 'ok' | 'muted' {
-  return status === 'Active' ? 'ok' : 'muted';
+function sessionTone(status: string): 'ok' | 'muted' | 'warn' {
+  return status === 'Active' ? 'ok' : status === 'Handed off' ? 'warn' : 'muted';
+}
+
+/** A handed-off conversation: who has it, the way back to the agent, and
+ *  the person's reply box when the customer is on WhatsApp. */
+function HandoffBar({ sessionId, onChanged }: { sessionId: string; onChanged: () => void }) {
+  const [st, setSt] = useState<HandoffStatus | null>(null);
+  const [note, setNote] = useState('');
+  const [reply, setReply] = useState('');
+  const [busy, setBusy] = useState<'return' | 'reply' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getHandoffStatus(sessionId).then(s => { if (alive) setSt(s); }).catch(err => { if (alive) setError(err instanceof Error ? err.message : String(err)); });
+    return () => { alive = false; };
+  }, [sessionId]);
+
+  const giveBack = async () => {
+    setBusy('return'); setError(null);
+    try { await returnToAgent(sessionId, note); onChanged(); }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(null); }
+  };
+  const send = async () => {
+    const text = reply.trim();
+    if (!text) return;
+    setBusy('reply'); setError(null);
+    try {
+      const after = await replyAsHuman(sessionId, text);
+      setReply('');
+      if (!after.handedOff) onChanged();   // "/agent" gave it back
+      else { setSt(after); onChanged(); }
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(null); }
+  };
+
+  if (!st) return error ? <p className="text-[12px] text-destructive">{error}</p> : null;
+  if (!st.handedOff) return null;
+  const since = st.handedOffAt ? new Date(st.handedOffAt).toLocaleString() : null;
+  const back = st.returnAt ? new Date(st.returnAt).toLocaleString() : null;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--archon-warning)] bg-[var(--archon-warning-tint)] px-3.5 py-2.5">
+        <UserRound className="h-4 w-4 shrink-0 text-[var(--archon-warning)]" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-semibold text-foreground">
+            {st.assignee ? `${st.assignee} has this conversation.` : 'A person has this conversation.'}
+            {st.reason && <span className="font-normal text-muted-foreground"> Reason: {st.reason}</span>}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            The agent is silent{since ? ` since ${since}` : ''}. It takes the conversation back
+            {back ? ` at ${back} if nobody writes before then` : ` after ${st.quietHours} quiet hours`}, or now with the button.
+          </div>
+        </div>
+        {asking ? (
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <input
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Anything the agent should know? (optional)"
+              className="h-8 min-w-0 flex-1 rounded-md border border-input bg-card px-2.5 text-[12px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-72"
+            />
+            <button type="button" disabled={busy != null} onClick={giveBack} className="h-8 shrink-0 rounded-md bg-primary px-3 text-[12px] font-semibold text-primary-foreground disabled:opacity-50">
+              {busy === 'return' ? 'Returning…' : 'Return now'}
+            </button>
+            <button type="button" onClick={() => setAsking(false)} className="h-8 shrink-0 rounded-md border border-border px-2.5 text-[12px]">Cancel</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setAsking(true)} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-[12px] font-semibold text-primary-foreground">
+            <Undo2 className="h-3.5 w-3.5" /> Return to agent
+          </button>
+        )}
+      </div>
+      {st.canReply && (
+        <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
+          <textarea
+            value={reply}
+            onChange={e => setReply(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
+            rows={2}
+            placeholder="Reply to the customer on WhatsApp as yourself… (type /agent to hand it back)"
+            className="min-h-[52px] flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-[12.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          />
+          <button type="button" disabled={busy != null || !reply.trim()} onClick={send} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground disabled:opacity-50" aria-label="Send">
+            {busy === 'reply' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </button>
+        </div>
+      )}
+      {error && <p className="text-[12px] text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/** The audit a handoff System row carries (ChatSessionHandoffHandler). */
+function handoffKind(toolCallsJson: string | null): 'handoff' | 'handoff_return' | null {
+  if (!toolCallsJson) return null;
+  try {
+    const k = (JSON.parse(toolCallsJson) as { kind?: string }).kind;
+    return k === 'handoff' || k === 'handoff_return' ? k : null;
+  } catch { return null; }
 }
 
 function fmtMs(ms: number): string {
@@ -73,6 +175,20 @@ function Transcript({ detail }: { detail: SessionDetail }) {
     <div className="space-y-3">
       {detail.messages.map(m => {
         if (m.Role__c === 'System') {
+          // A handoff, or the way back: the line the person and the agent both read.
+          const hk = handoffKind(m.ToolCallsJson__c);
+          if (hk) {
+            return (
+              <div key={m.Id} className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                {hk === 'handoff' ? <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--archon-warning)]" /> : <Undo2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--archon-success)]" />}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11.5px] font-semibold text-foreground">{hk === 'handoff' ? 'Handed off to a person' : 'Back with the agent'}</div>
+                  <p className="mt-0.5 whitespace-pre-wrap text-[12px] text-foreground">{m.Content__c}</p>
+                  <p className="mt-0.5 text-[10.5px] text-[var(--archon-faint)]">{new Date(m.CreatedDate).toLocaleString()}</p>
+                </div>
+              </div>
+            );
+          }
           // An approval decision written into the transcript: who, what, when.
           const isAudit = /"approvalId"/.test(m.ToolCallsJson__c ?? '');
           if (!isAudit) return null;
@@ -105,11 +221,12 @@ function Transcript({ detail }: { detail: SessionDetail }) {
         // ModelUsed__c only names whichever one produced the reply.
         const perModel = parseModelUsage(m.UsageJson__c);
         const multiModel = perModel.length > 1;
+        const author = m['AuthorUser__r.Name'] ?? m.AuthorUser__r?.Name ?? null;
         return (
           <div key={m.Id}>
             <div className="flex items-baseline gap-2">
-              <span className="text-[11.5px] font-semibold text-foreground">
-                {m.Role__c === 'User' ? 'User' : 'Assistant'}
+              <span className={cn('text-[11.5px] font-semibold', m.Role__c === 'Human' ? 'text-[var(--node-purple)]' : 'text-foreground')}>
+                {m.Role__c === 'User' ? 'User' : m.Role__c === 'Human' ? `${author ?? 'A colleague'} (person)` : 'Assistant'}
               </span>
               <span className="text-[10.5px] text-[var(--archon-faint)]">
                 {new Date(m.CreatedDate).toLocaleString()}
@@ -173,6 +290,9 @@ export default function ConversationsPage() {
   }, []);
 
   const traceBase = useHref('/trace/');
+  // A notification or email about a handoff links straight to the conversation.
+  const [params] = useSearchParams();
+  const linkedSession = params.get('session');
   const openSession = useCallback((id: string) => {
     setSelectedId(id);
     setDetailLoadState('loading');
@@ -190,6 +310,8 @@ export default function ConversationsPage() {
       .then(setDetailApprovals)
       .catch(() => { /* additive */ });
   }, []);
+
+  useEffect(() => { if (linkedSession) openSession(linkedSession); }, [linkedSession, openSession]);
 
   // Keep the list chip honest as approvals get decided in the open detail.
   useEffect(() => {
@@ -254,7 +376,10 @@ export default function ConversationsPage() {
                   </>
                 }
               >
-                <div className="p-4">
+                <div className="space-y-4 p-4">
+                  {detail.session.Status__c === 'Handed off' && (
+                    <HandoffBar sessionId={detail.session.Id} onChanged={() => openSession(detail.session.Id)} />
+                  )}
                   <Transcript detail={detail} />
                 </div>
               </SpecCard>

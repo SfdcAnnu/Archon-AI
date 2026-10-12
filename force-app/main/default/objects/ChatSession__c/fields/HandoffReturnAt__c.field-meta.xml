@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HandoffReturnAt__c</fullName>
+    <label>Handoff returns at</label>
+    <description>When the conversation goes back to the agent on its own, if nobody writes before then. Cleared when it returns.</description>
+    <type>DateTime</type>
+    <required>false</required>
+</CustomField>

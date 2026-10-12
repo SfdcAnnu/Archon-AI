@@ -20,6 +20,7 @@ import {
 } from '@/lib/connectors-data';
 import type { AgentNode, ToolNodeConfig } from '@/types/agent';
 import { PrebuiltActionForm } from './PrebuiltActionForm';
+import { HandoffForm } from './HandoffForm';
 
 const ACTION_TYPES: Array<{ value: ToolNodeConfig['actionType']; label: string }> = [
   { value: 'Prebuilt', label: 'Salesforce CRM' },
@@ -215,6 +216,10 @@ export function ToolForm({ node, onConfigChange, onAddSiblingTools }: ToolFormPr
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDetail]);
+
+  // A handoff node is its own form: no tool to pick, no approval, no
+  // background — the agent steps aside, a person takes the chat.
+  if (cfg?.actionType === 'Handoff') return <HandoffForm cfg={cfg} onConfigChange={onConfigChange} />;
 
   return (
     <div className="space-y-4">

@@ -264,7 +264,7 @@ public with sharing class AgentChatController {
             FROM ChatSession__c
             WHERE AgentDefinition__c = :agent.Id
               AND SenderPhone__c = :senderPhone
-              AND Status__c = 'Active'
+              AND Status__c IN ('Active', 'Handed off')
               AND ExpiresAt__c > :nowTs
             WITH USER_MODE
             ORDER BY LastActivityAt__c DESC
@@ -283,7 +283,7 @@ public with sharing class AgentChatController {
             FROM ChatSession__c
             WHERE AgentDefinition__c = :agent.Id
               AND RecordContextId__c = :recordContextId
-              AND Status__c = 'Active'
+              AND Status__c IN ('Active', 'Handed off')
               AND ExpiresAt__c > :nowTs
             WITH USER_MODE
             ORDER BY LastActivityAt__c DESC
@@ -767,6 +767,9 @@ public with sharing class AgentChatController {
         ChatSession__c s = rows[0];
         if (s.Status__c == 'Ended')   throw new ChatException('Session has been ended.');
         if (s.Status__c == 'Expired') throw new ChatException('Session has expired. Start a new chat.');
+        if (s.Status__c == AgentHandoffService.STATUS_HANDED_OFF) {
+            throw new ChatException('A person has this conversation right now. It returns to the agent when they hand it back.');
+        }
         if (throwIfExpired && s.ExpiresAt__c != null && s.ExpiresAt__c < System.now()) {
             s.Status__c = 'Expired';
             update s;
@@ -782,7 +785,9 @@ public with sharing class AgentChatController {
                    User__c, RecordContextId__c, RecordContextType__c, SenderPhone__c, Channel__c, Title__c, Status__c,
                    LastActivityAt__c, ExpiresAt__c, Department__c, TotalTurns__c,
                    TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMsTotal__c, UsageByModelJson__c,
-                   PendingApprovalToken__c, ActiveTopic__c
+                   PendingApprovalToken__c, ActiveTopic__c,
+                   HandoffReason__c, HandedOffAt__c, HandoffReturnAt__c, HandoffReturnHours__c,
+                   HandoffAssigneeType__c, HandoffAssigneeLabel__c, HandoffReturnNote__c
             FROM ChatSession__c WHERE Id = :sessionId WITH USER_MODE LIMIT 1
         ];
         if (rows.isEmpty()) throw new ChatException('Session not found.');
@@ -842,7 +847,7 @@ public with sharing class AgentChatController {
         return [
             SELECT Id, Name, Role__c, Content__c, ToolCallsJson__c, ToolResultsJson__c,
                    ModelUsed__c, TokensIn__c, TokensOut__c, CachedTokens__c, LatencyMs__c, UsageJson__c, PhaseMsJson__c,
-                   SequenceNumber__c,
+                   SequenceNumber__c, AuthorUser__c, AuthorUser__r.Name,
                    Sensitive__c, RequiredApproval__c, ApprovedAt__c, ApprovalStatus__c,
                    AttachedContentDocumentIds__c, RequestPayload__c, ResponsePayload__c,
                    Feedback__c, CreatedDate
@@ -899,8 +904,10 @@ public with sharing class AgentChatController {
         // here is already correct without any filtering.
         for (ChatMessage__c m : history) {
             histPayload.add(new Map<String, Object>{
-                'role'            => m.Role__c.toLowerCase(),
-                'content'         => m.Content__c == null ? '' : m.Content__c,
+                // A colleague's reply during a handoff went to the customer,
+                // so the model reads it on the assistant's side, marked.
+                'role'            => m.Role__c == 'Human' ? 'assistant' : m.Role__c.toLowerCase(),
+                'content'         => (m.Role__c == 'Human' ? '[A colleague replied to the customer] ' : '') + (m.Content__c == null ? '' : m.Content__c),
                 'toolCallsJson'   => m.ToolCallsJson__c,
                 'toolResultsJson' => m.ToolResultsJson__c,
                 'toolCallId'      => extractToolCallIdForTool(m)

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HandoffAssigneeType__c</fullName>
+    <label>Handoff assignee type</label>
+    <description>owner, queue, user, group or omni — who the handoff node said takes over.</description>
+    <type>Text</type>
+    <length>40</length>
+    <required>false</required>
+    <unique>false</unique>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>

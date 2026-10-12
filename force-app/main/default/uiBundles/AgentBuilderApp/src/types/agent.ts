@@ -80,9 +80,24 @@ export interface PrebuiltFieldPick {
   picklistValues?: string[];
 }
 
+/** Who takes a conversation the agent hands off (actionType 'Handoff'). */
+export type HandoffWho = 'owner' | 'queue' | 'user' | 'group' | 'omni';
+
 export interface ToolNodeConfig {
   description: string;
-  actionType: 'MCP' | 'Apex' | 'Flow' | 'Prebuilt';
+  actionType: 'MCP' | 'Apex' | 'Flow' | 'Prebuilt' | 'Handoff';
+  /** Hand off to a person (actionType 'Handoff') — read by the server's
+   *  hand_off_to_human tool (server-langchain/src/lc/handoff-tool.ts). */
+  whoTakesOver?: HandoffWho;
+  assigneeId?: string;
+  assigneeLabel?: string;
+  /** Omni-Channel: route the related Lead or Case instead of the conversation. */
+  routeRelated?: boolean;
+  notifyNotification?: boolean;
+  notifyEmail?: boolean;
+  returnAfterHours?: number;
+  customerLineOnHandoff?: string;
+  customerLineOnReturn?: string;
   toolName: string;
   connectorId: string;
   parameterSchema?: Record<string, unknown>;

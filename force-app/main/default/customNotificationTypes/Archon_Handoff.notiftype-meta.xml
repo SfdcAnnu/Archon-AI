@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomNotificationType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customNotifTypeName>Archon_Handoff</customNotifTypeName>
+    <description>An Archon agent handed a conversation to a person, or a customer wrote while a person has it.</description>
+    <desktop>true</desktop>
+    <masterLabel>Archon handoff</masterLabel>
+    <mobile>true</mobile>
+</CustomNotificationType>

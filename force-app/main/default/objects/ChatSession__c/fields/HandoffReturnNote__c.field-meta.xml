@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HandoffReturnNote__c</fullName>
+    <label>Handoff return note</label>
+    <description>What the person wanted the agent to know when they gave the conversation back; the agent reads it on its next turn.</description>
+    <type>TextArea</type>
+    <required>false</required>
+</CustomField>

@@ -135,6 +135,12 @@ public with sharing class WhatsAppAgentBridge {
                 msg.tdc_tsw__Sender_Number__c, 'whatsapp'
             );
             sessionId = session.Id;
+            if (session.Status__c == AgentHandoffService.STATUS_HANDED_OFF) {
+                // A person has this conversation: keep the customer's words,
+                // tell the person, and leave the agent out of it.
+                AgentHandoffService.recordCustomerMessage(session.Id, msg.tdc_tsw__Message_Text_New__c);
+                return;
+            }
         } catch (Exception e) {
             logError('start session', messageId, e);
             sessionId = null; // WhatsAppAgentTurnQueueable falls back to the generic reply when null.

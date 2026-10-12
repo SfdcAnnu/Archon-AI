@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HandoffAssigneeLabel__c</fullName>
+    <label>Handoff assignee</label>
+    <description>The name of who has the conversation, as shown to people and to the agent.</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <unique>false</unique>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>

@@ -689,6 +689,7 @@ Each item names the place in the code. The product requirements (document 02) wi
 2. `GET /api/agent/status/:correlationId` is a stub (routes/agent.routes.ts:120-127).
 3. Automation channel nodes send nothing; `apex_action`, `einstein`, `sentiment` and `embed` steps fail as stubs; the in-process `storage`, `email` and `channels` helpers return `stub: true` (nodes/channel.ts; nodes/action.ts:226-231; nodes/ai.ts:182-201; mcp/servers). Either build them or remove them from the palette.
 4. Closing an Omni-Channel work item does not return the conversation; the `Archon_Conversation` service channel is shipped but nothing in Apex references it.
+21. Nothing creates `AgentApproval__c` rows: the only insert is in a test class. The `approval` node pauses the run and submits a Salesforce approval process, but no row reaches the Approvals page, so a decision depends on the customer's own automation calling `POST /api/agent/runs/resume` (nodes/logic.ts:137-193; routes/runs.routes.ts:119-124; AgentApprovalController.cls:49).
 
 **Security**
 5. `ArchonConfig__mdt.JwtSecret__c` has a committed value in `customMetadata/ArchonConfig.Default.md-meta.xml`, is read by nothing, and should be removed from the repo and the object.

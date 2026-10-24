@@ -31,7 +31,7 @@ What is missing is a way for an admin, not a developer, to describe an assistant
 
 **Six products on one platform**, as the website names them: Agent Builder (describe it, Archon builds it), Customer Chat (WhatsApp and web), Voice (talk to Archon, watch it work), Team Copilot (ask the business a question), Metadata Expert (change Salesforce setup by asking), Connections (the tools the team already uses).
 
-**Three kinds of agent.** Communication agents chat with people. Voice agents talk. Automation agents work in the background on records, as steps with AI judgement where needed and rules everywhere else.
+**Two kinds of agent.** Communication agents chat with people, by text or by voice in the browser. Automation agents work in the background on records, as steps with AI judgement where needed and rules everywhere else. An agent can be set to do both.
 
 **Five principles, all built in today.** Your data stays in Salesforce. Assistants follow your permissions: an agent runs as the person, a team or the org by policy. Important actions need approval, in the chat where the person is. Every conversation is on record. A person can take over any conversation and give it back.
 

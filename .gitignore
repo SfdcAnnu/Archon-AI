@@ -90,3 +90,6 @@ Archon Mobile Demo/
 
 # Marketing website for aeventra.com (own git repo)
 aeventra-website/
+
+# graphify knowledge graph outputs (rebuilt locally by the post-commit hook)
+graphify-out/

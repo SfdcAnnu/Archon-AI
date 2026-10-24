@@ -1,0 +1,5 @@
+# graphify: rebuild the knowledge graph after each commit.
+# husky's core.hooksPath replaces .git/hooks, so forward to the hook that
+# `graphify hook install` writes there. No-op on machines without it.
+h="$(git rev-parse --git-dir)/hooks/post-commit"
+[ -f "$h" ] && sh "$h" || true

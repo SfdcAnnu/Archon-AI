@@ -214,9 +214,11 @@ function Understand({ d, answers, setAnswers, onSend, running, jobId }: { d: Bui
         <span className="hint">{kindChanged ? 'changed — sent with your answers' : 'decided from the requirement; change it if wrong'}</span>
       </div>
       <div className="bw-chips">{r.capabilities.map((c, i) => <span key={i} className="bw-chip">{c}</span>)}{r.riskLevel && <span className={`bw-chip ${r.riskLevel === 'high' ? 'r' : r.riskLevel === 'medium' ? 'a' : 'g'}`}>risk {r.riskLevel}</span>}</div>
+      {(r.decisions?.length ?? 0) > 0 && <div><div className="bw-label">Decided for you, as your architect would. Say in the chat if any is wrong.</div><ul className="bw-ul">{r.decisions!.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+      {qs.length === 0 && <p className="bw-p m">Nothing to ask you: the requirement was clear enough to decide everything.</p>}
       {qs.length > 0 && (
         <>
-          <p className="bw-p m">Things the Architect could not tell from the requirement. Answer here, or tell it to decide.</p>
+          <p className="bw-p m">Only you can answer these, and each one changes the design. Answer here, or tell it to decide.</p>
           {qs.map((q, i) => (
             <div key={i} className="bw-q">
               <div className="qt">{i + 1} · {q}</div>

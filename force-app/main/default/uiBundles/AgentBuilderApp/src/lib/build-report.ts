@@ -67,9 +67,15 @@ export function stageReport(stage: string, d: BuildDetail, view: BuildJobView | 
       const lines = [`**1 · Understood your requirement**`, '', r.goal];
       if (r.capabilities.length) lines.push('', 'The agent needs to:', ...r.capabilities.map(c => `- ${c}`));
       if (r.agentType) lines.push('', `**Type:** ${KIND_LABEL[r.agentType] ?? r.agentType}.`);
+      const ds = r.decisions ?? [];
+      if (ds.length) {
+        lines.push('', '**Decided for you**, as your architect would. Say if any is wrong, otherwise I go on with them:', ...ds.map((x, i) => `${i + 1}. ${x}`));
+      }
       const qs = r.openQuestions ?? [];
       if (qs.length) {
-        lines.push('', '**Assumptions I made** — say if any is wrong, otherwise I go on with them:', ...qs.map((q, i) => `${i + 1}. ${q}`));
+        lines.push('', '**Only you can answer these**; each one changes the design:', ...qs.map((q, i) => `${i + 1}. ${q}`));
+      } else {
+        lines.push('', 'Nothing to ask you: the requirement was clear enough to decide everything.');
       }
       if (r.clarifications?.length) lines.push('', '**Your answers, now part of the requirement:**', ...r.clarifications.map(c => `- ${c}`));
       return lines.join('\n');

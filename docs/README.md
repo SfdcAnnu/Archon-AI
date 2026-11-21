@@ -10,6 +10,7 @@ The enterprise document chain for Archon, written from the code and the decision
 | 03 | [Data dictionary](03-data-dictionary.md) | Draft 0.1, field tables generated from the metadata | Every Salesforce object and Postgres table, who writes and reads each, JSON shapes, caches, classification and retention |
 | 04 | [Test strategy](04-test-strategy.md) | Draft 0.1 | Six test levels with today's counts, coverage by area, thin spots, policies, a test per requirement, the release gate |
 | 05 | [Deployment and operations runbook](05-deployment-and-operations-runbook.md) | Draft 0.1 | Systems, releasing, rollback, configuration, onboarding an org, secrets, monitoring, incident playbooks |
+| 06 | [Product strategy and simplification plan](06-product-strategy.md) | Draft 0.1, 21 Nov 2026, for the sponsor's decision | What the demos said, what the measurements say, where Archon wins, the positioning, three tracks with targets, the re-sequenced release, the decisions |
 
 Regenerating the field tables in 03: the generator and page builder live in the authoring session's tool folder (`gen-fields.py`, `splice.py`, `build-doc.cjs`); they read `force-app/main/default/objects` and `server-langchain/prisma/schema.prisma`. Rerun them after a schema change and replace the tables.
 
